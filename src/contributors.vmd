@@ -1,0 +1,31 @@
+---
+title: Contributors
+subtitle: A finer band of miscreants you never will see!
+path: contributors
+layout: onecolumn
+---
+
+
+*Evan Ovadia* (aka Verdagon)
+
+Language designer, Valestrom and Midas implementor, mad scientist. Good at memory acrobatics, not so good at writing articles!
+
+
+*Theo Watkins*
+
+Hybrid-generational memory explorer, static analysis architect.
+
+
+*John D. Goodwin*
+
+Co-conspirator and catalyst. Check out his language, [Cone](https://cone.jondgoodwin.com/)!
+
+
+*Eske Hansen* (aka Veim)
+
+ValeJS architect, parsing trailblazer. Likes naming things and writing generators!
+
+
+*Kevin Navero* (aka Solstice333)
+
+Slayer of mountains, lord of the boundaries! Creator of our entire contributing, testing, and release pipelines!
