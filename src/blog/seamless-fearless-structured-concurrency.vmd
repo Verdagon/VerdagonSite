@@ -3,7 +3,7 @@ title: Seamless, Fearless, and Structured Concurrency
 author: Evan Ovadia
 date: Jan 8, 2022
 realm: blog
-path: blog/fearless-structured-concurrency
+path: blog/seamless-fearless-structured-concurrency
 layout: annotated
 namespace: c-blog m-annotated
 ---
