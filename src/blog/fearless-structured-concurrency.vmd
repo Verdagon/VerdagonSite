@@ -495,7 +495,7 @@ Key takeaways:
 <slice>
 #whatsvale: [Vale](https://vale.dev/) is a language we're making to explore techniques for easy, fast, and safe code.
 
-We actually discovered this "seamless, fearless, structured concurrency" while playing around with Vale's [region borrow checker](https://verdagon.dev/blog/zero-cost-refs-regions), which blends mutable aliasing with Rust's borrow checker.
+We actually discovered this "seamless, fearless, structured concurrency" while playing around with Vale's [region borrow checker](https://vale.dev/blog/zero-cost-refs-regions), which blends mutable aliasing with Rust's borrow checker.
 
 #executor: The `parallel` block has a default executor, but can be overloaded with `parallel(num_threads)` or `parallel(an_executor)`.
 
@@ -574,15 +574,15 @@ As we saw, we can combine...
 And in Part 2, we'll enable fearlessly sharing mutable data too. Stay tuned!
 
 
-Thanks for reading! And if you enjoy these articles, or want to support our work on Vale, please consider [sponsoring us on GitHub!](https://github.com/sponsors/ValeLang)
+Thanks for reading! And if you enjoy these articles, or want to support our work on Vale, you're welcome to [sponsor us on GitHub!](https://github.com/sponsors/ValeLang)
 
 
 
 <slice new-color="afterword"/>
 
-# Are Vale Regions like Rust Lifetimes?
+## Afterword: Vale Regions and Rust Lifetimes
 
-The `'r` does seem to hint that! Let's take another look:
+The `'r` seems to hint that they're similar! Let's take another look:
 
 ```
 fn blur(input 'r &Array<Array<int>>, x int, y int) int {
@@ -596,7 +596,7 @@ There are some similarities:
 
  * We can't e.g. make an object in `'r` point into an object in `'b`. The type system keeps them separate.
     * ...unless we use them in generic parameters, like `'r MyStruct<'b>`.
- * An reference to an object in region `'r` can't outlive region `'r`'s scope.
+ * A reference to an object in region `'r` can't outlive region `'r`'s scope.
  * Vale names this a "region borrow checker", similar to Rust's "borrow checker".
 
 
@@ -614,7 +614,7 @@ The compiler enforces that nobody changes objects in immutable regions by:
 
 Perhaps the biggest difference is that regions are *optional:*
 
- * One can write an entire Vale program with no regions; Vale gets its memory safety from [Generational References](https://vale.dev/blog/generational-references), and soon possibly [Hybrid-Generational Memory](https://vale.dev/blog/hybrid-generational-memory).
+ * One can write an entire Vale program with no regions; Vale gets its memory safety from [Generational References](https://vale.dev/blog/generational-references) (and soon possibly [Hybrid-Generational Memory](https://vale.dev/blog/hybrid-generational-memory)).
  * The user doesn't need to know about any of this; if they ignore regions altogether the program's behavior will still make sense and be predictable.
 
 
