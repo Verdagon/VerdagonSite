@@ -42,10 +42,10 @@ if [ $MODE == "build" ] ; then
   fi
 fi
 
-if [ $TARGET == "fearless-structured-concurrency" ] || [ $TARGET == "all" ] ; then
-  echo "Doing fearless-structured-concurrency"
-  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --stdlib_dir $STDLIB/src --out public/blog/fearless-structured-concurrency src/blog/fearless-structured-concurrency.vmd
-  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --stdlib_dir $STDLIB/src --out public/blog/fearless-structured-concurrency src/blog/fearless-structured-concurrency.vmd
+if [ $TARGET == "seamless-fearless-structured-concurrency" ] || [ $TARGET == "all" ] ; then
+  echo "Doing seamless-fearless-structured-concurrency"
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --stdlib_dir $STDLIB/src --out public/blog/seamless-fearless-structured-concurrency src/blog/seamless-fearless-structured-concurrency.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --stdlib_dir $STDLIB/src --out public/blog/seamless-fearless-structured-concurrency src/blog/seamless-fearless-structured-concurrency.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
