@@ -275,7 +275,7 @@ We usually need proper fear, respect, and discipline to stick to these rules. Bu
 
 
 <slice>
-#tasks: I include this \[and tasks\] because concurrency can illustrate data races too. Python uses concurrency (not parallelism) and can have data races, such as in [this example](https://gist.github.com/Verdagon/ef69b4c5e54a683ecd6a8afb715c3a80).
+#tasks: I include this "\[and tasks\]" because concurrency can have data races too. Python uses concurrency (not parallelism) and can have data races, such as in [this example](https://gist.github.com/Verdagon/ef69b4c5e54a683ecd6a8afb715c3a80).
 </slice>
 
 
