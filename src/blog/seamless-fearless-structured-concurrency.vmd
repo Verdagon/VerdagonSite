@@ -584,6 +584,7 @@ Thanks for reading! And if you enjoy these articles, or want to support our work
 
 The `'r` seems to hint that they're similar! Let's take another look:
 
+
 ```
 fn blur(input 'r &Array<Array<int>>, x int, y int) int {
   ... // Loop over the 3x3 ints around x,y in input and return the average
@@ -594,8 +595,7 @@ fn blur(input 'r &Array<Array<int>>, x int, y int) int {
 
 There are some similarities:
 
- * We can't e.g. make an object in `'r` point into an object in `'b`. The type system keeps them separate.
-    * ...unless we use them in generic parameters, like `'r MyStruct<'b>`.
+ * We can't mix up objects' regions; we can't use an object in `'r` where we expect an object in another region (e.g. `'b`), the compiler keeps them separate. [# Though, we can have structs in one temporary region pointing into structs in another region, like `'r MyStruct<'b>`.]
  * A reference to an object in region `'r` can't outlive region `'r`'s scope.
  * Vale names this a "region borrow checker", similar to Rust's "borrow checker".
 
@@ -603,20 +603,28 @@ There are some similarities:
 The biggest difference is that Vale lifts mutability to the region level:
 
  * In Rust, references are either immutable (`&`) or mutable (`&mut`) borrows. In Vale, there is only `&`.
- * Instead, Vale's _regions_ are inherently mutable or immutable. We see them as read-only (`'a`) or read-write (`'a!` or unnamed).
+ * Instead, Vale's _regions_ are inherently mutable or immutable. We see them as read-only (`'r`) or read-write (`'r!` or unnamed).
 
 
 The compiler enforces that nobody changes objects in immutable regions by:
 
- * Only giving references to receivers who see the region as read-only.
+ * Only giving those references to receivers who see the region as read-only.
  * Not allowing any changes to any object in a region we see as read-only.
 
 
-Perhaps the biggest difference is that regions are *optional:*
+Perhaps the biggest difference is that Vale has no aliasing restrictions.
 
- * One can write an entire Vale program with no regions; Vale gets its memory safety from [Generational References](https://vale.dev/blog/generational-references) (and soon possibly [Hybrid-Generational Memory](https://vale.dev/blog/hybrid-generational-memory)).
- * The user doesn't need to know about any of this; if they ignore regions altogether the program's behavior will still make sense and be predictable.
+ * In Rust, we can't have a mutable reference and an immutable reference to the same object.
+ * In Vale, there's only one kind of reference (`&`), and we can also have a read-only region and read-write region point at the same underlying region. [# A function that accepts a read-only region will actually be generated twice: once with and once without the assumption that the read-only region is immutable and can therefore take advantage of the immutability optimizations.]
+
+
+Because of these design decisions, Vale's regions are largely "opt-in":
+
+ * One can write an entire Vale program, without ever adding a region annotation or knowing about regions at all. [# This is because Vale gets its memory safety from [Generational References](https://vale.dev/blog/generational-references), and soon possibly [Hybrid-Generational Memory](https://vale.dev/blog/hybrid-generational-memory)].
+ * A new user can look at an existing program, ignore all region annotations, `parallel`, and `pure`, and the program will still make sense. All of these features are designed to improve a program's performance without affecting its semantics.
+
+
+We hope that these things will give Vale a gradual learning curve, and make life easy for newcomers.
 
 
 This is a pretty high-level overview of the differences, feel free to swing by our [discord](https://discord.gg/SNB8yGH) and we'd be happy to explain it!
-
