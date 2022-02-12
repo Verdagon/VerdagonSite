@@ -1,0 +1,47 @@
+---
+title: Comparing HGM and Traditional Reference Counting
+author: Evan Ovadia
+date: Jan 20, 2022
+realm: blog
+path: blog/comparing-hgm-traditional-reference-counting
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+> Can you explain the advantage of tethering over traditional reference counting? It would seem like RC counts can be elided in similar circumstances, if you can track the lifetime/identity of the referring object - I guess the primary difference is that tethering forces you to bind the object to a statically-known (stack-based) lifetime
+
+
+There are some similarities:
+
+ * When we make a new local pointing to an object:
+    * RC will increment the target's RC
+    * HGM will:
+       * Compare the generations.
+       * If generations don't match, panic (or produce NULL).
+       * Save the object's old isScopeTethered bit (in a hidden local var on stack).
+       * Write 1 to the object's isScopeTethered bit.
+ * When that local goes out of scope:
+    * RC will:
+       * Decrement the target's RC
+       * Compare target's RC to zero.
+       * If RC is zero, call the object's destructor.
+    * HGM will restore the object's old isScopeTethered bit.
+
+
+But there are several big advantages to HGM, all which come from this one fact: in HGM (and regular generational memory too), the compiler *determines exactly where we deallocate an object, so we can reuse its memory when we want.*
+
+
+This benefit manifests in various ways:
+
+ * We can put objects on the stack, because we can destroy them when the function call ends.
+ * We can embed objects in other objects, because we can destroy them when we need to swap them out for other contents there.
+ * We can embed objects in an array (rather than the Java-style array-of-references).
+ * We can embed objects into slabs of memory for custom allocators, because we know we can destroy them when we destroy the allocator.
+
+
+All of this is good because we can make our programs cache-friendly by controlling our objects' memory layout, which is often the bottleneck for modern programs.
+
+
+There's another benefit regarding arrays: we decided that when an array is tethered, we cannot add or remove elements (`.push()` and `.pop()` will assert there's no scope tether). This means that, while we have a scope tether to an array, our static analysis can know that its elements will remain alive, which means we can eliminate more generation checks.
+

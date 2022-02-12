@@ -173,6 +173,9 @@ OpenMP is a really amazing tool for C structured concurrency because it's *seaml
  * It's easy; if we want to write a parallel loop, we don't have to refactor our callers or rearchitect our program to enable it. We just start building!
 
 
+In other words, seamless concurrency is *the ability to read existing data concurrently without refactoring existing code.*
+
+
 This seamlessness is important because it saves us time, and we can more easily experiment with adding concurrency to more places in our program.
 
 
@@ -331,7 +334,7 @@ And because Rust's has async lambdas, it can also sometimes [#sometimes] do stru
 use async_scoped::*;
 
 #[async_std::main]
-async fn main() {
+async func main() {
     Scope::scope_and_block(|s| {
         for _ in 0..5 {
             s.spawn((|| async {
@@ -390,14 +393,14 @@ for (int i = 0; i < 5; i++) {
 But [Vale](https://vale.dev/) has a `foreach` loop that can accumulate each iteration's result, and produce an array: [#whatsvale]
 
 
-```
-fn main() export {
+```vale
+exported func main() {
   exponent = 3;
 
   results =
-    foreach i in 0..5 {
-      = pow(i, exponent); «blockresult1»
-    }
+    foreach i in range(0, 5) {
+      pow(i, exponent) «blockresult1»
+    };
 
   println(results);
 }
@@ -407,18 +410,19 @@ fn main() export {
 
 There! The loop doesn't modify anything created outside the block.
 
+
 We can now add a theoretical `parallel` keyword. [# To reiterate, this feature is theoretical, and we're still adding it to Vale. Stay tuned!]
 
 
 
-```
-fn main() export {
+```vale
+exported func main() {
   exponent = 3;
 
   results =
-    parallel foreach i in 0..5 {
-      = pow(i, exponent); «blockresult2»
-    }
+    parallel foreach i in range(0, 5) {
+      pow(i, exponent)
+    };
 
   println(results);
 }
@@ -442,16 +446,18 @@ We are now thread-safe!
 And just because we can, let's modify something created _inside_ the block:
 
 
-```
-fn main() export {
+```vale
+exported func main() {
   exponent = 3;
 
   results =
-    parallel foreach i in 0..5 {
+    parallel foreach i in range(0, 5) {
       a = pow(i, exponent);
       set a = a + 4; «set» // We can modify!
-      = a; «blockresult3»
-    }
+      a
+    };
+
+  println(results);
 }
 ```
 
@@ -460,23 +466,25 @@ fn main() export {
 You can see how the compiler can enforce that we only modify things that came from inside the block.
 
 
-If we call a function, it needs to know what it can modify and what it can't. For that, we use `'r`. Note how in this snippet, `blur`'s first parameter's type is `'r &Array<Array<int>>`. [# This is similar to Rust's lifetimes, more on that in the afterword.]
+If we call a function, it needs to know what it can modify and what it can't. For that, we use `'r`. Note how in this snippet, `blur`'s first parameter's type is `'r &[][]int`. [# This is similar to Rust's lifetimes, more on that in the afterword.]
 
 
-```
-fn main() export {
+```vale
+exported func main() {
   // Makes a 2D array of ints
-  input = Array(10, x => Array(10, y => x * 10 + y));
+  input = [](10, x => [](10, y => x * 10 + y));
 
   results =
-    parallel foreach 0..10 as x {
-      = parallel foreach 0..10 as y {
-          = blur(input, x, y);
-        }
-    }
+    parallel foreach x in range(0, 10) {
+      parallel foreach y in range(0, 10) {
+        blur(input, x, y)
+      }
+    };
+
+  println(results);
 }
 
-fn blur(input 'r &Array<Array<int>>, x int, y int) int {
+func blur(input 'r &[][]int, x int, y int) int {
   ... // Loop over the 3x3 ints around x,y in input and return the average
 }
 ```
@@ -499,11 +507,7 @@ We actually discovered this "seamless, fearless, structured concurrency" while p
 
 #executor: The `parallel` block has a default executor, but can be overloaded with `parallel(num_threads)` or `parallel(an_executor)`.
 
-#blockresult1: The `=` here means this line produces the block's result.
-
-#blockresult2: The `=` here means this line produces the block's result.
-
-#blockresult3: The `=` here means this line produces the block's result.
+#blockresult1: The lack of a `;` here means this line produces the block's result, similar to Scala and Rust.
 
 #set: `set a = a + 4;` is like `a = a + 4;` in C.
 
@@ -522,7 +526,7 @@ When we have a reference to an object in a read-only region, we:
  * Can pass it to a function, if the function sees the region as read-only.
 
 
-We're using `'r` to specify that a reference is in a read-only region. For example, an `'r &Array<int>` is an non-owning reference to an array of integers inside a read-only region.
+We're using `'r` to specify that a reference is in a read-only region. For example, an `'r &[]int` is an non-owning reference to an array of integers inside a read-only region.
 
 
 
@@ -585,8 +589,8 @@ Thanks for reading! And if you enjoy these articles, or want to support our work
 The `'r` seems to hint that they're similar! Let's take another look:
 
 
-```
-fn blur(input 'r &Array<Array<int>>, x int, y int) int {
+```vale
+func blur(input 'r &[][]int, x int, y int) int {
   ... // Loop over the 3x3 ints around x,y in input and return the average
 }
 ```

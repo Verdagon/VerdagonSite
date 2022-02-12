@@ -1,0 +1,58 @@
+---
+title: Single Ownership Can Be Easy
+subtitle: And why we love it!
+realm: blog
+path: blog/speed-1-single-ownership
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+This page talks about the first ingredient to Vale's speed: *single ownership.*
+
+Single ownership is when we *keep track of who is responsible for destroying an object.*
+
+
+reference SOFCP
+
+
+## In Vale
+
+
+Before we explain its superpower, lets see some other languages that use it!
+
+
+## Rust and C++
+
+explain how they work
+
+c++ has use-after-free, which is a particular risk with single ownership
+
+rust has the borrow checker, which is restrictive, cant use the observer pattern
+
+but in vale, we're making it much easier. we hope to show the world that single ownership can be safe, effective, and easy!
+
+
+## The Secret Power: Enforcing Later Actions
+
+and show threads, and some other example that doesnt work with defer
+
+removeObserver, keeps us from forgetting
+
+the path example, keeps us from using a path twice, guarantee uniqueness. it even returns something!
+
+
+
+## Rust and C++ have crippled destructors
+
+
+
+## GC'd languages would want it
+
+show removeObserver(this)
+
+
+## Single Ownership is Better than Defer
+
+Defer cant do any of that!
+

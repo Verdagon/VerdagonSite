@@ -1,0 +1,34 @@
+---
+title: Isolates
+subtitle: Part 3 of the Memory Safety Grimoire
+realm: grimoire
+path: grimoire/isolates
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+Colin Gordon published a paper named [Uniqueness and Reference Immutability for Safe Parallelism](https://www.cs.drexel.edu/~csgordon/assets/pdf/papers/msr-tr-2012-79.pdf).
+
+> An externally-unique aggregate is a cluster of objects that freely reference each other, but for which only one external reference into the aggregate exists.
+
+We call this an "isolate".
+
+Isolates have a fascinating property: they can temporarily become deeply immutable, which means:
+
+ * It can be safely shared with multiple threads in structured concurrency.
+ * We can use hierarchy borrowing on anything inside:
+    * We can skip all reference counting overhead
+    * We can skip almost all generational memory overhead
+
+When mutable, we can know that we can only access these objects from one thread, which means that any reference counting is nonatomic.
+
+There is a challenge with isolates: we can't let a reference escape. There are a few things that might help with this:
+
+ * A reference that we get from an isolate can only be passed to "isolated" functions; ones that return an isolate, so we know a reference does not escape.
+ * Use a borrow checker to track that no references escape.
+ * Use a region borrow checker to track that no references escape.
+
+
+It's like a zero cost version of rust's ref cell.
+ 

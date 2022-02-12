@@ -1,0 +1,18 @@
+---
+title: Single Ownership Can Be Easy
+subtitle: And why we love it!
+realm: blog
+path: blog/speed-1-single-ownership
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+
+## It makes our code way faster than GC/RC
+
+talk about how it enables inline data, on stack, in arrays, in structs.
+
+talk about how its so fast.
+
+talk about the cache

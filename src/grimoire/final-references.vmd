@@ -1,0 +1,13 @@
+---
+title: Final References
+subtitle: Part Five of the Memory Safety Grimoire
+realm: grimoire
+path: grimoire/final-references
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+When combined with reference counting or constraint references, final references enables hierarchy borrowing.
+
+Careful when using it with inline data, because a final reference field inside a varying struct field is not really final.
+

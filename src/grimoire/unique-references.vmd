@@ -1,0 +1,13 @@
+---
+title: Unique References
+subtitle: Part Six of the Memory Safety Grimoire
+realm: grimoire
+path: grimoire/unique-references
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+Unique references help us get inline data.
+
+They also help with thread isolation.
+

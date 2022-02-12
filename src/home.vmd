@@ -1,66 +1,91 @@
 ---
 path: 
 layout: onecolumn
-namespace: home
-realm: home
+namespace: c-blog
+realm: blog
 path: home
 ---
 
+Welcome! I'm Evan Ovadia, a software architect, language designer, and hobbyist game developer.
 
-# Vale is the fast, fearless, and flexible programming language.
+I use this site to blog about my endeavors. Enjoy!
+
 
 
 <<<<
 
+# Recent posts:
 
-Vale's goal is to show the world that speed and safety can be easy. Vale is:
-
- * *Fast:* Vale is an AOT compiled language that uses an entirely new approach to memory management: [generational references](/blog/generational-references), which have zero aliasing costs and no garbage collection pauses.
- * *Fearless:* It is the [safest native language](/blog/fearless): zero `unsafe`, region isolation, extern boundaries, and dependency extern whitelisting.
- * *Flexible:* Its new take on [regions](/guide/regions) enables alternate memory management and allocation strategies, with the [region borrow checker](/blog/zero-cost-refs-regions) enabling seamless, fast, and _easy_ interop between them.
-
-
-Read comparisons with [C++, Javascript, and Rust](/blog/comparisons)!
+ * [Seamless, Fearless, Structured Concurrency](/blog/seamless-fearless-structured-concurrency)
+ * [Generational References](/blog/generational-references)
+ * [Hybrid-Generational Memory](/blog/hybrid-generational-memory)
+ * [Zero Cost References with Regions](/blog/zero-cost-refs-regions)
+ * [Next Steps for Single Ownership and RAII](/blog/raii-next-steps)
+ * [Announcing Vale!](https://www.reddit.com/r/ProgrammingLanguages/comments/hplj2i/vale/)
 
 
-*Featuring*:
 
- * [Statically Typed](/guide/introduction) with type inference.
- * [Ownership](/guide/references), move semantics, and deterministic destruction.
- * [Memory Safe](/guide/references#nonowning), using constraint and weak references.
- * [Regions](/guide/regions) for different allocation strategies.
- * [Inline References](/guide/references#inline) for optimization.
- * [Generics](/guide/generics), including virtual generics.
- * [Interface Constructors](/guide/interfaces#sealedconstructors)
- * [Universal Function Call Syntax](/guide/introduction#functions)
- * [Mutable and Immutable Objects](/guide/structs#mutability)
- * [Patterns](/guide/patterns): Destructuring, Parameters, Extractors
+# Software Engineering
+
+I've worked on [Google Earth](https://earth.google.com/web), [Google Chat](https://chat.google.com/), and [Google MyMaps](https://mymaps.google.com).
+
+
+#### Google Earth
+
+I worked on [Earth](https://earth.google.com/web) from 2016 to 2019. I was all up and down the stack, but spent most of my time in the C++ core, making the program correctly handle state transitions and synchronizing state with the server.
+
+<img src="https://i.imgur.com/0qYHnky.jpg" width="100%"/>
+
+Earth was a fascinating program. It had so many moving parts with asynchronous operations, and we had to bring all of our architectural jujitsu to keep it all stable. I'm particularly proud of the unidirectional data-flow, built-in self-testing, and state management systems.
+
+
+#### Google Chat
+
+From 2019 to 2021, I was on the [Google Chat](https://chat.google.com/) team, diving deep into their server and client-side codebases to diagnose architectural problems and identify the sources of common bugs, and redesigning their core Message object to be more reliable in the face of a rapidly evolving feature set.
+
+<img src="https://i.imgur.com/0aweUuT.jpg" width="100%"/>
+
+Chat was one helluva challenge. My favorite memory was when the director told me "We have a lot of problems with our message object. I need you to figure out what's causing them and fix them," which led to a months-long odyssey of archaeology and traveling to distant locales to talk to mystics present and past to figure out _what the heck_ caused the codebase to get in its current state. That quest spawned 5 massive re-architecting projects.
+
+
+#### Google MyMaps
+
+I was on the [MyMaps](https://mymaps.google.com) team from 2014 to 2016, on the web client team, mostly revamping the site to use Material design. Along the way, I redesigned their panel state system, which would later inform the designs for Earth's state system.
+
+<img src="https://www.google.com/maps/about/images/mymaps/mymaps-desktop-16x9.png" width="100%"/>
+
+Make maps!
+
+
+#### Present Day
+
+I left Google in late 2021, to become a digital nomad and spend more time with Vale and game dev for a while.
+
+At some point, I might jump back into the workforce. If you know an endeavor that could use my blend of software architecture, reliability, and state management prowess, let me know!
+
+[2022 Resume](https://verdagon.dev/EvanOvadia2022Resume812.pdf)
+
 
 
 ////
 
-*Recent posts:*
+# Vale
 
- * [Generational References](/blog/generational-references) (Jan 2)
- * [Hybrid-Generational Memory](/blog/hybrid-generational-memory) (Jan 2)
- * [Zero Cost References with Regions](/blog/zero-cost-refs-regions) (Jul 29 2020)
- * [Next Steps for Single Ownership and RAII](/blog/raii-next-steps) (Jul 15 2020)
- * [Announcing Vale!](https://www.reddit.com/r/ProgrammingLanguages/comments/hplj2i/vale/) (Jul 11 2020)
+My biggest endeavor is Vale, a statically-typed ahead-of-time-compiled language that aims to be fast, safe, and flexible.
 
+I'm combining the best parts of C++, Rust, and Scala (and even a tiny bit of Javascript!) with some novel innovations:
 
-```vale
-fn main() export {
-  println("Hello world!");
-}
-```stdout
-Hello world!
-```: `import stdlib.*;`
+ * Generational Memory, an alternative to RC, GC, or borrow checking.
+ * HGM, speeding up Generational Memory with "LifeCell"s.
+ * Region Borrow Checking, which allows us to temporarily treat all pre-existing memory as immutable, enabling optimizations and seamless structured concurrency.
+
+Check it out at [https://vale.dev/](https://vale.dev/)!
 
 
 ```vale
-fn main() export {
+exported func main() {
   planets = []["Venus", "Earth", "Mars"];
-  each planets (planet){
+  foreach planet in planets {
     println("Hello " + planet + "!");
   }
 }
@@ -71,10 +96,37 @@ Hello Mars!
 ```: `import stdlib.*;`
 
 
-Vale is at version 0.1, see the [Roadmap](/roadmap) for what's next!
 
-Vale is [open for contributions](/contribute), thank you to our team of [contributors](/contributors)!
+# Game Dev
 
+I also do game development on the side, primarily for the [7DRL](https://itch.io/jam/7drl-challenge-2022) challenges!
+
+
+#### Shattered Forest (2021)
+
+<img src="https://img.itch.zone/aW1hZ2UvOTU3ODk0LzU0NTUyNzMucG5n/original/mtHkHu.png" width="100%"/>
+
+[Shattered Forest](https://verdagon.itch.io/shattered-forest) was a grand experiment in _how insane_ we could make terrain. Its levels had paths that criss-crossed over each other, as the player could hop a few tiles away, as long as the source and destination had the same elevation.
+
+
+#### Ember Deep (2020)
+
+<img src="https://img.itch.zone/aW1hZ2UvNTg0MDA3LzMwODYzMDAucG5n/original/vaHNB5.png" width="100%"/>
+
+[Ember Deep](https://verdagon.itch.io/ember-deep) was the first game to use Geomancer, the pentagonal tiling editor.
+
+It also improved a lot on Incendian Falls' time-traveling mechanic.
+
+
+#### Incendian Falls (2019)
+
+<img src="https://img.itch.zone/aW1hZ2UvMzc5NzU1LzE5MTk2NjkucG5n/original/tevxMt.png" width="100%"/>
+
+[Incendian Falls](https://verdagon.itch.io/incendian-falls) was the first prototype of the Chronobase time-travel system. It used a DSL to define an entire database and API that allows reverting to arbitrary revisions, with built-in pauseless compaction.
+
+I gave a talk at the [2019 Roguelike Celebration](https://www.youtube.com/watch?v=Xwa1KbXqeGQ) conference about Domino, the unique art style.
+
+It was also the first game to ever use pentagonal tiling. Pretty trippy, right?
 
 >>>>
 

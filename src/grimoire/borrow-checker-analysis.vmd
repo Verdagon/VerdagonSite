@@ -1,0 +1,261 @@
+
+
+
+goal: rust aint perfect, we can't improve until we know what the drawbacks are.
+
+
+the borrow checker doesnt let you ____
+you must escape it, with rc or unsafe
+
+
+the problem with rust is that it draws lines that are arbitrary in the big scheme of things. theres no way to know when youre wrong, or you need to work around the borrow checker.
+
+
+
+if you return a borrow reference that points into a parameter, youll likely need to copy data out of it.
+
+
+if you have a vec you can remove things from, youll run into fragmentation there, kind of. sparse stuff. iterating doesnt work as cleanly then.
+maybe rule of thumb: if its removable, use the heap?
+
+
+
+# Can't Do Various Patterns
+
+We need work arounds like unsafe or RefCell.
+
+Careful about adding either; unsafe kills determinism, RefCell kills pure structured concurrency.
+
+75% of rust programs have unsafe or unsafe dependencies: https://2020.icse-conferences.org/details/icse-2020-papers/68/Is-Rust-Used-Safely-by-Software-Developers-
+
+the safest language is javascript
+
+also, rusts rc isnt as fast as built in rc
+
+- observers. "harmful", nonsense. an index is just a n.o.ref. why add an intermediary? why not two? also, if you push two things to the event queue, and change the world with the first one, the second one might be acting on out of date information. "event queues are good is full of misdirection". why not have two intermediaries? and youre not getting rid of any state, its just now somewhere very far away. we've turned a local complexity into a global one.
+
+- dependency injection. cant do it.
+
+- doubly linked lists, trees w backrefs, graphs. these are pretty common. observers, dependency injection, etc
+
+- RAII is crippled. in c++, we have non-owning refs inside objects so RAII can do its thing. but rust cant have those nor destructor parameters.
+- for example, we cant unregister a struct that's listening to messages from a central router
+- idiomatic rust cant have raii without unsafe
+
+most important feature in c++: destructors!
+https://youtu.be/ltCgzYcpFUI?t=950
+
+
+"this is how you should have been writing c++" is nonsense. we can have multiple mutable references in the same thread very easily.
+(perhaps even show them an example that would go well with region borrow checking?)
+
+
+# Ergonomics
+
+- most of our refs cant be derefd now lol
+
+
+# Polymorphism
+
+Imagine having a hierarchy of components. To mock one of them, we have to have a generic parameter. If we have six such mockable components, we will need six generic parameters.
+
+
+# Centralization
+
+We have to put a bunch stuff in a bunch of central arrays. tbf, this is probably more a problem with single ownership.
+
+
+# Bounds Checking
+
+When a bunch of stuff is in central arrays, accessing them will always incur a bounds check. If we have a generational arena, we will need both a bounds check and a generation check.
+
+Or worse if we are referring to things by ids we would have to do a hash and perhaps a modulus.
+
+https://ceronman.com/2021/07/22/my-experience-crafting-an-interpreter-with-rust/
+
+"Using vector indices is slower than a regular pointer dereference. An arithmetic operation is needed to get the address of the element, but more importantly, Rust will always check if the index is out of bounds."
+
+
+
+# Shared Mutability Isn't Unsafe
+
+borrow checker is aliasability xor mutability
+
+an even more permissive model would be: aliasability xor deletion
+like constraint refs
+
+even more permissive: aliasability xor type changing, allowed to replace a variant with one of same type
+like type stability
+
+even more permissive: aliasability xor shape changing, allowed to replace a variant with one of equal shape
+like shape stability
+
+
+## You Cant Escape Shared Mutability Anyway
+
+Indexes!
+
+This thread is full of talking about it: https://www.reddit.com/r/rust/comments/9fqget/jonathan_blow_entity_systems_and_the_rust_borrow/
+
+
+# Bad for Prototyping
+
+Bad for prototyping:
+
+ * https://news.ycombinator.com/item?id=26419670
+ * https://www.reddit.com/r/rust/comments/iwij5i/blog_post_why_not_rust/g627nwx/ (and refactoring)
+ * Distracted by details:
+    * https://news.ycombinator.com/item?id=23744577
+    * As the compiler will stop you from borrow checking or something unsafe again and again, you are being distracted constantly by focusing on the language itself instead of the problem you are solving. - https://blogs.dust3d.org/2019/03/13/why-i-rewrote-the-mesh-generator-of-dust3d-from-rust-to-cplusplus/
+
+
+# Bad Architecture
+
+- encapsulation, everything is virally accessible
+- our APIs become brittle, because need more.
+- we centralize. if A needs a non-owning ref to B, rust in practice must have a Vec somewhere they can both reach. usually high up.
+
+
+
+# Ossified Architecture
+
+Once youre done prototyping, it's difficult to change.
+
+https://www.reddit.com/r/rust/comments/iwij5i/blog_post_why_not_rust/g62ytxa/?utm_source=share&utm_medium=web2x&context=3
+
+https://news.ycombinator.com/item?id=27458058
+
+https://news.ycombinator.com/item?id=27249237
+
+"In general I find refactoring to be a far more excruciating process in Rust than in other languages. It is also far more satisfying." - https://kevinhoffman.medium.com/to-box-or-not-to-box-my-first-real-rust-refactor-db467119c4c7
+
+"Refactoring is a massive pain" - https://lobste.rs/s/jgcvev/why_not_rust
+
+
+"One of three things in my experience:
+1) Refactor into an unrecognizable mess
+2) Add a lot of RwLock or RefCell
+3) Abandon the project in rust
+...
+The issue is that to maintain the same interface, it gets to be so hacky that maintence becomes borderline impossible"
+- https://discord.com/channels/273534239310479360/818964227783262209/917808318184054784
+
+"Changing it is a nightmare" - https://lobste.rs/s/x22ulj/why_developers_who_use_rust_love_it_so_much#c_yd7dmv
+
+Heard this from a guy I interviewed too.
+
+- our architectures ossify, needing more refactors but being harder to refactor
+
+
+# Difficult to Learn
+
+https://news.ycombinator.com/item?id=27959122
+
+https://news.ycombinator.com/item?id=26794281
+
+No gradual complexity:
+
+ * https://www.reddit.com/r/rust/comments/i9sor7/frustrated_its_not_you_its_rust/g1ilbv0/
+ * I totally agree. One of the issues is that there are so many complex and novel topics that you will run into in your first week of working on a real project, and you have to wrap your head around all of them to some degree to be able to progress. If there is an obvious and clear progression path, I did not discover it. - https://news.ycombinator.com/item?id=26794916
+
+"Yeah, I could have tried restructuring my code to try to avoid compiler issues. But this would have been even more time spent working around issues with Rust. Go was better than Rust by pretty much every metric that mattered for me, so I went with Go instead." https://news.ycombinator.com/item?id=22336284
+
+
+this leads to convenient and frustrating ignoring:
+"But I can't get past the "Don't look behind the curtain -- oh wait, all the ugly stuff is on this side of the curtain. Umm. Don't look at the ugly stuff, just pretend it isn't there," tone that rust tutorials lead with. (also Haskell)"
+https://www.reddit.com/r/rust/comments/i9sor7/comment/g1ilbv0/?utm_source=reddit&utm_medium=web2x&context=3
+
+
+It's like a puzzle:
+
+ * https://news.ycombinator.com/item?id=26938245
+ * https://zserge.com/posts/better-c-benchmark/
+
+
+That dopamine hit!
+
+like heroin: https://news.ycombinator.com/item?id=25799704
+
+" I think it brings out the OCD in all of us, because we're apt to believe that the 'hard correctness' is somehow a thing of value. We climbed the mountain and believe that's what 'makes it better' but it may very well be irrelevant. As you say, Java is so often actually 'better' in the big picture." - page 2 of https://news.ycombinator.com/item?id=25799704
+
+Rust is a language of "in theory, yes, but not in practice"
+
+ * There actually is run-time overhead
+ * We dont solve NPEs, not really. our non owning refs still might panic on use-after-free. if theyre indices into an array, indexing panics. if we do check, we'll likely expect or unwrap. if not, we likely throw an unrecoverable error. these are references that we expect to exist. one way or another, we'll be checking and likely halting for them.
+ * doesnt actually get rid of shared mutability. theres inherent shared mutability, hence IDs.
+ * there's inherent state. we sometimes illusion it away like FP by doing transforms. rust and FP both vilify shared mutability, not realizing theyre mimicking it
+
+
+it doesnt get rid of all bugs. after all, haskell has an even better type system, is even more safe, and still has lots of bugs.
+no, it gets rid of *some* of your bugs.
+in practice, maybe 1/10 of our bugs reported by QA had some use-after-free. valgrind rocks. so we're taking on these *massive* costs to cut our reported bugs by... 11%.
+"but dont you risk all sorts of bad stuff!!" bad stuff is: security, privacy, UX. neither security nor privacy are saved by rust, because rust doesnt force you away from indices. the only true solution here is gc, rc, vale, or outlawing indices/IDs. rust has not solved this. tbh this is why i like that servers use java. and UX isnt harmful, the other 9/10 of our bugs are like that anyway.
+
+
+Whats rust good for?
+
+ * AAA real-time games that are designed once and thrown away, and veterans have a better idea for next game
+    * except, we dont really care about safety that much?
+
+ * distributed online services? no, vales bump allocators will be better. also, those tend to be a little more IO bound right? would suggest GC would work well for them.
+
+ * web assembly? rust is TERRIBLE for apps. maybe the occasional heavy number crunchy stuff?
+
+
+bad for?
+
+ * servers in general
+ * turn based games
+
+
+State and dependencies should be private in a class, and model should be separated from functionality.
+
+
+misc:
+
+- they dont make memory safety problems go away completely, they turn them into logic bugs, such as the indexing privacy problem
+
+lots of half-truths and false hype.
+
+seems like we spend a lot of time thinking about how to get around rust's restrictions rather than thinking about what we're actually trying to do
+
+
+theyre very defensive and aggressive about being the one true way. every criticism starts with "i love rust, but"
+- https://www.reddit.com/r/rust/comments/2og8xf/why_rust_started_rather_than_ada/
+
+
+separation of data and functionality is a lie. whether we have all our model+state in a giant World object, or have it as a hierarchy of objects, is literally the same thing. literally no difference.
+
+they will both want private data to keep implementation details away, so we can change them later. we also need private data to maintain invariants.
+
+
+"enum/match run-time dispatch"
+
+shared mutability always has a cost. in Yew, they had to have an entire message-passing framework to get around this.
+shared mutability is inherent, and it has a cost. the only question is where you pay it.
+
+
+
+in rust, if you wrap stuff in a giant World object, and you need to mutate part of it, suddenly you cant hand it around in an imm reference, you need to hand individual parts, because youre mutably borrowing this part.
+so, youre forced to separate your data, such that your mutable borrows will block access to as few other things as possible. this often leads to a lot of parallel arrays at the top.
+if you really want to pass the world, you will need to take in a mutable reference to the world, and a bunch of IDs of what youre operating on. youll need to do a lot of lookups. this is why we handed generational indices down so far.
+See:
+- MoveUnitDesire::enact
+- AttackUnitDesire::enact
+- FireTileComponent::on_turn
+
+
+
+the culture:
+need better phrase than "hostile kindness"
+as soon as you point out that rust's teachings might be wrong, they turn pretty vicious. dont challenge their teachings.
+
+
+
+if you use Rc/RefCell, you get around AxM, but you *also* lose single ownership! uh oh
+
+
+negative about rust: https://news.ycombinator.com/item?id=29606523
+
+
+

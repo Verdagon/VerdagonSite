@@ -1,0 +1,76 @@
+---
+title: Single Ownership, From a C Perspective
+subtitle: And why we love it!
+realm: blog
+path: blog/speed-1-single-ownership
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+## What is Single Ownership? From a C Perspective
+
+In C, when we call `malloc`, we mentally keep track of who is responsible for freeing it.
+
+Of course, sometimes we forget to track it, and cause a memory leak:
+
+```c
+void main() {
+  char* myBuffer = GetRealPath("./myfile.txt");
+
+  // prints: /Users/Valerian/Bogglewoggle/myfile.txt
+  printf("Real path: %s\n", myBuffer);
+
+  // uh oh, we forgot to free(myBuffer)!
+}
+```
+
+
+It would be nice if the compiler could enforce this!
+
+We can imagine a variant of C with these rules:
+
+ * Anything that comes from `malloc` must be put in a variable ending in `_owning`.
+ * We can't let an `_owning` variable go out of scope, we *must* give it to `free`.
+ * We can't use that variable after that.
+
+
+```c
+void main() {
+  char* myBuffer_owning = GetRealPath("./myfile.txt");
+
+  // prints: /Users/Valerian/Bogglewoggle/myfile.txt
+  printf("Real path: %s\n", myBuffer_owning);
+
+  // Take out this line for a compiler error!
+  free(myBuffer_owning)!
+
+  // Can't do this, myBuffer_owning was already freed:
+  // printf("Freed: %s\n", myBuffer_owning);
+}
+```
+
+
+Now, our compiler is *tracking who is responsible for freeing the buffer*. We could also add move semantics [#movesemantics] to transfer this responsibility to someone else.
+
+
+One last improvement: instead of using a suffix like `char* myBuffer_owning`, perhaps we use a symbol, like: `char! myBuffer`.
+
+When you look at it that way, it's kind of like `char`, `char!`, and `char*` are all different types:
+
+ * `char` is an *inline* value; it's on the stack, or inside the containing struct or array.
+ * `char!` is an *owning pointer* to something in the heap.
+ * `char*` is a *non-owning pointer*.
+
+
+As you can see, the compiler could help us remember who should call `free`.
+
+<slice>
+#movesemantics: "Move semantics" means that instead of giving the buffer to `free`, we can transfer it to another `_owning` local:
+
+ * We can assign it to another `_owning` local.
+ * We can pass it to a different function, which receives it into an `_owning` parameter.
+ * We return it. Callers must receive it into an `_owning` local.
+
+And of course, the compiler would prevent us from using the original `_owning` reference.
+</slice>
+

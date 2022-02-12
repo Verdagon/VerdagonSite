@@ -1,0 +1,130 @@
+---
+title: The Memory Safety Grimoire
+subtitle: Components and Spells for Making Memory Safe Languages
+realm: grimoire
+path: grimoire/grimoire
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+In 2017, [a new pyramid was uncovered at the Dahshur Necropolis](https://www.smithsonianmag.com/smart-news/new-pyramid-discovered-egypt-180962813/), which contains some of Egypt's most ancient pyramids. Langdon Roberts, a world-renowned [Computational Egyptologist](https://escholarship.org/uc/item/0fk4n4gv), was able to decipher the hieroglyphs: they described how ancient egyptians made memory safe programs, using *techniques we've never seen before!*
+
+
+Previously, we only knew of the "Usual Three" ways for a language to have memory safety:
+
+ * Garbage collection [# By "garbage collection", we're referring to tracing garbage collection.]
+ * Reference counting
+ * Borrow checking
+
+
+And new languages had to weigh their benefits and drawbacks respectively:
+
+ * Easy to use, has high throughput, but uses more memory and has nondeterministic pauses.
+ * Easy to implement, uses less memory, but is slow and can leak. [# With good use of weak references, one can avoid the leaks.]
+ * Faster, but is more difficult and can't do basic patterns like [observers](https://en.wikipedia.org/wiki/Observer_pattern). [# There are some unidiomatic ways around this limitation, such as `Rc` and `unsafe`.]
+
+
+But no longer! With this tome of secrets, our secret *memory safety grimoire,* a daring new language can *design their own memory model!*
+
+
+# Memory Safety: Scratching the Surface
+
+"That's impossible!" one might say, "memory safety is already a solved problem!"
+
+
+We used to think so too, until we excavated some hieroglyphs that show us: The Usual Three are all just part of a *larger puzzle with many pieces missing*.
+
+
+Over the last few years, a [cabal of languages](https://reddit.com/r/ProgrammingLanguages) have deciphered and explored this surprising array of tools for making new memory models.
+
+For example:
+
+ * Type stability, which has all the benefits of the borrow checker without its restrictions, in exchange for more memory.
+ * Compile time reference counting, which blends reference counting and borrow checking.
+ * Generational memory, which lets u embed objects inside other objects and alias references for free.
+ * Scope tethering, which help enable borrow references.
+ * Region borrow checking, which enables pure structured concurrency.
+
+
+
+# Beholding the Grimoire
+
+The first few finished translations are here, and we expect to post a new one every two weeks. It's hard to predict, but we expect upwards of 30 entries.
+
+
+*Beware:* We don't know which of these techniques actually help memory safety, and which summon ancient demons. Proceed at your own risk!
+
+
+ * [Generational Memory](/grimoire/generational-memory.vmd)
+ * [Type Stability](/grimoire/type-stability.vmd)
+ * [Isolates](/grimoire/isolates.vmd)
+ * [Constraint References](/grimoire/constraint-references.vmd)
+ * [Final References](/grima/final-references)
+ * [Inline Data](/grimoire/inline-data.vmd)
+ * [Unique References](/grimoire/unique-references.vmd)
+ * Change Detectors
+ * Check-on-set
+ * Thread Isolation
+ * Hardened Boundaries
+ * Runtime Checking Purity
+ * Extending Lifetime
+ * Asserting Lifetime
+ * Containing Lifetime
+ * Shape Stability
+ * Deep Copying
+ * Allocators
+ * Page Headers
+ * Freeze References
+ * Top-Byte-Ignore, Memory Tagging
+ * Aspect Tracking
+ * Generational Index
+ * Region Borrow Checking
+ * Pure Functions
+ * Hierarchy Borrowing
+ * Basil Stacks
+ * Immutability
+ * Borrow Checking
+ * Scope Tethering
+ * Undead Cycle
+ * Single Ownership
+ * Temporary Copies of Immutable Data
+ * Virtual Memory
+ * Stack Scanning
+ * Reserved Memory
+ * Remembering Scope in Object
+ * Reference Smuggling (a.k.a. Fat Pointers)
+ * Pointer Smuggling (Using pointers' unused bits)
+ * Address Smuggling (Specifying address middle bits)
+
+
+If you know of any more memory safety techniques, or want to see in-progress decipherings, then come to the #grimoire channel in the [Vale discord](https://discord.com/invite/SNB8yGH)!
+
+
+# Using the Grimoire
+
+To design a memory model, it one must start with a foundation. So far we've identified seven techniques which can be used as foundations:
+
+ * Garbage collection (e.g. Java)
+ * Reference counting (e.g. Swift)
+ * Borrow checking (e.g. Rust)
+ * Generational memory (e.g. Vale)
+ * Memory tagging (unknown)
+ * Type stability (unknown)
+ * Basil stacks (unknown)
+
+
+After that, one would try to add other techniques from the grimoire.
+
+
+Careful, as some techniques do not mix well! For example, inline memory can conflict with final references in some case, and requires extra measures such as unique references to resolve the conflict. One must tread carefully!
+
+
+# Afterword
+
+From Langdon Roberts' journal:
+
+> We are only halfway through our deciphering, but we can already see that the ancient Egyptians did things _very_ differently from us. It's as if they went down a completely different path.
+
+> It says here that they can fit an infinitely large reference counter into just one bit. They can see when an object is dead, without keeping it allocated. They can stop time, freeze the world, and explore it at their leisure, without incurring the normal run-time costs. How is any of this possible?
+
+> My friends, we all thought we had solved memory safety. I'm starting to think... that we haven't even scratched the surface.

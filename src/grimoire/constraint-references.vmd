@@ -1,0 +1,24 @@
+---
+title: Constraint References
+subtitle: Part Four of the Memory Safety Grimoire
+realm: grimoire
+path: grimoire/constraint-references
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+Adam Dingle and David F. Bacon published a paper named [Ownership You Can Count On:
+A Hybrid Approach to Safe Explicit Memory Management](https://researcher.watson.ibm.com/researcher/files/us-bacon/Dingle07Ownership.pdf).
+
+In it they discuss a type of optionally runtime-checked single ownership.
+
+The type system will make sure that each object has exactly one owning reference. When that owning reference goes out of scope, we *assert that it is the last reference to the object* and then free the object.
+
+This allows mutable aliasing.
+
+This can be disabled for maximum speed.
+
+This allows hierarchy borrowing.
+
+This was also described in [The Next Steps for Single Ownership and RAII](https://vale.dev/blog/raii-next-steps) and [Friendship Ended With the Garbage Collector](https://yorickpeterse.com/articles/friendship-ended-with-the-garbage-collector/).

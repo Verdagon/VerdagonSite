@@ -1,0 +1,61 @@
+---
+title: Inline Data
+subtitle: Part Six of the Memory Safety Grimoire
+realm: grimoire
+path: grimoire/inline-data
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+Inline data is super fast.
+
+When data is inline, it is much more cache-friendly.
+
+It's generally difficult to have inline data.
+
+# The Usual Approaches
+
+One way to have it is to have a borrow checker.
+
+An other ways to use unique references, like C#. Well technically C# uses copy semantics but they're kind of the same thing.
+
+If you cant take references to it directly, you can access its members, like golang.
+
+You can use inheritance, like Java or Swift.
+
+All these are structs, but I could see C#, java, and swift using final sealed interfaces
+
+
+# Inline Structs
+
+Reference counting needs one adjustment: Instead of being just an object pointer, every reference will also need an offset or a pointer to where the counter lives. [# There is a way to encode that offset into the object pointer itself, with the right pentagrams and spell components.]
+
+ * Inline struct members work nicely.
+ * Array element structs can work nicely. It's just as if we are copying each member respectively.
+
+
+Constraint references can do that too, but could instead have a counter at the top of every inline object.
+
+
+Generational memory can do the same thing.
+
+
+# Inline Unions
+
+Borrow checking, constraint references, and generational memory, can all handle this just fine.
+
+In type stability and reference counting, union fields and elements need to be unique.
+
+
+# Summary
+
+All of them handle inline structs pretty easily.
+
+Any of them could use unique references / copy semantics to handle inline unions.
+
+Some approaches can do more interesting things to handle inline unions:
+
+ * Borrow checker and constraint references work by making sure no references to the inline union outlive it.
+ * Generational references work by making sure the thing is still there when we want to de reference it.
+
+
