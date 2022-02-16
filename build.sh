@@ -168,6 +168,7 @@ if [ $MODE == "build" ] ; then
   cp src/*.css public
   cp src/components/*.css public/components
   cp src/EvanOvadia2022Resume812.pdf public/EvanOvadia2022Resume812.pdf
+  cp src/EvanOvadiaResume2022Dev.pdf public/EvanOvadiaResume2022Dev.pdf
   cp src/components/*.js public/components
   cp src/components/*.png public/components
   cp src/images/* public/images

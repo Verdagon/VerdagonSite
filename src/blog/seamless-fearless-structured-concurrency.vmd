@@ -1,7 +1,7 @@
 ---
 title: Seamless, Fearless, and Structured Concurrency
 author: Evan Ovadia
-date: Jan 8, 2022
+date: Feb 15, 2022
 realm: blog
 path: blog/seamless-fearless-structured-concurrency
 layout: annotated
@@ -265,7 +265,7 @@ The problem is that they didn't see each others add operations; they're both add
 If instead the 4th thread's store happened before the 5th thread's load, we'd have gotten the correct answer 5.
 
 
-This is a *data race* bug. They are _very_ difficult to detect, because they depend on the scheduling of the threads.
+This is a *data race* bug. They are _very_ difficult to detect, because they depend on the scheduling of the threads, which is effectively random.
 
 Luckily, we've figured out how to avoid these problems, with some "concurrency ground rules":
 
@@ -334,7 +334,7 @@ And because Rust's has async lambdas, it can also sometimes [#sometimes] do stru
 use async_scoped::*;
 
 #[async_std::main]
-async func main() {
+async fn main() {
     Scope::scope_and_block(|s| {
         for _ in 0..5 {
             s.spawn((|| async {
