@@ -148,7 +148,7 @@ int main() {
 
 
 
-This is *structured concurrency*. It runs our iterations in parallel!
+This is *structured concurrency*. It runs our iterations in parallel, and makes sure the parallel iterations are complete before continuing on.
 
 
 Nathaniel Smith makes a great case that we should use structured concurrency rather than directly using thread APIs such as `pthread_create`, `go`, `asyncio.create_task`, etc. [# See [Notes on structured concurrency, or: Go statement considered harmful](https://vorpus.org/blog/notes-on-structured-concurrency-or-go-statement-considered-harmful/).] Structured concurrency isn't a silver bullet, of course, but it's definitely a big step forward.
@@ -578,7 +578,7 @@ As we saw, we can combine...
 And in Part 2, we'll enable fearlessly sharing mutable data too. Stay tuned!
 
 
-Thanks for reading! And if you enjoy these articles, or want to support our work on Vale, you're welcome to [sponsor us on GitHub!](https://github.com/sponsors/ValeLang)
+Thanks for reading! If you want to discuss more, come by the [r/Vale](http://reddit.com/r/vale) subreddit or the [Vale discord](https://discord.gg/SNB8yGH), and if you enjoy these articles or want to support our work on Vale, you're welcome to [sponsor us on GitHub!](https://github.com/sponsors/ValeLang)
 
 
 
