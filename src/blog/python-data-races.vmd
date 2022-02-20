@@ -1,0 +1,146 @@
+---
+title: Python's Data Races, Despite the Global Interpreter Lock
+author: Evan Ovadia
+date: Feb 20, 2022
+realm: blog
+path: blog/python-data-races
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+I recently wrote an article on [how a language can improve on Rust's and Pony's concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), and one of my readers asked:
+
+
+> "Does Python have fearless concurrency? The [Global Interpreter Lock](https://wiki.python.org/moin/GlobalInterpreterLock) makes only one thread run at a time, so I'd assume there's no data races."
+
+
+Note that we're not talking about general [race conditions](https://www.modernescpp.com/index.php/race-condition-versus-data-race), just data races. A *data race* is when: [# From the [Rustonomicon](https://doc.rust-lang.org/nomicon/races.html).]
+
+ * Two or more threads concurrently accessing a location of memory.
+ * One or more of them is a write.
+ * One or more of them is unsynchronized.
+
+
+But in Python, every thread is synchronized, because of the [Global Interpreter Lock](https://wiki.python.org/moin/GlobalInterpreterLock). So it can't have data races, right?
+
+
+Data races only happen in *parallel* code, not *concurrent* code, right? [# In Python, since only one thread can ever run at a time, it's concurrent. Concurrency is when we're doing multiple tasks at once, but only progressing one task at a time. Parallelism is when we e.g. use multiple cores to progress multiple threads at a time.]
+
+
+<slice />
+
+
+# A Python Data Race
+
+
+At first I said, "Yep, we still need mutexes to avoid race conditions, but the GIL makes Python immune to mere data races."
+
+
+...but that didn't seem right. I did a little bit of experimenting, and made [this program](https://gist.github.com/Verdagon/ef69b4c5e54a683ecd6a8afb715c3a80):
+
+
+```python
+from threading import Thread
+from time import sleep
+
+counter = 0
+
+def increase():
+    global counter
+    for i in range(0, 100000):
+        counter = counter + 1
+
+threads = []
+for i in range(0, 400):
+    threads.append(Thread(target=increase))
+for thread in threads:
+    thread.start()
+for thread in threads:
+    thread.join()
+
+print(f'Final counter: {counter}')
+```stdout
+Final counter: 31735072
+```
+
+
+
+Surprisingly, we didn't get 40000000, we got 31735072. [# This was on a 2.6 GHz 6-Core i7 Mac, for your computer to show a data race you may need to change the 400 or 100000.]
+
+
+This program's data race happens in the `counter = counter + 1` line. Let's pretend there are only two threads, and the program just started.
+
+ * Thread A loads 0 from `counter` into register A.
+ * Thread B loads 0 from `counter` into register B.
+ * Thread A adds 1 to register A, it now contains 1.
+ * Thread B adds 1 to register B, it now contains 1.
+ * Thread A stores register A into `counter`, it now contains 1.
+ * Thread B stores register B into `counter`, it now contains 1.
+
+As you can see, even though both threads incremented `counter`, it's not `2`, it's `1`. This is a data race in action.
+
+
+<slice />
+
+
+# The Intrigue
+
+
+This was actually pretty hard to discover. The first few experiments failed, because Python is pretty smart about when it runs each thread.
+
+
+Python will only interrupt a thread if it's taking too long. From [anekix's StackOverflow answer](https://stackoverflow.com/a/49573860):
+
+> In new versions, instead of using instruction count as a metric to switch threads, a configurable time interval is used. The default switch interval is 5 milliseconds.
+
+
+So, it seems a thread needs to last longer than 5 milliseconds to possibly trigger a data race. This explains why we had to do 100,000 iterations in each thread.
+
+
+This policy makes it difficult to identify when one has race conditions. However, it probably also reduces their frequency in production, which is a nice benefit.
+
+
+# Thoughts on Detecting Races
+
+
+As a language designer, I wonder if there was a missed opportunity in here.
+
+
+[Go's map iteration order is random](https://news.ycombinator.com/item?id=7655948), in part because it prevents us from accidentally relying on iteration order. We could take some inspiration from that.
+
+
+I wonder if, in development mode, Python could use a shorter interval so that we notice any race conditions hiding in our code, and in release mode, could use this longer (5ms) interval. [# We could do this today, by using `sys.setswitchinterval()`!]
+
+
+This also relates to one's philosophy on determinism. We know that:
+
+ * Determinism helps a lot for reproducing bugs. Nobody likes heisenbugs. [# A "heisenbug" is when we encounter a bug, but when investigating, have difficulty making it happen again, because it's based on some non-deterministic factor.]
+ * Determinism can cause some bugs. If we accidentally depend on a hash map's ordering in 100 places, and then change our hash map's algorithm, suddenly we have 100 bugs.
+
+
+These would seem to be incompatible, but a core goal of [Vale](https://vale.dev/) is to make races more obvious, and reproduce them easily.
+
+
+We could do this with *universal deterministic replayability*, where in development mode we record all non-deterministic inputs, such as command line arguments, stdin, sockets, files, etc. [# More specifically, it would just records any inputs from FFI into a file.] [# This feature is about halfway complete in Vale: the [FFI semantics](https://vale.dev/fearless) and FFI serialization are ready, but we don't record to a file yet.], plus the scheduling of all inter-thread messages and mutex lockings. This might seem difficult, but it's very possible when one uses a region-based borrow checker, and eliminates `unsafe` blocks and undefined behavior.
+
+
+With that, every run would be *random but recorded*, and when we do encounter a race, we could reproduce the race trivially by replaying the recording.
+
+
+Someday, perhaps problems like these will be a thing of the past!
+
+
+<slice />
+
+
+# Conclusion
+
+*TL;DR:* Python threads can have data races!
+
+This might all sounds pretty obvious to Python veterans, but it was surprising to me. Maybe it will be surprising to others!
+
+
+Thanks for reading! If you want to discuss more, come by the [r/Vale](http://reddit.com/r/vale) subreddit or the [Vale discord](https://discord.gg/SNB8yGH), and if you enjoy these articles or want to support our efforts, please [sponsor us on GitHub!](https://github.com/sponsors/ValeLang)
+
+
+- Evan O
