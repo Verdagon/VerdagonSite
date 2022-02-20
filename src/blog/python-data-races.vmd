@@ -33,10 +33,10 @@ Data races only happen in *parallel* code, not *concurrent* code, right? [# In P
 # A Python Data Race
 
 
-At first I said, "Yep, we still need mutexes to avoid race conditions, but the GIL makes Python immune to mere data races."
+At first I thought that, although we need mutexes to avoid race conditions, the GIL makes Python immune to mere data races.
 
 
-...but that didn't seem right. I did a little bit of experimenting, and made [this program](https://gist.github.com/Verdagon/ef69b4c5e54a683ecd6a8afb715c3a80):
+However, that didn't seem right. I did a little bit of experimenting, and made [this program](https://gist.github.com/Verdagon/ef69b4c5e54a683ecd6a8afb715c3a80):
 
 
 ```python
@@ -70,7 +70,7 @@ Surprisingly, we didn't get 40000000, we got 31735072. [# This was on a 2.6 GHz 
 
 This program's data race happens in the `counter = counter + 1` line. Let's pretend there are only two threads, and the program just started.
 
- * Thread A loads 0 from `counter` into register A.
+ * Thread A loads 0 from `counter` into register* A. [# I say register, but CPython doesn't actually use registers directly; it load variables onto stack frames that are stored on the heap, according to [this post](https://tenthousandmeters.com/blog/python-behind-the-scenes-5-how-variables-are-implemented-in-cpython/).
  * Thread B loads 0 from `counter` into register B.
  * Thread A adds 1 to register A, it now contains 1.
  * Thread B adds 1 to register B, it now contains 1.
@@ -115,13 +115,13 @@ I wonder if, in development mode, Python could use a shorter interval so that we
 This also relates to one's philosophy on determinism. We know that:
 
  * Determinism helps a lot for reproducing bugs. Nobody likes heisenbugs. [# A "heisenbug" is when we encounter a bug, but when investigating, have difficulty making it happen again, because it's based on some non-deterministic factor.]
- * Determinism can cause some bugs. If we accidentally depend on a hash map's ordering in 100 places, and then change our hash map's algorithm, suddenly we have 100 bugs.
+ * Relying on non-guaranteed determinism can cause some bugs. For example, if we accidentally depend on a hash map's ordering in 100 places, and then change our hash map's algorithm, we suddenly have 100 bugs.
 
 
 These would seem to be incompatible, but a core goal of [Vale](https://vale.dev/) is to make races more obvious, and reproduce them easily.
 
 
-We could do this with *universal deterministic replayability*, where in development mode we record all non-deterministic inputs, such as command line arguments, stdin, sockets, files, etc. [# More specifically, it would just records any inputs from FFI into a file.] [# This feature is about halfway complete in Vale: the [FFI semantics](https://vale.dev/fearless) and FFI serialization are ready, but we don't record to a file yet.], plus the scheduling of all inter-thread messages and mutex lockings. This might seem difficult, but it's very possible when one uses a region-based borrow checker, and eliminates `unsafe` blocks and undefined behavior.
+We could do this with *universal deterministic replayability*, where in development mode we record all non-deterministic inputs, such as command line arguments, stdin, sockets, files, etc. [# More specifically, it would just records any inputs from FFI into a file.] [# This feature is about halfway complete in Vale: the [FFI semantics](https://vale.dev/fearless) and FFI serialization are ready, but we don't record to a file yet.], plus the scheduling of all inter-thread messages and mutex lockings. This might seem difficult, but it's possible for a language to guarantee determinism, for example if it uses a [region-based borrow checker](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), and eliminates `unsafe` blocks and undefined behavior.
 
 
 With that, every run would be *random but recorded*, and when we do encounter a race, we could reproduce the race trivially by replaying the recording.
