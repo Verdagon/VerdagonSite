@@ -23,7 +23,7 @@ TL;DR:
 # Structured Concurrency
 
 
-If you've never used it, believe me when I say, structured concurrency is a _lot_ of fun. [#mindblown]
+If you've never used it, believe me when I say that structured concurrency is a _lot_ of fun. [#mindblown]
 
 
 With structured concurrency, you can launch multiple threads at once, to run your calculations in parallel, for a big speedup. And often, it can be done with a tiny adjustment.

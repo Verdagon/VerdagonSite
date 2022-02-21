@@ -163,6 +163,26 @@ if [ $TARGET == "surprising-weak-refs" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
+if [ $TARGET == "python-data-races" ] || [ $TARGET == "all" ] ; then
+  echo "Doing python-data-races"
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --stdlib_dir $STDLIB/src --out public/blog/python-data-races src/blog/python-data-races.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --stdlib_dir $STDLIB/src --out public/blog/python-data-races src/blog/python-data-races.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
+if [ $TARGET == "googler-to-traveler" ] || [ $TARGET == "all" ] ; then
+  echo "Doing googler-to-traveler"
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --stdlib_dir $STDLIB/src --out public/blog/googler-to-traveler src/blog/googler-to-traveler.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --stdlib_dir $STDLIB/src --out public/blog/googler-to-traveler src/blog/googler-to-traveler.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
 if [ $MODE == "build" ] ; then
   echo "Copying..."
   cp src/*.css public

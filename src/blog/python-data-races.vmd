@@ -70,12 +70,12 @@ Surprisingly, we didn't get 40000000, we got 31735072. [# This was on a 2.6 GHz 
 
 This program's data race happens in the `counter = counter + 1` line. Let's pretend there are only two threads, and the program just started.
 
- * Thread A loads 0 from `counter` into register* A. [# I say register, but CPython doesn't actually use registers directly; it load variables onto stack frames that are stored on the heap, according to [this post](https://tenthousandmeters.com/blog/python-behind-the-scenes-5-how-variables-are-implemented-in-cpython/).
- * Thread B loads 0 from `counter` into register B.
- * Thread A adds 1 to register A, it now contains 1.
- * Thread B adds 1 to register B, it now contains 1.
- * Thread A stores register A into `counter`, it now contains 1.
- * Thread B stores register B into `counter`, it now contains 1.
+ * Thread A loads 0 from `counter` into register\* X. [# I say "register", but CPython doesn't actually use registers directly; it load variables onto stack frames that are stored on the heap, according to [this post](https://tenthousandmeters.com/blog/python-behind-the-scenes-5-how-variables-are-implemented-in-cpython/).]
+ * Thread B loads 0 from `counter` into register Y.
+ * Thread A adds 1 to register X, it now contains 1.
+ * Thread B adds 1 to register Y, it now contains 1.
+ * Thread A stores register X into `counter`, it now contains 1.
+ * Thread B stores register Y into `counter`, it now contains 1.
 
 As you can see, even though both threads incremented `counter`, it's not `2`, it's `1`. This is a data race in action.
 
@@ -144,3 +144,7 @@ Thanks for reading! If you want to discuss more, come by the [r/Vale](http://red
 
 
 - Evan O
+
+
+
+
