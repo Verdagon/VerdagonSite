@@ -1,5 +1,5 @@
 ---
-title: Python's Data Races, Despite the Global Interpreter Lock
+title: Data Races in Python, Despite the Global Interpreter Lock
 author: Evan Ovadia
 date: Feb 20, 2022
 realm: blog
@@ -97,7 +97,7 @@ Python will only interrupt a thread if it's taking too long. From [anekix's Stac
 So, it seems a thread needs to last longer than 5 milliseconds to possibly trigger a data race. This explains why we had to do 100,000 iterations in each thread.
 
 
-This policy makes it difficult to identify when one has race conditions. However, it probably also reduces their frequency in production, which is a nice benefit.
+This policy makes it difficult to identify when one has data races. However, it probably also reduces their frequency in production, which is a nice benefit.
 
 
 # Thoughts on Detecting Races
@@ -109,7 +109,7 @@ As a language designer, I wonder if there was a missed opportunity in here.
 [Go's map iteration order is random](https://news.ycombinator.com/item?id=7655948), in part because it prevents us from accidentally relying on iteration order. We could take some inspiration from that.
 
 
-I wonder if, in development mode, Python could use a shorter interval so that we notice any race conditions hiding in our code, and in release mode, could use this longer (5ms) interval. [# We could do this today, by using `sys.setswitchinterval()`!]
+I wonder if, in development mode, Python could use a shorter interval so that we notice any data races hiding in our code, and in release mode, could use this longer (5ms) interval. [# We could do this today, by using `sys.setswitchinterval()`!]
 
 
 This also relates to one's philosophy on determinism. We know that:
