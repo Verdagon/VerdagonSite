@@ -9,6 +9,9 @@ layout: annotated
 namespace: c-blog m-annotated
 ---
 
+! Note: This article was published before we changed from constraint refs to HGM.
+
+
 While diving the depths of single ownership, we discovered a hidden gem from the most unlikely of places. With it, we were able to reassemble C++ into something that really unleashes the full potential of RAII.
 
 Recall these ancient mantras, known to any C++ developer:

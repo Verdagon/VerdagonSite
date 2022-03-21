@@ -1,0 +1,55 @@
+---
+title: The Next Decade in Languages, Part 1: Allocators
+author: Evan Ovadia
+date: Draft
+realm: blog
+path: blog/beyond-rust-innovations
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+
+specifically, decoupling it, and making it easier
+
+
+mention cone, where we'll see a vast ecosystem of new allocators
+
+
+Memory tagging
+
+
+
+
+
+Some more things I see coming soon:
+
+* Decoupled allocation, to use any allocator with any existing code. Cone has some really cool things on the way here, where we can package up allocators into modules and others can import them and use them [0]. Odin is also trailblazing here, with its implicit allocator "context" parameter [1]. Zig does this in an explicit way in its standard library [2].
+
+* First-class isolated regions, where certain areas of memory cannot point to each other, but within a particular region we can freely mutably alias. Vale [3] and Verona [4] are doing some interesting experiments here.
+
+* Better static analysis, to close the gap between memory-managed languages and C. Lobster's algorithm is very impressive here [5], and Vale is attempting an "automatic Rust" approach [6].
+
+* True "structured parallelism", where we can "freeze" all existing memory and freely access it in parallel from a loop's body. Pure functional languages might be able to do this, but it would be interesting in an imperative language. Rust can almost do this, but can only share things with Sync.
+
+* Blending the borrow checker with other paradigms. Cone is going all-in on this concept [7], and looks really promising. The pieces are also there in D and Vale, but we'll see!
+
+I also have some things on my wish list (full deterministic replayability!) but they aren't really on the horizon yet.
+
+(Disclaimer: I work on Vale, which aims to bring many of these features into the mainstream)
+
+[0]: https://cone.jondgoodwin.com/coneref/refregionglo.html
+
+[1]: https://odin-lang.org/docs/overview/#allocators
+
+[2]: https://ziglearn.org/chapter-2/
+
+[3]: https://vale.dev/blog/zero-cost-refs-regions
+
+[4]: https://www.microsoft.com/en-us/research/project/project-ver...
+
+[5]: https://aardappel.github.io/lobster/memory_management.html
+
+[6]: https://vale.dev/blog/hybrid-generational-memory
+
+[7]: https://cone.jondgoodwin.com/coneref/refperm.html 

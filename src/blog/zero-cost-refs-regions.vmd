@@ -166,7 +166,7 @@ func gameLoop(world &World) {
   }
 }
 
-pure func strongestDesire<'i, 'r ro>( «956»
+pure func strongestDesire<'i rw, 'r imm>( «956»
   this 'r &Unit)
 IDesire<'r, 'i> «111»
 'i { «504»
@@ -177,11 +177,11 @@ IDesire<'r, 'i> «111»
   ret desires[0];
 }
 
-pure func getDesire<'i, 'r ro>(
-  this 'r &ChaseAbility impl IAbility)
+pure func getDesire<'i rw, 'r imm>(
+  self 'r &ChaseAbility)
 IDesire<'i, 'r>
 'i {
-  unit = this.unit;
+  unit = self.unit;
   world = unit.world;
   loc = unit.location;
   nearbyUnits =
@@ -193,16 +193,16 @@ IDesire<'i, 'r>
   ret ChaseDesire(70, closest, path);
 }
 
-struct ChaseDesire<'i, 'r ro> 'i {
+struct ChaseDesire<'i rw, 'r imm> 'i {
   impl IDesire;
 
   strength Int;
   victim 'r &Unit;
   path List<Location>;
 
-  func strength(&this impl IDesire) «1134»
+  func strength(&self) «1134»
   Int {
-    ret this.strength;
+    ret self.strength;
   }
 }
 
@@ -273,7 +273,7 @@ With our `Mutexes` and region annotations, the compiler can give us free, zero-c
 ////
 ```vale
 func templar(
-    inAstMutex &!Mutex<InAst>) {
+    inAstMutex &Mutex<InAst>) {
   inAstLock = inAstMutex.openro();
   inAst = inAstLock.contents;
 
@@ -290,9 +290,9 @@ func templar(
   ret outAstMutex;
 }
 
-func translateFunction<'a ro, 't>(
+func translateFunction<'a, 't>(
   func 'a &InAstFunction,
-  outAst 't &!OutAst)
+  outAst 't &OutAst)
 OutASTFunction {
   // Read func, add things to outAst.
   ...;
@@ -355,7 +355,7 @@ We use the keyword `pool` after the region declaration `'i`.
 
 ////
 ```vale
-pure func findNearbyUnits<'r ro, 'i pool>
+pure func findNearbyUnits<'r ro, 'i = pool>
   (world 'r &World, origin Location)
 'i List<'r &Unit>
 'i {

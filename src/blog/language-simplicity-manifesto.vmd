@@ -1,0 +1,139 @@
+---
+title: Language Simplicity Manifesto
+author: Evan Ovadia
+date: Feb 15, 2022
+realm: blog
+path: blog/seamless-fearless-structured-concurrency
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+## Abstract
+
+This article spells out a very desirable aspect of a programming language: simplicity.
+
+It is easy to say "a language should be simple". In practice, such a simplistic notion rarely helps, because simplicity is fundamentally at odds with other goals (speed, memory safety, etc).
+
+This article describes how to identify and strive for simplicity.
+
+Throughout the article, we'll use Java, C++, and Vale as examples. In follow-up articles, we'll measure Rust, Haskell, and Python as well.
+
+
+
+## Incidental Complexity
+
+We should try to minimize incidental complexity.
+
+
+
+## Inherent Complexity
+
+If we get rid of all of the incidental complexity, is our thing simple?
+
+Not yet. We still have inherent complexity, complexity that must be present.
+
+However, we can reduce the impact of this inherent complexity, such as via abstraction.
+
+
+## Learning Curve Complexity
+
+Some complexity is easier to keep in our heads than others. Some is easy to learn, for example types. Some keeps haunting you, such as AxM or immutability. Single ownership is somewhere inbetween.
+
+
+## Simplicity Measures Mental Resource Usage
+
+Simplicity is how well something fits into the programmer's head.
+
+Here's a view with three components that interact. It tangles them together. All of this logic *must* be present.
+
+But if we separate them into sub-components, we suddenly have less complexity, because for any given task we can safely forget a lot of details.
+
+We no longer have to remember more details and constraints.
+
+
+
+GC is the king of simplicity.
+
+Adding constraints, like immutability, or AxM, or UB, increases complexity.
+
+
+
+# Why We Want Simplicity
+
+simplicity should be one of the top secondary priorities
+
+
+1. because youll be hiring newgrads and teaching them, and that will take a lot of time. if the language is difficult, this could cause churn, further shortening the usefulness. [# this is the main factor for why I recommend people make their programs in java, believe it or not.] this was a major problem in google, we couldnt hire c++ developers, so we hired people who we had to teach.
+2. because youre trying to get new users. if the complexity turns people off, they likely wont come back. its difficult to recover from a failed launch, because people dont readily give a product a second chance.
+3. because not everyone looks at programming as a fascinating puzzle to solve. most programmers are trying to get something done, and want the language to get out of the way so they can do it. two kinds of complexity: initial and inherent. example: c++'s enable_shared_from_this is inherent because you keep running into it.
+
+
+# How We Lose It
+
+simplicity is something we accidentally give up as we pursue other priorities, such as speed or safety.
+a language has a reasonably finite complexity budget.
+
+
+how do you know if a language is complex? don't ask those who are good at it. theyre very quick to profess how easy it was for them, because theyre very invested in the language. ask those who have explored it and moved on.
+
+
+
+# Common Sources of Complexity
+
+## Static Typing
+
+simplicity can be moved elsewhere in time. with dynamic typing, we still have to think about types, just later. except we can let ourselves not think about it for a bit, and lean on the compiler to get us back on track. so we dont have to think about it *as much*.
+
+
+# Non-Tricks to Reduce Complexity
+
+talk about tactical simplicity vs strategic simplicity. we can sacrifice simplicity at one level for simplicity at another.
+
+
+# Tricks to Reduce Complexity
+
+## Composability
+
+When we can combine two features to achieve the effects of another, thats more simple.
+
+one must look at the combination power of the basics; the basics are the minimum set of features one needs, to combine to write their program.
+
+
+## Adding Simplifying Features
+
+adding features can make real life simpler. see c++. an example of opt-in complexity?
+
+
+## Optimization Hints
+
+Like C#'s struct
+
+
+some tools:
+- hints. if someone knows they can ignore something completely, then the language remains simple.
+- fix suggestions; if the compiler can show you how to fix something and why, and its guaranteed to solve that problem (unlike rust lol) then the feature has little negative impact.
+- have opt-in advanced features. example: c# structs, vale regions, you should be able to make any program knowing less than 5% of the language. if the language forces newbies into another advanced concept every day, its not as good.
+  - vale has only one: single ownership.
+- familiarity. innovation is good, but wherever possible, stick to familiar syntax and paradigms and build off of them. where you do diverge, make it easy to realize, or optional.
+
+
+
+
+
+
+
+
+
+
+make it as simple as possible, and no simpler
+"If I had more time, I would have written a shorter letter". Simplicity takes effort. It takes time.
+
+a lot of language design is deciding how much complexity is in the language and how much is in user-space.
+
+
+
+In vale, I had to keep my eyes open for opportunities to simplify.
+
+i'll use vale as an example because it's famously difficult to have speed and safety without incurring a massive complexity cost.
+
