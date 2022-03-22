@@ -177,6 +177,16 @@ if [ $TARGET == "googler-to-traveler" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
+if [ $TARGET == "higher-raii-7drl" ] || [ $TARGET == "all" ] ; then
+  echo "Doing higher-raii-7drl"
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/higher-raii-7drl src/blog/higher-raii-7drl.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/higher-raii-7drl src/blog/higher-raii-7drl.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
 if [ $MODE == "build" ] ; then
   echo "Copying..."
   cp src/*.css public

@@ -1,0 +1,249 @@
+---
+title: Vale's "Higher RAII", the impossible pattern that saved me a vital 5 hours in the 7DRL Challenge
+author: Evan Ovadia
+date: Feb 15, 2022
+realm: blog
+path: blog/seamless-fearless-structured-concurrency
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+This year's 7-Day Roguelike Challenge has just come to an end, and 202 new roguelike games have been suddenly released into the world. Hundreds of 7DRL developers are leaning back, relaxing after an intense week of coding, debugging, and playtesting.
+
+
+Only 20% of entries end up successful, because it's surprisingly difficult to make an entire roguelike game within 7 days. I attempted the challenge, and after an epic seven days, slid into a finish *15 minutes before the end.*
+
+
+In such a short challenge, every hour counts. One has to be careful to keep scope down, and employ good tools to keep bugs away and keep debugging time down. Today, I'll describe one of the tools that saved me some critical hours near the end.
+
+
+
+## The Tools
+
+
+This was the first year I used the [Vale programming language](https://vale.dev/), a language I've been contributing to for quite a while.
+
+
+Vale is bringing three innovations into the programming languages world:
+
+ * Generational references [# Generational references are kind of like pointers, but every time we dereference it, the language will automatically check whether the object is still alive. Generational references are faster than reference counting, and gives us control over our memory layouts for more cache friendliness. It's also not as restrictive as Rust's borrow checker, and imposes less constraints on our architecture and therefore less refactoring.]
+ * The region borrow checker, mentioned in [Seamless, Fearless, and Structured Concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), which blends shared mutability with Rust's borrow checker.
+ * *Higher RAII*, where we can tell the compiler to make sure we call a function, at some point in the future.
+
+
+Let's hear more about that last one!
+
+
+<slice />
+
+
+## Higher RAII
+
+
+Higher RAII is based on "RAII", which was developed for C++ primarily by Bjarne Stroustrup and Andrew Koenig, though other languages like D and Rust also offer it in some form. RAII automatically calls a zero-argument non-returning function (often called a "destructor") just before we destroy an object. Higher RAII does that, plus much more.
+
+
+With Higher RAII, we can ensure that we eventually call *any* function... even ones with parameters, return values, even ones that don't destroy the object.
+
+
+Imagine that you're dropping your laptop off at a repair shop. They tie a wristband with an ID around your wrist. This is a "Higher RAII" wristband, in that:
+
+ * You're not able to remove this wristband.
+ * They will remove this wristband from your wrist when you pick your laptop up.
+
+When you get home, you try to remove the wristband, and suddenly realize that you forgot to pick up your laptop. So you get back in your car, and go exchange the wristband for the laptop.
+
+
+
+<slice />
+
+
+
+## A Real World Example
+
+
+C++ uses a `promise` to send data to another thread's `future`. For example:
+
+ * Thread A calls `myIntPromise.set_value(1337)`.
+ * Thread B calls `myIntFuture.get()` which waits and receives that `1337`.
+
+The programmer *must* remember to call `set_value`. However, sometimes the programmer forgets, and then thread B waits forever.
+
+
+In Vale, we can use Higher RAII to make it so setting the value is the only way to get rid of the `promise`:
+
+
+```vale
+#!DeriveStructDrop
+struct Promise<T> {
+  future &Future<T>;
+}
+func SetValueAndDestroy<T>(self Promise<T>, new_value T) {
+  set self.future.value = new_value;
+  destruct self;
+}
+```
+
+
+
+Here's how that works.
+
+
+In Vale, every object has exactly one *owning reference* pointing to it. For example, `self Promise<T>` is an owning reference. `future &Future<T>` is *not* an owning reference, because it has a `&`.
+  
+
+
+The compiler normally automatically `destruct`s the object when we destroy its owning reference's containing scope (or containing object). However, the `#!DeriveStructDrop` instructs the compiler to never automatically do that, but instead throw a compile error:
+
+```vale
+func main() {
+  promise Promise<int> = ...;
+
+  // Here, since promise still exists, compiler will try to call its `drop` function.
+  // Compile error: No function named `drop` exists!
+}
+```
+
+
+
+Now, the user must do *something* with the owning reference. Thats where `SetValueAndDestroy` comes in: it will take the owning reference and destruct it, as well as set the `future`'s value:
+
+```vale
+func main() {
+  promise Promise<int> = ...;
+
+  SetValueAndDestroy(promise, 1337);
+  // The above line moved the promise local variable into the
+  // SetValueAndDestroy function, so it no longer exists here.
+}
+```
+
+
+<slice />
+
+
+## The TokenedHashMap
+
+In a roguelike, the player and all enemies and anything else that can move is called a "unit".
+
+We often need to know if there is a unit in a particular spot in the world, so we have a `locationToUnit` cache, basically a `HashMap<Location, &Unit>`.
+
+ * When we make a unit, we add it to the `locationToUnit` cache with its location.
+ * When we destroy the unit, we remove it from the cache.
+
+In past years, *I have forgotten to remove it from the cache.* This caused units to see other units that were no longer alive, costing me precious hours of debugging.
+
+
+Luckily, Higher RAII can help with this!
+
+
+We can make a special TokenedHashMap class:
+
+ * When we add something to the hash map, we get a `HashMapToken` back.
+ * We can't destroy a `HashMapToken`. This is like the above wristband.
+ * We can destroy the `HashMapToken` by removing something from the hash map.
+
+
+```vale
+#!DeriveStructDrop
+struct HashMapToken { }
+
+struct TokenedHashMap<K, V> {
+  inner HashMap<K, V>;
+
+  func add(&self, key K, value V) HashMapToken {
+    self.inner.add(key, value);
+    ret HashMapToken();
+  }
+
+  func remove(self &TokenedHashMap, key K, token HashMapToken) V {
+    destruct token;
+    ret self.inner.remove(key);
+  }
+
+  ...
+}
+```
+
+
+<slice />
+
+
+## How the TokenedHashMap saved me
+
+
+Sure enough, at the very end of this year's 7DRL, I forgot to remove this unit from the locToUnit cache. Normally, this would cause hours of debugging. Luckily, the compiler realized this and signaled an error:
+
+```vale
+func Destroy(self UnitController, server &GameInstance) {
+  // Destroys the UnitController
+  [unit, locToUnitToken, view] = self;
+
+  (view).Destroy(server.domino);
+  set server.animationsEndTimeFromNow =
+      max(server.animationsEndTimeFromNow, 500);
+
+  // Compile error here, because we didn't do anything with locToUnitToken
+}
+```
+
+
+So, after profusely thanking the compiler, I added a `server.locToUnit.remove(unit.location, locToUnitToken);` which fixed the problem.
+
+
+Huzzah!
+
+
+I don't know if I would have succeeded this year, if the compiler didn't catch that bug. I finished 16 minutes before the deadline, and this kind of bug has cost be hours before, so probably not.
+
+
+Instead, I have a successful entry, and I've maintained my success streak!
+
+
+<slice />
+
+
+## How else can it be used?
+
+Higher RAII can be applied to a lot of places:
+
+ * On the view side, we can have a Dialog class with two buttons. It can only be destroyed if we also supply which button the user pressed.
+ * The UnitController has a UnitView, and the only way to destroy it is via the `Destroy(view, connection)` function takes a `Connection` parameter.
+ * When we pause the game logic to wait for animations, we often have a "currently acting unit". We can enforce that we correctly finish the unit's actions before proceeding with the next.
+
+
+In general, when we want to make sure that we do something in the future, we should use Higher RAII to make sure it actually happens.
+
+
+It's an incredibly versatile and valuable pattern, one that I hope Vale will bring into the mainstream one day.
+
+
+Thanks for reading! In the coming weeks, I'll be writing more about the Vale 7DRL experience, so subscribe to our [RSS feed](https://verdagon.dev/rss.xml) or the [r/Vale](https://reddit.com/r/vale) subreddit, and come hang out in the [Vale discord](https://discord.gg/SNB8yGH).
+
+
+If you want to support our work, please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+
+
+<slice new-color="afterword"/>
+
+
+# Afterword: Do any other languages have this?
+
+C++ has had regular RAII since the 90s, and D and Rust have picked it up since then, but they're not quite "Higher" RAII, because:
+
+ * They always allow us to destroy any object. In other words, the compiler will automatically take off the wristband at any time, leaving the laptop in the shop for eternity.
+ * They don't allow us to pass parameters into the function that destroys the object.
+
+
+This is mostly because of their exceptions and stack-unwinding requirements. When a C++ exception is in flight, or a Rust panic is unwinding the stack, they call the destructors for any object they're destroying.
+
+
+Vale has no such restriction, because it doesn't have exceptions, and doesn't use destructors for stack unwinding.
+
+
+In Vale, we instead:
+
+ * Have a completely separate region of memory for any operation that could fail. When a fail happens, we blast away that entire region, and the rest of the program continues running.
+ * Register "panic expressions" for certain scopes, which are invoked immediately when we trigger a panic, similar to algebraic effects. Vale also uses the [region borrow checker](https://verdagon.dev/blog/seamless-fearless-structured-concurrency) and `iso` objects to make ensure memory safety when this happens.
