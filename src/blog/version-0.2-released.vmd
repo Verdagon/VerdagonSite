@@ -1,0 +1,10 @@
+---
+title: Vale Programming Language 0.2 Released: Fearless FFI, Generational References, and Modules
+author: Evan Ovadia
+date: Mar 22, 2022
+realm: blog
+path: blog/seamless-fearless-structured-concurrency
+layout: annotated
+namespace: c-blog m-annotated
+---
+

@@ -1,5 +1,5 @@
 ---
-title: Vale's "Higher RAII", the impossible pattern that saved me a vital 5 hours in the 7DRL Challenge
+title: Vale's Higher RAII, the pattern that saved me a vital 5 hours in the 7DRL Challenge
 author: Evan Ovadia
 date: Mar 22, 2022
 realm: blog
@@ -9,10 +9,10 @@ namespace: c-blog m-annotated
 ---
 
 
-This year's 7-Day Roguelike Challenge has just come to an end, and 202 new roguelike games have been suddenly released into the world. Hundreds of 7DRL developers are leaning back, relaxing after an intense week of coding, debugging, and playtesting.
+This year's [7-Day Roguelike Challenge](https://7drl.com/) has just come to an end, and 202 new roguelike games have been suddenly released into the world. Hundreds of 7DRL developers are leaning back, relaxing after an intense week of coding, debugging, and playtesting.
 
 
-Only 20% of entries end up successful, because it's surprisingly difficult to make an entire roguelike game within 7 days. I attempted the challenge, and after an epic seven days, slid into a finish *15 minutes before the end.*
+Only 20% of entries end up successful, because it's surprisingly difficult to make an entire roguelike game within 7 days. I attempted the challenge, and after an epic seven days, slid into a finish *15 minutes before the deadline.*
 
 
 In such a short challenge, every hour counts. One has to be careful to keep scope down, and employ good tools to keep bugs away and keep debugging time down. Today, I'll describe one of the tools that saved me some critical hours near the end.
@@ -27,9 +27,9 @@ This was the first year I used the [Vale programming language](https://vale.dev/
 
 Vale is bringing three innovations into the programming languages world:
 
- * Generational references [# Generational references are kind of like pointers, but every time we dereference it, the language will automatically check whether the object is still alive. Generational references are faster than reference counting, and gives us control over our memory layouts for more cache friendliness. It's also not as restrictive as Rust's borrow checker, and imposes less constraints on our architecture and therefore less refactoring.]
- * The region borrow checker, mentioned in [Seamless, Fearless, and Structured Concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), which blends shared mutability with Rust's borrow checker.
- * *Higher RAII*, where we can tell the compiler to make sure we call a function, at some point in the future.
+ * Generational references, where the compiler will make sure the object is alive when we dereference a reference to it. [# Generational references are faster than reference counting, and gives us control over our memory layouts for better performance. It's also more flexible than borrow checking, and gives us more freedom with our architectures!]
+ * The region borrow checker (mentioned in [Seamless, Fearless, and Structured Concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency)) which improves upon Rust's borrow checker to handle shared mutable objects.
+ * *Higher RAII*, where we can tell the compiler to make sure we call a function at some point in the future.
 
 
 Let's hear more about that last one!
@@ -41,7 +41,7 @@ Let's hear more about that last one!
 ## Higher RAII
 
 
-Higher RAII is based on "RAII", which was developed for C++ primarily by Bjarne Stroustrup and Andrew Koenig, though other languages like D and Rust also offer it in some form. RAII automatically calls a zero-argument non-returning function (often called a "destructor") just before we destroy an object. Higher RAII does that, plus much more.
+Higher RAII is based on C++'s "RAII" [# RAII stands for Resource Acquisition is Initialization, and was developed for C++ primarily by Bjarne Stroustrup and Andrew Koenig. Other languages like D and Rust also offer it in some form.] which automatically calls a zero-argument non-returning function (often called a "destructor") just before we destroy an object. Higher RAII does that, plus much more.
 
 
 With Higher RAII, we can ensure that we eventually call *any* function... even ones with parameters, return values, even ones that don't destroy the object.
@@ -52,8 +52,10 @@ Imagine that you're dropping your laptop off at a repair shop. They tie a wristb
  * You're not able to remove this wristband.
  * They will remove this wristband from your wrist when you pick your laptop up.
 
-When you get home, you try to remove the wristband, and suddenly realize that you forgot to pick up your laptop. So you get back in your car, and go exchange the wristband for the laptop.
+When you get home, you absentmindedly try to remove the wristband, and suddenly realize that you forgot to pick up your laptop. So you get back in your car, and go exchange the wristband for the laptop.
 
+
+With Higher RAII, you can turn any object into a wristband, and the compiler will enforce that you get rid of it correctly instead of just destroying it.
 
 
 <slice />
@@ -71,7 +73,7 @@ C++ uses a `promise` to send data to another thread's `future`. For example:
 The programmer *must* remember to call `set_value`. However, sometimes the programmer forgets, and then thread B waits forever.
 
 
-In Vale, we can use Higher RAII to make it so setting the value is the only way to get rid of the `promise`:
+In Vale, we can use Higher RAII to enforce that we set the value before destroying the `promise`:
 
 
 ```vale
@@ -90,7 +92,7 @@ func SetValueAndDestroy<T>(self Promise<T>, new_value T) {
 Here's how that works.
 
 
-In Vale, every object has exactly one *owning reference* pointing to it. For example, `self Promise<T>` is an owning reference. `future &Future<T>` is *not* an owning reference, because it has a `&`.
+In Vale, every object has exactly one *owning reference* pointing to it. For example, the parameter `self Promise<T>` is an owning reference. `future &Future<T>` is *not* an owning reference, because it has a `&`.
   
 
 
@@ -123,22 +125,30 @@ func main() {
 <slice />
 
 
+As you can see, the compiler now enforces that we correctly get rid of the promise, by setting its value.
+
+
 ## The TokenedHashMap
 
-In a roguelike, the player and all enemies and anything else that can move is called a "unit".
 
-We often need to know if there is a unit in a particular spot in the world, so we have a `locationToUnit` cache, basically a `HashMap<Location, &Unit>`.
+This year, I made a `TokenedHashMap` class that used Higher RAII to make sure I remembered to remove things from it.
+
+
+For context: in roguelike games, we often need to know if there is a unit [# The player and all other moving entities are called units.] in a particular spot in the world, so we have a `locationToUnit` cache, basically a `HashMap<Location, &Unit>`.
+
+
+This map must be carefully maintained:
 
  * When we make a unit, we add it to the `locationToUnit` cache with its location.
  * When we destroy the unit, we remove it from the cache.
 
-In past years, *I have forgotten to remove it from the cache.* This caused units to see other units that were no longer alive, costing me precious hours of debugging.
+However, in past years, *I had forgotten to remove it from the cache.* This caused units to see other units that were no longer alive, costing me precious hours!
 
 
-Luckily, Higher RAII can help with this!
+Luckily, Higher RAII can help with this.
 
 
-We can make a special TokenedHashMap class:
+Let's make our special TokenedHashMap class:
 
  * When we add something to the hash map, we get a `HashMapToken` back.
  * We can't destroy a `HashMapToken`. This is like the above wristband.
@@ -176,29 +186,28 @@ struct TokenedHashMap<K, V> {
 Sure enough, at the very end of this year's 7DRL, I forgot to remove this unit from the locToUnit cache. Normally, this would cause hours of debugging. Luckily, the compiler realized this and signaled an error:
 
 ```vale
-func Destroy(self UnitController, server &GameInstance) {
+func Destroy(self UnitController, game &GameInstance) {
   // Destroys the UnitController
   [unit, locToUnitToken, view] = self;
 
-  (view).Destroy(server.domino);
-  set server.animationsEndTimeFromNow =
-      max(server.animationsEndTimeFromNow, 500);
+  (view).Destroy(game.domino);
 
   // Compile error here, because we didn't do anything with locToUnitToken
 }
 ```
 
 
-So, after profusely thanking the compiler, I added a `server.locToUnit.remove(unit.location, locToUnitToken);` which fixed the problem.
+
+So, after profusely thanking the compiler, I added a `game.locToUnit.remove(unit.location, locToUnitToken);` which fixed the problem.
 
 
 Huzzah!
 
 
-I don't know if I would have succeeded this year, if the compiler didn't catch that bug. I finished 16 minutes before the deadline, and this kind of bug has cost be hours before, so probably not.
+Last year, I wasted over half a day on a bug just like this. I likely wouldn't have succeeded this year, if the compiler didn't catch that bug.
 
 
-Instead, I have a successful entry, and I've maintained my success streak!
+Instead, I have a completed entry, and I've maintained my 4-year success streak!
 
 
 <slice />
@@ -210,13 +219,13 @@ Higher RAII can be applied to a lot of places:
 
  * On the view side, we can have a Dialog class with two buttons. It can only be destroyed if we also supply which button the user pressed.
  * The UnitController has a UnitView, and the only way to destroy it is via the `Destroy(view, connection)` function takes a `Connection` parameter.
- * When we pause the game logic to wait for animations, we often have a "currently acting unit". We can enforce that we correctly finish the unit's actions before proceeding with the next.
+ * When we pause the game logic to wait for animations, we often have a "currently acting unit". We can enforce that we correctly finish the unit's actions before starting the next unit's actions.
 
 
 In general, when we want to make sure that we do something in the future, we should use Higher RAII to make sure it actually happens.
 
 
-It's an incredibly versatile and valuable pattern, one that I hope Vale will bring into the mainstream one day.
+It was exciting to finally use it! I come from a heavy C++ and Rust background, and I've always known that RAII has a lot of untapped potential. Finally, Vale is powerful enough to use, and it feels really good to finally use Higher RAII in a real-life program. It's an incredibly versatile and valuable pattern, one that I hope Vale will bring into the mainstream!
 
 
 Thanks for reading! In the coming weeks, I'll be writing more about the Vale 7DRL experience, so subscribe to our [RSS feed](https://verdagon.dev/rss.xml) or the [r/Vale](https://reddit.com/r/vale) subreddit, and come hang out in the [Vale discord](https://discord.gg/SNB8yGH).
