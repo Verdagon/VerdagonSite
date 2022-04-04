@@ -7,6 +7,7 @@ realm: blog
 path: blog/zero-cost-refs-regions
 layout: annotated
 namespace: c-blog m-annotated
+sponsor: me
 ---
 
 ! Note: This article was published before we changed resilient mode to use [HGM](/blog/hybrid-generational-memory) instead of RC. Now, read-only regions eliminate gen-checks, rather than RC overhead.
@@ -174,7 +175,7 @@ IDesire<'r, 'i> «111»
     this.abilities*.getDesire(); «1136»
   desires.sort(
     { _.strength() > _.strength() }); «911»
-  ret desires[0];
+  return desires[0];
 }
 
 pure func getDesire<'i rw, 'r imm>(
@@ -190,7 +191,7 @@ IDesire<'i, 'r>
   closestLoc = closest.location;
   path =
     world.findPath(loc, closestLoc);
-  ret ChaseDesire(70, closest, path);
+  return ChaseDesire(70, closest, path);
 }
 
 struct ChaseDesire<'i rw, 'r imm> 'i {
@@ -202,7 +203,7 @@ struct ChaseDesire<'i rw, 'r imm> 'i {
 
   func strength(&self) «1134»
   Int {
-    ret self.strength;
+    return self.strength;
   }
 }
 
@@ -287,7 +288,7 @@ func templar(
 
   ...
 
-  ret outAstMutex;
+  return outAstMutex;
 }
 
 func translateFunction<'a, 't>(
@@ -388,7 +389,7 @@ pure func findNearbyUnits<'r ro, 'i = pool>
     unexploredSet.addAll(
       &newNearbyLocs);
   }
-  ret result;
+  return result;
 }
 ```: notest
 >>>>

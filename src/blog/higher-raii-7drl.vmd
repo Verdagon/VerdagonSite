@@ -6,20 +6,20 @@ realm: blog
 path: blog/seamless-fearless-structured-concurrency
 layout: annotated
 namespace: c-blog m-annotated
+sponsor: me
 ---
 
 
 This year's [7-Day Roguelike Challenge](https://7drl.com/) has just come to an end, and 202 new roguelike games have been suddenly released into the world. Hundreds of 7DRL developers are leaning back, relaxing after an intense week of coding, debugging, and playtesting.
 
 
-Only 20% of entries end up successful, because it's surprisingly difficult to make an entire roguelike game within 7 days. I attempted the challenge, and after an epic seven days, slid into a finish *15 minutes before the deadline.*
+Only 20% of entries end up successful, because it's surprisingly difficult to make an entire roguelike game within 7 days. I attempted the challenge, and after an epic seven days, slid into a finish *15 minutes before the deadline.* [# You can find the game [here](https://verdagon.itch.io/vale-prototype), but be warned, it's just a prototype of using Vale, so not many fun things were added to it!]
+
+
+<img src="../images/ValeDomino.png" style="width: 100%;"/>
 
 
 In such a short challenge, every hour counts. One has to be careful to keep scope down, and employ good tools to keep bugs away and keep debugging time down. Today, I'll describe one of the tools that saved me some critical hours near the end.
-
-
-
-## The Tools
 
 
 This was the first year I used the [Vale programming language](https://vale.dev/), a language I've been contributing to for quite a while.
@@ -38,7 +38,7 @@ Let's hear more about that last one!
 <slice />
 
 
-## Higher RAII
+# Higher RAII
 
 
 Higher RAII is based on C++'s "RAII" [# RAII stands for Resource Acquisition is Initialization, and was developed for C++ primarily by Bjarne Stroustrup and Andrew Koenig. Other languages like D and Rust also offer it in some form.] which automatically calls a zero-argument non-returning function (often called a "destructor") just before we destroy an object. Higher RAII does that, plus much more.
@@ -62,7 +62,7 @@ With Higher RAII, you can turn any object into a wristband, and the compiler wil
 
 
 
-## A Real World Example
+# A Real World Example
 
 
 C++ uses a `promise` to send data to another thread's `future`. For example:
@@ -128,7 +128,7 @@ func main() {
 As you can see, the compiler now enforces that we correctly get rid of the promise, by setting its value.
 
 
-## The TokenedHashMap
+# The TokenedHashMap
 
 
 This year, I made a `TokenedHashMap` class that used Higher RAII to make sure I remembered to remove things from it.
@@ -164,12 +164,12 @@ struct TokenedHashMap<K, V> {
 
   func add(&self, key K, value V) HashMapToken {
     self.inner.add(key, value);
-    ret HashMapToken();
+    return HashMapToken();
   }
 
   func remove(self &TokenedHashMap, key K, token HashMapToken) V {
     destruct token;
-    ret self.inner.remove(key);
+    return self.inner.remove(key);
   }
 
   ...
@@ -180,7 +180,7 @@ struct TokenedHashMap<K, V> {
 <slice />
 
 
-## How the TokenedHashMap saved me
+# How the TokenedHashMap saved me
 
 
 Sure enough, at the very end of this year's 7DRL, I forgot to remove this unit from the locToUnit cache. Normally, this would cause hours of debugging. Luckily, the compiler realized this and signaled an error:
@@ -213,7 +213,7 @@ Instead, I have a completed entry, and I've maintained my 4-year success streak!
 <slice />
 
 
-## How else can it be used?
+# How else can it be used?
 
 Higher RAII can be applied to a lot of places:
 
@@ -246,13 +246,15 @@ C++ has had regular RAII since the 90s, and D and Rust have picked it up since t
  * They don't allow us to pass parameters into the function that destroys the object.
 
 
-This is mostly because of their exceptions and stack-unwinding requirements. When a C++ exception is in flight, or a Rust panic is unwinding the stack, they call the destructors for any object they're destroying.
+This is mostly because of their decisions w.r.t. exceptions and stack-unwinding. When a C++ exception is in flight, or a Rust panic is unwinding the stack, they call the destructors for any object they're destroying.
 
 
-Vale has no such restriction, because it doesn't have exceptions, and doesn't use destructors for stack unwinding.
+Vale has a different approach. Basically, when a panic happens, we blast away only the containing region [# There are various ways to make new regions, such as creating a thread or mutex or `iso` object, or "try-calling" a pure function, etc.] and allow the rest of the program to continue running. [# The [region borrow checker](https://verdagon.dev/blog/seamless-fearless-structured-concurrency) tracks which objects are in which regions.]
 
+To deal with any open resources (like file descriptors, mutex locks, etc), we can either:
 
-In Vale, we instead:
+ * Use a per-region linked-list to track them, which is consumed on panic.
+ * Ensure every object has a zero-arg `drop()` function generated. It would be `private` to preserve our higher RAII, and generally only callable via unwinding.
+ * Register "panic expressions" for certain scopes, which are invoked immediately when we trigger a panic, similar to algebraic effects.
 
- * Have a completely separate region of memory for any operation that could fail. When a fail happens, we blast away that entire region, and the rest of the program continues running.
- * Register "panic expressions" for certain scopes, which are invoked immediately when we trigger a panic, similar to algebraic effects. Vale also uses the [region borrow checker](https://verdagon.dev/blog/seamless-fearless-structured-concurrency) and `iso` objects to make ensure memory safety when this happens.
+We're leaning towards that first option, stay tuned for more exploration of the topic!

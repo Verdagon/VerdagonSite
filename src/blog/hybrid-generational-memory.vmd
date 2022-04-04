@@ -7,6 +7,7 @@ realm: blog
 path: blog/hybrid-generational-memory
 layout: annotated
 namespace: c-blog m-annotated
+sponsor: me
 ---
 
 

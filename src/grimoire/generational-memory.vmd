@@ -236,7 +236,7 @@ func getShipName(ships &Map<int, &Spaceship>, id int) str {
 
   // Check if ship is still alive:
   //   assert(shipRef.targetGen == shipRef.obj.actualGen);
-  ret ship.name;
+  return ship.name;
 }
 ```: notest
 

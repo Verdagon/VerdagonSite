@@ -6,6 +6,7 @@ realm: blog
 path: blog/hgm-static-analysis-part-1
 layout: annotated
 namespace: c-blog m-annotated
+sponsor: me
 ---
 
 
@@ -33,7 +34,7 @@ struct Spaceship {
 exported func main() int {
   s = Spaceship(10);
   b = &s;
-  ret b.fuel;
+  return b.fuel;
   // s goes out of scope here,
   // so there's an implicit drop(s),
   // freeing the Spaceship.
@@ -93,7 +94,7 @@ exported func main() int {
   // b is a non-owning reference, so it is added to the Variables table;
   // and because it references the object owned by s, its value is set to s
 
-  ret b.fuel; // Requires liveness check
+  return b.fuel; // Requires liveness check
   // implicit drop(s) here, so:
   // Objects = {‘s’->false}
   // Variables = {}

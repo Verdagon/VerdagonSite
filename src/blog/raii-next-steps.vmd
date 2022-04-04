@@ -7,6 +7,7 @@ realm: blog
 path: blog/next-steps-raii
 layout: annotated
 namespace: c-blog m-annotated
+sponsor: me
 ---
 
 ! Note: This article was published before we changed from constraint refs to HGM.
@@ -579,7 +580,7 @@ struct Transaction {
   func rollback(this, list &TransactionList, mode RollMode) RollbackStatus {
     ...
     list.reclaim(this); // move this into a different function
-    ret SUCCESS;
+    return SUCCESS;
   }
 }
 ```: `exported func main() {}`

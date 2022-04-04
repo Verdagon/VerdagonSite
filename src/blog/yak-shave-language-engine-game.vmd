@@ -1,0 +1,255 @@
+---
+title: A Tale of Yak Shaving: Accidentally Making a Language, for an Engine, for a Game
+author: Evan Ovadia
+date: Apr 5, 2022
+realm: blog
+path: blog/yak-shave-language-engine-game
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: me
+---
+
+
+There's an old mantra in game development:
+
+> "Don't make a game engine, make a game." - Confucius, 1337 A.D.
+
+It's a wise saying, because we game developers have so much fun making the underlying foundations, that we never get around to adding the actual gameplay.
+
+
+This is an article about *how badly I disregarded that advice, and what happened because of it.*
+
+
+As you can guess, I made my own game engine.
+
+
+<video autoplay loop muted controls src="/images/ValePrototypeCombat.mp4" style="width:100%; max-width: 100%; aspect-ratio: 1.7;" />
+
+
+It was an gloriously unwise decision, and delayed my game for a _long time_. This is what's known as [yak-shaving](https://www.hanselman.com/blog/yak-shaving-defined-ill-get-that-done-as-soon-as-i-shave-this-yak): getting so distracted by the details that you lose track of the original goal.
+
+
+I learned a valuable lesson from that mistake: *don't get distracted trying to make the perfect tools.*
+
+
+So, having learned that lesson thoroughly, I then made the same mistake again! Not being satisfied with C#, C++, Rust, and other languages in the landscape, [# These languages are mostly fine... but C# is slow, Rust can't handle a lot of basic safe patterns, and C++ doesn't have the syntactic goodies that I'm so used to.] I made *an entire programming language, [Vale](https://vale.dev/),* and rewrote the game engine with that.
+
+
+It wasn't on purpose, it just _happened_. You start out making a simple DSL, [# Domain-Specific Language, usually a tiny language that helps with one specific task.] and you find yourself working on it more than the game itself. Then, momentum just carries you forward, because you're having so much fun.
+
+
+After _eight years_, I finally had an entire general-purpose programming language and engine that I could use in the [7 Day Roguelike Challenge](http://7drl.com/).
+
+
+<slice />
+
+
+# The Unexpected
+
+Making a programming language is like raising a child. They start out helpless and generally oblivious, and they constantly fall and spout nonsense. Adorable, indecipherable nonsense. [# This nonsense usually comes in the form of toddler-speak or s-expressions, depending on the time of day.]
+
+
+Eventually, you teach them how to walk, how to do basic math, how to follow instructions, and how to signal basic syntax errors... and then the impossible happens: they win an argument with you. They point out a mistake you made, and _they were right._
+
+
+It's a complex mix of emotions: embarassment because you were wrong, sorrow because they no longer need you, and pride because you taught them well.
+
+
+In the 7DRL challenge, Vale [found a bug in one of my caches at compile time](verdagon.dev/blog/higher-raii-7drl) because it uses something called "Higher RAII" which doublechecks we actually fulfill our responsibilities. [# [This was me at the time.](http://i0.kym-cdn.com/photos/images/newsfeed/000/917/464/752.jpg)]
+
+
+<slice />
+
+
+<slice />
+
+
+# The Good Parts
+
+
+There's a certain joy from using a new language that nobody else has ever used before. I felt like an Indiana Jones, exploring a tomb that no modern eyes have beheld.
+
+
+There's a freedom one feels when not slowed down by garbage collection or reference counting, and not constrained by a borrow checker. [# I have a particular wariness for the borrow checker, after learning it that it's incompatible with observers, most dependency injection, [most RAII](/blog/higher-raii-7drl), and it can sometimes influence one into more complicated architecture [with no performance benefit](https://www.reddit.com/r/roguelikedev/comments/i3xekn/ec_vs_ecs_for_roguelikes/)). This is why I made the [Region Borrow Checker](/blog/zero-cost-refs-regions), which should handle shared mutability a bit better.] I'm free to implement what I want, and know that the language will help me do it safely. It's like I've been driving a Honda Civic in city traffic, and now I'm in a BMW cruising down the highway.
+
+
+<<<<
+It was also nice to see that Vale is heading in the right direction. I found a lot of places that were just begging to harness [Hybrid-Generational Memory](verdagon.dev/blog/hybrid-generational-memory) and [seamless structured concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency).
+////
+<video autoplay loop muted controls src="/images/ValePrototypeFleeing.mp4" style="width:100%; max-width: 100%; aspect-ratio: 1.7;" />
+>>>>
+
+
+For example, those two features would make it so there's *zero memory safety overhead* for the entire below function. For a language with shared mutability to have that is _unheard of_ and makes me quite excited for Vale's future.
+
+
+```vale
+pure func CellularAutomata(
+    considerCornersAdjacent bool,
+    rand &XS32Rand,
+    map &PatternMap<bool>)
+PatternMap<bool> {
+  new_map = PatternMap<bool>(make_pentagon_9_pattern());
+
+  foreach [loc, tile] in &map.tiles { «concurrency»
+    neighbors = map.GetAdjacentExistingLocations(loc, considerCornersAdjacent);
+    num_walkable_neighbors = 0;
+    foreach neighbor in &neighbors { «hgm»
+      if map.tiles.get(neighbor).get() { «immaccess»
+        set num_walkable_neighbors = num_walkable_neighbors + 1;
+      }
+    }
+    new_impassable =
+      if num_walkable_neighbors * 2 == neighbors.len() {
+        (rand.Next() mod 2i64) == 0i64
+      } else {
+        num_walkable_neighbors > neighbors.len() / 2
+      };
+
+    new_map.tiles.add(loc, new_impassable); «isocontents»
+  }
+
+  return new_map;
+}
+```
+
+
+
+<slice>
+#concurrency: If we add `parallel` in front of this loop, it can perform these iterations in parallel on multiple threads, using [seamless structured concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency).
+
+
+#immaccess: Because we're accessing data that was a parameter to a pure function, it doesn't have to check that the data is still alive or increment any reference counters, see [Zero-Cost References with Regions](/blog/zero-cost-refs-regions).
+
+
+#hgm: [Hybrid-Generational Memory](verdagon.dev/blog/hybrid-generational-memory) would notice that we're iterating over a piece of data we own, so it wouldn't have to keep checking it still exists.
+
+
+#isocontents: PatternMap would contain an "*iso*" HashMap, which means nobody outside has any references to it. Because of this, PatternMap can freely mutate it without memory safety overhead.
+</slice>
+
+
+# The Bad Parts
+
+The Vale compiler is written in Scala, for its great development speed. [# I use Scala it in a mostly imperative fashion, more like Kotlin than any pure functional approach.] [# In case you're curious, the backend is in C++, because I'm a madman.]
+
+However, Scala is _slow as heck_ so the Vale compiler runs slow, which means Vale code takes a long time to compile. [# Moral of the story for language designers: Pay attention to your compile speed. Don't over-optimize, but at least track performance regressions and leave some TODOs around your codebase so you know where potential slowdowns might be when you do decide to optimize.]
+
+
+*This was the biggest risk in this year's challenge,* and almost pushed me past the deadline. Now I know that this year's priority should be to rewrite the compiler in Vale itself, which would be much faster.
+
+
+<slice />
+
+
+# The Result
+
+After the longest yak-shave in history, I still don't have much of a game. It's only about 6,000 lines of Vale code.
+
+
+It's clear that if I spent all this time working on an actual game instead, instead of making the perfect programming language for game design, then I'd have three or four games by now! In this timeline, I don't have those games.
+
+
+Still, I'm very glad I spent this time working on a programming language, because I ended up creating something _so weird, so unrecognizable_ [# Nobody would have thought that there was an alternative to GC, RC, and borrow checking!] that it blows people's minds, and that's a really great feeling.
+
+
+I also now have something that can help a lot of people for decades to come. Speed and safety has always incurred a lot of complexity burden on the programmer, and maybe with this language, I can help with that.
+
+
+
+# That's all!
+
+Thanks for visiting, and I hope you enjoyed reading about this experience as much as I enjoyed writing it!
+
+
+In the coming weeks, I'll be writing more about our "region borrow checker" which helps eliminate Vale's memory safety overhead, so subscribe to our [RSS feed](https://verdagon.dev/rss.xml) or the [r/Vale](https://reddit.com/r/vale) subreddit, and come hang out in the [Vale discord](https://discord.gg/SNB8yGH).
+
+
+If you found this interesting or entertaining, please consider sponsoring me:
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor me on GitHub!
+  </a>
+</center>
+
+With your help, I can write this kind of nonsense more often!
+
+
+<slice new-color="afterword"/>
+
+
+# About the Vale Language Project
+
+The Vale Language Project is not just about making Vale, it's about *exploring, discovering, and publishing* new programming language mechanisms that enable *speed*, *safety*, and *ease of use.*
+
+
+*The world needs more exploration here!* Currently, most programming language research is is in:
+
+ * High-overhead languages involving reference counting and tracing garbage collection.
+ * Complex languages (Ada/Spark, Coq, Rust, Haskell, etc.) which impose a higher complexity burden on the average programmer.
+
+These are useful, but there is a *vast field of possibilities* in between, waiting to be explored!
+
+
+Our aim is to explore that space, discover what it has to offer, and make *speed and safety easier than ever before.*
+
+
+In this quest, we've discovered a lot of new techniques:
+
+ * [Region Borrow Checking](/blog/zero-cost-refs-regions), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Generational Memory](/blog/generational-references), for a language to ensure an object still exists at the time of dereferencing.
+ * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
+
+
+These techniques have also opened up some new emergent possibilities:
+
+ * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
+ * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
+ * [Fearless FFI](/blog/fearless#safe-externs), which allows us to call into C without risk of accidentally corrupting Vale objects.
+ * Deterministic replayability, to record all inputs and replay execution. Goodbye races and heisenbugs!
+ * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
+
+
+We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
+
+ * We can mix an `unsafe` block with Fearless FFI to make a much safer systems programming language!
+ * We can mix Erlang's isolation benefits with functional reactive programming to make much more resilient programs!
+ * We can mix region borrow checking with Pony's `iso` to support shared mutability.
+
+...plus a lot more interesting ideas to explore!
+
+
+The Vale programming language is only one combination of the features we've found. Our goal is to publish all the techniques we've found, even the ones that couldn't fit in Vale, so that other languages can make strides in this area.
+
+
+Our medium-term goals:
+
+ * Publish the Language Simplicity Manifesto, a collection of principles to keep programming languages' learning curves down.
+ * Publish the Memory Safety Grimoire, a collection of "memory safety building blocks" that languages can potentially use to make new memory models, just like Vale combined generational references and scope tethering.
+ * Prototype the Region Borrow Checker in Vale, to show the world that shared mutability can work with borrow checking!
+ * Prototype Hybrid-Generational Memory in Vale, to see how fast and easy we can make single ownership.
+
+
+We aim to publish articles biweekly on all of these topics, and inspire the next generation of fast, safe, and easy programming languages.
+
+
+If you want to support our work, please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+With enough sponsorship, we can:
+
+ * Work on this full-time.
+ * Turn the Vale Language Project into a 501(c)(3) non-profit organization.
+ * Make Vale into a production-ready language, and push it into the mainstream!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>

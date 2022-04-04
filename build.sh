@@ -157,6 +157,16 @@ if [ $TARGET == "surprising-weak-refs" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
+if [ $TARGET == "yak-shave-language-engine-game" ] || [ $TARGET == "all" ] ; then
+  echo "Doing yak-shave-language-engine-game"
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/yak-shave-language-engine-game src/blog/yak-shave-language-engine-game.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/yak-shave-language-engine-game src/blog/yak-shave-language-engine-game.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
 if [ $TARGET == "python-data-races" ] || [ $TARGET == "all" ] ; then
   echo "Doing python-data-races"
   echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/python-data-races src/blog/python-data-races.vmd

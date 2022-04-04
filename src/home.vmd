@@ -6,7 +6,7 @@ realm: blog
 path: home
 ---
 
-Welcome! I'm Evan Ovadia, a software architect, language designer, and hobbyist game developer.
+Welcome! I'm Evan Ovadia, a software architect, hobbyist game developer, and lead for the [Vale Programming Language](https://vale.dev/).
 
 I use this site to blog about my endeavors. Enjoy!
 
@@ -16,6 +16,9 @@ I use this site to blog about my endeavors. Enjoy!
 
 # Recent posts:
 
+ * [A Tale of Yak Shaving: Accidentally Making a Language, for an Engine, for a Game
+](/blog/yak-shave-language-engine-game)
+ * [Surprising Weak-Ref Implementations: Swift, Obj-C, C++, Rust, and Vale](/blog/surprising-weak-refs)
  * [Vale's Higher RAII, the pattern that saved me a vital 5 hours in the 7DRL Challenge](/blog/higher-raii-7drl)
  * [Data Races in Python, Despite the Global Interpreter Lock](/blog/python-data-races)
  * [Seamless, Fearless, Structured Concurrency](/blog/seamless-fearless-structured-concurrency)
@@ -24,6 +27,72 @@ I use this site to blog about my endeavors. Enjoy!
  * [Zero Cost References with Regions](/blog/zero-cost-refs-regions)
  * [Next Steps for Single Ownership and RAII](/blog/raii-next-steps)
  * [Announcing Vale!](https://www.reddit.com/r/ProgrammingLanguages/comments/hplj2i/vale/)
+
+
+Follow along via our [RSS feed](/rss.xml) or the [r/Vale](https://reddit.com/r/vale) subreddit!
+
+
+# Game Dev
+
+I also do game development on the side, primarily for the [7DRL](https://itch.io/jam/7drl-challenge-2022) challenges!
+
+
+#### Shattered Forest (2021)
+
+<img src="https://img.itch.zone/aW1hZ2UvOTU3ODk0LzU0NTUyNzMucG5n/original/mtHkHu.png" width="100%"/>
+
+[Shattered Forest](https://verdagon.itch.io/shattered-forest) was a grand experiment in _how insane_ we could make terrain. Its levels had paths that criss-crossed over each other, as the player could hop a few tiles away, as long as the source and destination had the same elevation.
+
+
+#### Ember Deep (2020)
+
+<img src="https://img.itch.zone/aW1hZ2UvNTg0MDA3LzMwODYzMDAucG5n/original/vaHNB5.png" width="100%"/>
+
+[Ember Deep](https://verdagon.itch.io/ember-deep) was the first game to use Geomancer, the pentagonal tiling editor.
+
+It also improved a lot on Incendian Falls' time-traveling mechanic.
+
+
+#### Incendian Falls (2019)
+
+<img src="https://img.itch.zone/aW1hZ2UvMzc5NzU1LzE5MTk2NjkucG5n/original/tevxMt.png" width="100%"/>
+
+[Incendian Falls](https://verdagon.itch.io/incendian-falls) was the first prototype of the Chronobase time-travel system. It used a DSL to define an entire database and API that allows reverting to arbitrary revisions, with built-in pauseless compaction.
+
+I gave a talk at the [2019 Roguelike Celebration](https://www.youtube.com/watch?v=Xwa1KbXqeGQ) conference about Domino, the unique art style.
+
+It was also the first game to ever use pentagonal tiling. Pretty trippy, right?
+
+
+
+////
+
+# [Vale](https://vale.dev/)
+
+My biggest endeavor is Vale, a statically-typed ahead-of-time-compiled language that aims to be fast, safe, and flexible.
+
+I'm combining the best parts of C++, Rust, and Scala (and even a tiny bit of Javascript!) with some novel innovations:
+
+ * Generational Memory, an alternative to RC, GC, or borrow checking.
+ * HGM, speeding up Generational Memory with "LifeCell"s.
+ * Region Borrow Checking, which allows us to temporarily treat all pre-existing memory as immutable, enabling optimizations and seamless structured concurrency.
+
+Check it out at [https://vale.dev/](https://vale.dev/)!
+
+
+```vale
+exported func main() {
+  planets = []["Venus", "Earth", "Mars"];
+  foreach planet in planets {
+    println("Hello " + planet + "!");
+  }
+}
+```stdout
+Hello Venus!
+Hello Earth!
+Hello Mars!
+```: `import stdlib.*;`
+
 
 
 
@@ -68,67 +137,6 @@ At some point, I might jump back into the workforce. If you know an endeavor tha
 [2022 Resume](https://verdagon.dev/EvanOvadia2022Resume812.pdf)
 
 
-
-////
-
-# Vale
-
-My biggest endeavor is Vale, a statically-typed ahead-of-time-compiled language that aims to be fast, safe, and flexible.
-
-I'm combining the best parts of C++, Rust, and Scala (and even a tiny bit of Javascript!) with some novel innovations:
-
- * Generational Memory, an alternative to RC, GC, or borrow checking.
- * HGM, speeding up Generational Memory with "LifeCell"s.
- * Region Borrow Checking, which allows us to temporarily treat all pre-existing memory as immutable, enabling optimizations and seamless structured concurrency.
-
-Check it out at [https://vale.dev/](https://vale.dev/)!
-
-
-```vale
-exported func main() {
-  planets = []["Venus", "Earth", "Mars"];
-  foreach planet in planets {
-    println("Hello " + planet + "!");
-  }
-}
-```stdout
-Hello Venus!
-Hello Earth!
-Hello Mars!
-```: `import stdlib.*;`
-
-
-
-# Game Dev
-
-I also do game development on the side, primarily for the [7DRL](https://itch.io/jam/7drl-challenge-2022) challenges!
-
-
-#### Shattered Forest (2021)
-
-<img src="https://img.itch.zone/aW1hZ2UvOTU3ODk0LzU0NTUyNzMucG5n/original/mtHkHu.png" width="100%"/>
-
-[Shattered Forest](https://verdagon.itch.io/shattered-forest) was a grand experiment in _how insane_ we could make terrain. Its levels had paths that criss-crossed over each other, as the player could hop a few tiles away, as long as the source and destination had the same elevation.
-
-
-#### Ember Deep (2020)
-
-<img src="https://img.itch.zone/aW1hZ2UvNTg0MDA3LzMwODYzMDAucG5n/original/vaHNB5.png" width="100%"/>
-
-[Ember Deep](https://verdagon.itch.io/ember-deep) was the first game to use Geomancer, the pentagonal tiling editor.
-
-It also improved a lot on Incendian Falls' time-traveling mechanic.
-
-
-#### Incendian Falls (2019)
-
-<img src="https://img.itch.zone/aW1hZ2UvMzc5NzU1LzE5MTk2NjkucG5n/original/tevxMt.png" width="100%"/>
-
-[Incendian Falls](https://verdagon.itch.io/incendian-falls) was the first prototype of the Chronobase time-travel system. It used a DSL to define an entire database and API that allows reverting to arbitrary revisions, with built-in pauseless compaction.
-
-I gave a talk at the [2019 Roguelike Celebration](https://www.youtube.com/watch?v=Xwa1KbXqeGQ) conference about Domino, the unique art style.
-
-It was also the first game to ever use pentagonal tiling. Pretty trippy, right?
 
 >>>>
 

@@ -1,4 +1,6 @@
 
+- not much simplicity to be found
+- not very resilient to needed changes
 
 
 goal: rust aint perfect, we can't improve until we know what the drawbacks are.

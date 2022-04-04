@@ -6,6 +6,7 @@ realm: blog
 path: blog/python-data-races
 layout: annotated
 namespace: c-blog m-annotated
+sponsor: me
 ---
 
 I recently wrote an article on [how a language can improve on Rust's and Pony's concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), and one of my readers asked:

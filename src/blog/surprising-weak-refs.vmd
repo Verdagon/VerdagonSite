@@ -1,43 +1,91 @@
 ---
-title: Surprising Weak-Ref Implementations: Vale, Rust, Swift, Obj-C, C++
+title: Surprising Weak-Ref Implementations: Swift, Obj-C, C++, Rust, and Vale
 subtitle: Such shenanigans, right under our noses!
 author: Evan Ovadia
-date: Jan 8
+date: Apr 4, 2022
 realm: blog
 path: blog/hybrid-generational-memory
 layout: annotated
 namespace: c-blog m-annotated
+sponsor: me
 ---
 
 
 > "Are you kidding me? That's... *horrifying.*" - Alice (about Obj-C).
 
-> "And you're fine with that!?" - Ed (about Vale).
+> "That's nonsense!" - Ed (about Vale).
 
-> "It's not just an index. Being a weak reference is a *state of mind.*" - Bob (about Rust)
+> "It's not just an index, a weak reference is a *state of mind.*" - Bob (about Rust)
 
 
 Weak references are _weird_.
 
-...let's see the wonderful and arcane mechanisms that make weak references work!
+
+This post is a collection of all the mysterious and arcane mechanisms that languages use to offer weak references.
+
+Our quest was to figure out the best approach to use for [Vale](https://vale.dev/), that aligned with its goals of being *fast, memory safe, and easy to use.*
+
+In the end, we made a completely new approach!
 
 
 # What are they _supposed_ to be?
 
-In most languages, [# More specifically, in shared-ownership languages like Python, Swift, Obj-C, C#.] normal references are "strong". As long as there is at least one strong reference to an object, the object stays alive. When the last strong reference goes away, the object is deallocated.
-
-We can also have *weak* references to the object, which _don't_ keep the object alive. They become null when the target object dies.
+In most languages, [# More specifically, in shared-ownership languages like Python, Swift, Obj-C, C#.] normal references are "strong". As long as there is at least one strong reference to an object, the object stays alive. When the last strong reference goes away, the object is deallocated. [# In reference counted languages like Swift, the language immediately notices there are no more strong references to the object, and deallocates the object right away. In tracing-garbage-collected languages like Java, the interpreter eventually notices that nobody points at this object, and deallocates it then.]
 
 
-These aren't just useful to break ref-counting cycles, they're used to know when something still logically exists, to factor into our program's behavior. If you've ever seen an `alive` or `dead` boolean in a class, it probably could have been replaced by a weak reference.
+We can also have *weak* references to the object, which _don't_ keep the object alive. After the target object dies, they appear to be null. [# Languages rarely set them to null. More often, a weak reference has some way of knowing whether the target object is still alive, so it can pretend to be null.]
 
-Sounds pretty simple, right? It's probably easy to implement too. Maybe just an integer or a boolean or something?
+
+These aren't just useful to break [ref-counting cycles](https://www.appypie.com/how-to-fix-strong-reference-cycle-swift). They're also used to know when something still logically exists, to factor into our program's behavior. If you ever seen an `alive` or `dead` boolean in a class, you're likely seeing a good use-case for weak references.
+
+
+For example, we can use it in an observer:
+
+```vale
+func handleClick(self &Button) {
+  // Check if self.clickObserverWeakRef points to an object that's still alive.
+  // If it is, refer to it as clickObserver.
+  if clickObserver = self.clickObserverWeakRef.lock() {
+    // Now that we know it's alive, call its onClick.
+    clickObserver.onClick();
+  }
+}
+```
+
+
+
+Or perhaps a magic missile can check if its enemy still exists:
+
+```vale
+func takeAction(self &Missile) {
+  // Check if self.enemyWeakRef points to an enemy that's still alive.
+  // If it is, refer to it as enemy.
+  if enemy = self.enemyWeakRef.lock() {
+    // Now that we know it's alive, move one step closer to it.
+    self.position.goToward(enemy.position);
+    if self.position == enemy.position {
+      // We've reached the enemy, explode!
+      self.explode();
+    }
+  } else {
+    // The enemy is gone. Explode where we are anyway!
+    self.explode();
+  }
+}
+```
+
+
+
+It's a rather useful tool! And it's pretty simple under the hood.
+
+_...except_ in Objective-C.
+
 
 
 # Objective-C's Global Weak Pointer Tracking Manager [# 
 Sources: [Matt](https://stackoverflow.com/a/42847825), [Mecki](https://stackoverflow.com/a/23689503)]
 
-To implement this, Objective-C has a mutex-guarded global hash map, tracking all the weak references and what objects they point to. See, easy!
+Objective-C has a mutex-guarded global hash map, tracking all the weak references and what objects they point to.
 
 Specifically:
 
@@ -50,7 +98,7 @@ Specifically:
     * It uses that address to set the weak reference to nil.
 
 
-There _are_ benefits to this approach!
+Unexpectedly, there _are_ benefits to this approach!
 
  * Given a weak reference, checking if it's pointing at a live object is _extremely fast_. We just have to check if the reference is nil.
  * This doesn't have the "zombie allocation" problem that Swift and Rust have; this approach _may_ use less memory than they do.
@@ -66,9 +114,10 @@ But of course, it has drawbacks:
 </slice>
 
 
+
 # Swift's Zombie Objects [# Source: [Mike Ash](https://mikeash.com/pyblog/friday-qa-2015-12-11-swift-weak-references.html)]
 
-When Swift isn't using the above Objective-C approach for compatibility reasons, Swift does something pretty elegant.
+When Swift isn't using the Objective-C approach for compatibility reasons, Swift actually does something pretty elegant.
 
 A Swift object has two counters in it:
 
@@ -78,11 +127,12 @@ A Swift object has two counters in it:
 
 Remember how we said "when the last strong reference goes away, the object is deallocated"? *That's not true for Swift.*
 
+
 Let's say an object has strong references and weak references pointing at it.
 
 When the last strong reference goes away, the object is *deinitialized*, but not deallocated. I like to think that deinitializing just zeroes out all the fields. [# This isn't quite true, it actually doesn't change the memory, but it helps a lot to think of it this way.]
 
-The object isn't deallocated quite yet; the object is in a zombie state because there are still weak references pointing to it.
+The object isn't deallocated quite yet; the object is in kind of a "zombie state" because it has no usable contents, but it's kept alive while there are still weak references pointing to it.
 
 
 If we ask one of these weak references "are you pointing at a live object?", it will look into the object and check if the strong ref count is positive. If so, it responds `true`. If it's zero, it responds `false`. [# If the answer is `false`, Swift also sets the reference to be _actually_ null, rather than just pointing at a zombie object, so it can answer more quickly next time, without having to dereference again.]
@@ -91,276 +141,335 @@ If we ask one of these weak references "are you pointing at a live object?", it 
 Later, when we let go of the last weak reference, the weak reference counter goes to zero, and the object is deallocated; the zombie is finally destroyed.
 
 
-Swift's approach has some benefits:
+Swift's approach has a big benefit:
 
- * It have some memory overhead (two counters per object, and zombie objects which take up space)
- * It's very fast, because the ref-count is next to the rest of the object's fields, which is very cache-friendly. [# This means that the counters are on the same cache line as the fields, which means if we access one, we eagerly bring the other into cache, making subsequent accesses faster.]
+ * It's very fast, because the ref-count is next to the rest of the object's fields, which is very cache-friendly. [# This means that the counters are on the same cache line as the fields, which means if we access the counter, the CPU naturally brings some nearby fields into cache, making subsequent accesses faster.]
 
 and some costs:
 
- * We pay the cost of weak references even if we never use them.
  * Zombie objects: the entire object's allocation might stick around even after the last strong reference disappears.
+ * It has some memory overhead (a second counter per object), which we pay even if we never use weak references.
  * All objects must be separately allocated in the heap, we can never have a weak reference to an object that lives inside another object's memory.
 
 
-Swift's approach is also very simple, and I like that. [# Especially compared to Objective-C's approach!]
+Swift's approach is very simple, and I like that. [# Especially compared to Objective-C's approach!]
 
 <slice/>
 
-
-# Rust's Weak
-
-In Swift, we had a weak reference count *inside* each object, and in Objective-C, it was a hash map *outside* that tracked weak reference information.
-
-If we look at the memory layout, Rust is similar to Swift; right next to the object we have a strong ref count and a weak ref count.
-
-There is one difference: in Rust, we can choose whether an object has these counters are not. A `Spaceship` will by default not have any counters, but an `Rc<Spaceship>` will have them.
-
-This has a big benefit:
-
- * In Rust, we can opt-in to the counters' 16B overhead _only when we need it_. Otherwise, we don't need to pay that cost.
- * Each new weak reference is only 8B.
-
-And costs:
-
- * Given a regular borrow reference (`&Spaceship`), we can't create a weak reference. We need access to an existing `Rc<Spaceship>` or `Weak<Spaceship>` to make a `Weak<Spaceship>`. In Swift, we can make a weak reference from any object.
- * We need to decide, at the time of allocation, whether an object will be reference-counted. We can't change our minds later.
- * Zombie objects: the entire object's allocation might stick around even after the last strong reference disappears.
- * All objects must be separately allocated in the heap, we can never have a weak reference to an object that lives inside another object's memory.
- * Complexity: `Weak<Spaceship>` is infectious, and we can't upgrade a borrow reference (`&Spaceship`) to a weak reference (`Weak<Spaceship>`).
-
-
-Rust programs often use a weak-reference-esque substance called a "generational index", see the section further below on that.
-
-<slice/>
 
 
 # C++'s weak_ptr
 
-Rust allowed us to use reference counting on some objects, and not others. C++ is very similar.
+If we look at the memory layout, C++ is similar to Swift; right next to the object we can have a strong ref count and a weak ref count. [# This is the case if we use std::make_shared. If we initialize a shared_ptr directly, then the counters will be somewhere else in the heap.]
 
-Rust has a distinction between `Spaceship` and `Rc<Spaceship>`, and in the same way, C++ has a distinction between `Spaceship` and `shared_ptr<Spaceship>`.
+In C++, we choose whether an object can have weak references to it or not. A `Spaceship` will by default not have any counters, but a `shared_ptr<Spaceship>` will have them.
 
-Whereas Rust and Swift put its counters next to the object in memory, C++ keeps it separate. Under the hood, a `shared_ptr<Spaceship>` is not just a pointer, it's actually two pointers stuck together:
+We can make a weak reference, a `weak_ptr<Spaceship>`, from any `shared_ptr<Spaceship>`.
 
- * A pointer to the Spaceship,
- * and a pointer to a separate "control struct" allocation in the heap which contains the strong reference counter and the weak reference counter. [# It has a third field too, see [this](https://stackoverflow.com/a/6830836) for more information.]
 
 This has benefits:
 
- * Like Rust, we can opt-in to the counters' 16B overhead only when we need it.
- * Each new weak reference is only 8B.
- * It's the most flexible; we can wrap an existing allocation in a shared_ptr, and change our minds later to make it not shared.
+ * We can opt-in to the counters' 16B overhead only when we need it. [# This is a principle called "zero-cost abstraction"; if we don't use a feature, it doesn't cost us any space or CPU time.]
 
-And costs:
+And a cost:
 
- * Each reference is 16B.
- * All objects must be separately allocated in the heap, we can never have a weak reference to an object that lives inside another object's memory.
- * Complexity: `weak_ptr` (and `shared_ptr`) is infectious, and we can't upgrade a raw pointer/reference to a weak_ptr. [# Unless we use `enable_shared_from_this` which is notoriously brittle.]
+ * Each weak_ptr is 16B. [#weakptrimpl]
+
+And some oddities:
+
  * If we make the allocation with `make_shared`, the object and its control struct share an allocation, resulting in zombie objects. [# [Source](https://dev.to/fenbf/how-a-weakptr-might-prevent-full-memory-cleanup-of-managed-object-i0i)]
+ * If we have a regular pointer (`Spaceship*`) we cannot get a `weak_ptr<Spaceship>` unless `Spaceship` inherits from `std::enable_shared_from_this`.
+
+
+<slice>
+#weakptrimpl: A typical implementation of weak_ptr stores two pointers:
+
+ * a pointer to the control block; and
+ * the stored pointer of the shared_ptr it was constructed from. 
+
+Source: [cppreference](https://en.cppreference.com/w/cpp/memory/weak_ptr)
+</slice>
+
+
+# Rust's Weak
+
+Rust's `Rc` and `Weak` are basically C++'s `shared_ptr` and `weak_ptr`, with a couple differences:
+
+ * Rust's `Rc` always puts its counters next to the object, whereas C++ lets us put it in a separate block if we want to.
+ * Given a `&Spaceship`, we aren't able to get a `Weak<Spaceship>`.
+
+
+We don't often see `Rc` and `Weak` in Rust. Instead, we use other mechanisms that behave like weak references.
+
+
+# Weak References, Hidden in Plain Sight
+
+We've now seen a few different kinds of weak references. However, if we zoom out a bit, we see a lot of things that act very similarly to weak references.
+
+
+A weak reference is basically something that you can trade for a regular reference to the object _if it still exists_.
+
+
+When you think of it that way, a lot of things are weak references.
+
+
+For example, a string containing a filename, like `myfile.txt`. We can trade it for the contents of a file, if the file still exists:
+
+```vale
+func main() {
+  if contents = readFileAsString("myfile.txt") {
+    // File exists!
+    println(contents);
+  } else {
+    println("File doesn't exist!");
+  }
+}
+```
 
 
 
-# Vale's Generational References
+Or perhaps we have an integer ID, and we can use it to look up a Spaceship in a map:
 
-Vale does something rather unusual.
-
-In Vale, every allocation [# Not every object has a generation, only every allocation. Since an object can contain other objects' memory ("inline"), multiple objects can share one generation number.] contains a "current generation number". It represents "I am the *n*th inhabitant of this memory location".
-
-Owning references are regular 8B pointers, but (like C++) non-owning references are actually two things stuck together:
-
- * A pointer to the object,
- * A "target generation number", which remembers the generation at the time the reference was made.
-
-
-When dereferencing a one of these, it does a "liveness check" to see whether the allocation's generation number *still matches* our reference's target generation.
+```vale
+func printName(ships &HashMap<int, Spaceship>, ship_id int) {
+  if ship = ships.get(ship_id) {
+    println("Ship exists! {ship.name}")
+  } else {
+    println("Ship doesn't exist!");
+  }
+}
+```
 
 
-It's as if the reference is saying:
 
-> *"Hello! I'm looking for the 11th inhabitant of this house, are they still around?"*
+Notice how we first check for existence, and then use the resulting data. Just like a weak reference!
 
 
-and the person who opens the door says:
+My favorite kind of weak-reference-in-disguise is the *generational index*, often used in C++ and Rust programs.
 
-> *"No, sorry, I'm the 12th inhabitant of this house, the 11th inhabitant is no more."* [#whatthen]
+
+# Generational Indices
+
+We often store our objects in arrays or vectors, such as a `Vec<Spaceship>`. [# Or a C++ `std::vector<Spaceship>` or a Java `ArrayList<Spaceship>`.] When we destroy a `Spaceship`, we often like to reuse its spot for another `Spaceship`.
+
+Sometimes, we remember a `Spaceship`'s index in the Vec. Later, we might want to know if that `Spaceship` is still there, or if it's been reused. Here's how!
+
+
+Next to every object in the vector, we have an integer: `Vec<(Spaceship, i64)>`. That `i64` is the `Spaceship`'s *current generation number*. Every time we reuse a slot, we increment that number.
+
+Whenever we want to remember a `Spaceship`'s index, we'll also remember its generation number at the time. This is the *remembered generation number*.
+
+For convenience, let's put the index and this "remembered generation number" in a little struct called a `GenerationalIndex`:
+
+```
+struct GenerationalIndex {
+  index: i64,
+  remembered_generation: i64
+}
+struct Missile {
+  enemy_ref: GenerationalIndex
+}
+```
+
+
+
+Now, if we want to know whether the `Spaceship` still exists, we just *compare the current generation number to the remembered generation number,* like:
+
+```
+if enemies[missile.enemy_ref.index] == missile.enemy_ref.remembered_generation {
+  // Enemy still exists!
+  let enemy = &enemies[missile.enemy_ref.index];
+  ...
+}
+```
+
+
+
+It's as if the generational index is saying:
+
+> *"Hello! I'm looking for the 11th inhabitant of index 7, are they still around?"*
+
+and the element at index 7 says:
+
+> *"No, sorry, I'm the 12th inhabitant, the 11th inhabitant is no more."*
 
 or instead:
 
 > *"Yes! That is me. Which of my fields would you like to access?"*
 
 
-This has benefits:
+That's a generational index. It's like a weak reference!
 
- * Making or destroying new weak references is free, nothing needs to be incremented.
+
+However, there is one downside to generational indices: to "dereference" it, we need access to the containing Vec (like the `enemies` Vec above), usually passed in through a parameter.
+
+This can sometimes be inconvenient: when we add a new parameter, we have to change our callers to supply it, and then our callers' callers, and our callers' callers' callers, which can result in "refactoring shockwaves". Doing this too often can cause churning APIs.
+
+Sometimes, to work around this drawback, we give up and put all of our containers into a "god object" and pass that around as an argument to every function in our codebase.
+
+Perhaps there's a better way to address this drawback. Read on!
+
+
+
+# Vale's Generational References
+
+Vale adds something like the generational index, which we call a *generational reference*.
+
+
+Every object has a "current generation number" next to it in memory. Whenever we destroy an object, we increment that number. [# Note that we don't free() it to the operating system quite yet, because we need that generation number to stick around so we can compare it to weak references' remembered generation numbers. Later on, we release the physical memory back to the OS using some virtual memory techniques. See [Mesh](https://tiba-jrchang.medium.com/mesh-compacting-memory-management-for-c-c-applications-bc2a2cecc8cc) for more!]
+
+
+To make a weak reference to that object, we get two things:
+
+ * A pointer to the object. [# Since it's not an index, we don't need access to any container!]
+ * The object's current generation number.
+
+...and stick them together.
+
+
+To know whether the object still exists, Vale just compares the object's current generation number to our reference's remembered generation number.
+
+
+Similar to the generational index, It's as if the reference is saying:
+
+> *"Hello! I'm looking for the 11th inhabitant of this house, are they still around?"*
+
+
+and the person who opens the door says:
+
+> *"No, sorry, I'm the 12th inhabitant of this house, the 11th inhabitant is no more."*
+
+or instead:
+
+> *"Yes! That is me. Which of my fields would you like to access?"*
+
+
+
+We implemented generational references, and found them to be [at least 2.3x faster than reference counting!](/blog/generational-references)
+
+
+Compared to the other weak reference approaches, this has benefits:
+
+ * Making or destroying new weak references is free, no reference counters need to be incremented.
+ * It enables [Fearless FFI](https://vale.dev/fearless#safe-externs); C code cannot corrupt Vale objects. [# Reference-counting approaches such as Python suffer from this. We give a reference to C code, the C code has to manually remember to increment/decrement it. Forgetting to do so will corrupt the Python object. No such incrementing is needed for generational references!]
  * It doesn't suffer the zombie object problem.
- * Supporting weak references only costs every allocation 8B.
- * Can do inline things.
+ * Supporting generational references costs an allocation only 8B!
 
 And costs:
 
- * Supporting weak references still costs every allocation 8B. We don't get to choose which allocations incur this cost.
+ * Supporting generational references costs an allocation a whole 8B.
+ * It can take some virtual memory maneuvers to release memory to the OS. [# See [Mesh](https://tiba-jrchang.medium.com/mesh-compacting-memory-management-for-c-c-applications-bc2a2cecc8cc), an algorithm for merging virtual addresses into one underlying physical page.]
+ * It can only be used for heap allocations, which have stable addresses.
 
 
-Vale adds static analysis and scope-tethering, making something like an "automatic borrow checker", see [hybrid-generational memory](/blog/hybrid-generational-memory) for more details!
+We foresee the average Vale program blending three different approaches:
+
+ * For heap allocations, we'd use generational references.
+ * When we have convenient access to the container, we'd use generational indexes.
+ * For everything else, we'd use "augmented generational indexes" which also bundle in a reference to the container.
+
+By offering these all in the standard library, we can make it easy to have fast weak references. That's good, because Vale's goal is to make speed and safety easier than ever before.
 
 
-<slice>
-#whatthen: This will safely halt the program, unless the user is explicitly checking whether something is alive (such as for a weak reference).
-</slice>
-
-
-# Weak References in Disguise
-
-What even _is_ a weak reference anyway?
-
-It's something that you can trade for a regular reference to the object _if it still exists_.
-
-When you think of it that way, a lot of things are weak references:
-
- * A string containing a file's path, like `/Users/JimRaynor/Hyperion.txt`
- * An integer containing an ID for a Spaceship.
- * A string containing a URL.
-
-Though, these do require that you ask some sort of external central tracker, respectively:
-
- * The file system.
- * A Map<int, Spaceship>.
- * The internet.
-
-
-## Generational Indices
-
-My favorite kind of weak-reference-in-disguise is the *generational index*, something that contains:
-
- * An index into a central array somewhere,
- * the target generation number of the element in that slot.
-
-It's similar to Vale's generational indices, but the objects (and their current generation numbers) are in a central array. [# Vale's approach was inspired by generational indices.]
-
-It does use a lot of memory, though. We're put things into a central vector so that we can have non-owning references into them, but that vector has anywhere between 1-2x the maximum memory it has ever needed. This can be very wasteful, if we added then removed a lot of elements.
-
-
-# Comparison
-
-<div class="comparison">
- <table>
-  <thead>
-   <tr>
-    <th width="16%">Aspect</th>
-    <th width="14%">Obj-C</th>
-    <th width="14%">Swift</th>
-    <th width="14%">C++ weak_ptr</th>
-    <th width="14%">Vale</th>
-    <th width="14%">Rust's Weak</th>
-    <th width="14%">Gen Indices</th>
-   </tr>
-  </thead>
-  <tbody>
-   <tr>
-    <th>B/Obj if 0</th>
-    <td class="good">0</td>
-    <td class="bad">16</td>
-    <td class="good">0</td>
-    <td class="meh">8</td>
-    <td class="good">0</td>
-    <td class="bad">8 + T [#plust]</td>
-   </tr>
-   <tr>
-    <th>B/Obj if >0</th>
-    <td class="bad">32</td>
-    <td class="meh">16</td>
-    <td class="bad">24</td>
-    <td class="good">8</td>
-    <td class="meh">16</td>
-    <td class="bad">8 + T</td>
-   </tr>
-   <tr>
-    <th>B/Weak</th>
-    <td class="bad">16</td>
-    <td class="good">8</td>
-    <td class="bad">16</td>
-    <td class="bad">16</td>
-    <td class="good">8</td>
-    <td class="bad">16</td>
-   </tr>
-   <tr>
-    <th>Zombies</th>
-    <td class="good">No</td>
-    <td class="bad">Yes</td>
-    <td class="meh">Some [#somezeds]</td>
-    <td class="good">No</td>
-    <td class="bad">Yes</td>
-    <td class="good">No</td>
-   </tr>
-   <tr>
-    <th>Aliasing</th>
-    <td class="terrible">Slow [#terrible]</td>
-    <td class="meh">Medium</td>
-    <td class="meh">Medium</td>
-    <td class="good">None</td>
-    <td class="meh">Medium</td>
-    <td class="good">None</td>
-   </tr>
-   <tr>
-    <th>Where</th>
-    <td class="good">Any</td>
-    <td class="bad">Heap [#heap]</td>
-    <td class="bad">Heap</td>
-    <td class="good">Any</td>
-    <td class="bad">Heap</td>
-    <td class="bad">Array [#array]</td>
-   </tr>
-   <tr>
-    <th>Upgrade</th>
-    <td class="good">Yes</td>
-    <td class="good">Yes</td>
-    <td class="bad">No</td>
-    <td class="good">Yes</td>
-    <td class="bad">No</td>
-    <td class="bad">No</td>
-   </tr>
-  </tbody>
- </table>
-</div>
-
- * *B/Obj if 0*: Bytes per object when there are zero weak refs.
- * *B/Obj if >0*: Bytes per object if there are some weak refs.
- * *B/Weak*: Bytes per weak reference.
- * *Zombies*: Whether a weak reference keeps the allocation alive.
- * *Aliasing*: Run-time cost of making new weak references.
- * *Where*: Where the object has to live, to enable weak references.
- * *Upgrade*: Whether you can make a weak reference from a regular reference.
-
-<slice>
-#plust: T refers to the space wasted by the vector containing the objects and generations.
-
-#somezeds: `weak_ptr` causes zombie objects only if `make_shared` originally made this object.
-
-#terrible: Emphasis here because this mechanism is prohibitively slow, because it requires a mutex and hashing.
-
-#heap: This means the object has to be in the heap if we want to make a weak reference to it.
-
-#array: This means the object has to be in an array if we want to make a weak reference to it. We also have to pass a reference to the array around (usually via parameter).
-</slice>
+<slice />
 
 
 # Conclusion
 
-Weak references are pretty slick. (insert conclusion here)
+
+Thanks for reading! In the coming weeks, I'll be writing about how we can augment generational references with an "automatic borrow checker," so subscribe to our [RSS feed](https://verdagon.dev/rss.xml) or the [r/Vale](https://reddit.com/r/vale) subreddit, or come hang out in the [Vale discord](https://discord.gg/SNB8yGH).
+
+
+
+If you found this interesting, please consider sponsoring us:
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>
+
+With your help, we can write articles like this more often!
+
+
+- Evan Ovadia
 
 
 <slice new-color="afterword"/>
 
 
-# Afterword: Don't Use GC'd Weak References (Python, C#, Java)
 
-In languages with tracing garbage collectors, the garbage collector runs at random times, nondeterministically.
+# About the Vale Language Project
 
-Normally, this nondeterminism doesn't affect the program's logic, which is good.
+The Vale Language Project is not just about making Vale, it's about *exploring, discovering, and publishing* new programming language mechanisms that enable *speed*, *safety*, and *ease of use.*
 
-However, there's _one_ way that the garbage collector's nondeterminism can creep into our program: weak references.
 
-Weak references only become null when the garbage collector runs and determines the target object is unreachable.
+*The world needs more exploration here!* Currently, most programming language research is is in:
 
-So, unless you want mysterious bugs in your program, don't use weak references in Python, C#, Java, or any other garbage collected language.
+ * High-overhead languages involving reference counting and tracing garbage collection.
+ * Complex languages (Ada/Spark, Coq, Rust, Haskell, etc.) which impose a higher complexity burden on the average programmer.
+
+These are useful, but there is a *vast field of possibilities* in between, waiting to be explored!
+
+
+Our aim is to explore that space, discover what it has to offer, and make *speed and safety easier than ever before.*
+
+
+In this quest, we've discovered a lot of new techniques:
+
+ * [Region Borrow Checking](/blog/zero-cost-refs-regions), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Generational Memory](/blog/generational-references), for a language to ensure an object still exists at the time of dereferencing.
+ * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
+
+
+These techniques have also opened up some new emergent possibilities:
+
+ * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
+ * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
+ * [Fearless FFI](/blog/fearless#safe-externs), which allows us to call into C without risk of accidentally corrupting Vale objects.
+ * Deterministic replayability, to record all inputs and replay execution. Goodbye races and heisenbugs!
+ * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
+
+
+We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
+
+ * We can mix an `unsafe` block with Fearless FFI to make a much safer systems programming language!
+ * We can mix Erlang's isolation benefits with functional reactive programming to make much more resilient programs!
+ * We can mix region borrow checking with Pony's `iso` to support shared mutability.
+
+...plus a lot more interesting ideas to explore!
+
+
+The Vale programming language is only one combination of the features we've found. Our goal is to publish all the techniques we've found, even the ones that couldn't fit in Vale, so that other languages can make strides in this area.
+
+
+Our medium-term goals:
+
+ * Publish the Language Simplicity Manifesto, a collection of principles to keep programming languages' learning curves down.
+ * Publish the Memory Safety Grimoire, a collection of "memory safety building blocks" that languages can potentially use to make new memory models, just like Vale combined generational references and scope tethering.
+ * Prototype the Region Borrow Checker in Vale, to show the world that shared mutability can work with borrow checking!
+ * Prototype Hybrid-Generational Memory in Vale, to see how fast and easy we can make single ownership.
+
+
+We aim to publish articles biweekly on all of these topics, and inspire the next generation of fast, safe, and easy programming languages.
+
+
+If you want to support our work, please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+With enough sponsorship, we can:
+
+ * Work on this full-time.
+ * Turn the Vale Language Project into a 501(c)(3) non-profit organization.
+ * Make Vale into a production-ready language, and push it into the mainstream!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>

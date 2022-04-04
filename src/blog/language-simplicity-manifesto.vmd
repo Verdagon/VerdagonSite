@@ -6,6 +6,7 @@ realm: blog
 path: blog/seamless-fearless-structured-concurrency
 layout: annotated
 namespace: c-blog m-annotated
+sponsor: me
 ---
 
 
