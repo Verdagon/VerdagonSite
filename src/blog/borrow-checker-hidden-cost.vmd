@@ -1,0 +1,37 @@
+title: The Borrow Checker's Hidden Costs
+
+
+When we follow the borrow checker's lead in Rust, we give up most shared mutability.
+
+"You can do anything without shared mutability, though."
+
+True! Anything is possible within the confines of the borrow checker, if you're willing to pay a certain cost.
+
+This is an article about those costs.
+
+
+# The Phases of Borrow Checking
+
+There are three phases to learning how to use the borrow checker:
+
+ 1. Learning the borrow checker's rules.
+ 2. Learning the design patterns that work within the borrow checker's rules
+ 3. Learning when and how to break those rules.
+
+When I got to phase #2, Rust had "clicked", and I was able to write anything I wanted, with enough refactoring.
+
+But when I got to phase #3, I looked back at my past self, and realized a lot of the hidden costs I was paying while in #2.
+
+
+# This article is not about Rust as a whole
+
+...it's about the borrow checker specifically. Rust is more than just the borrow checker, it has a lot of tools that complement it, such as `split_at_mut`, `Cell`, `RefCell`, FFI for the purposes of modifying some shared mutable state, etc.
+
+It could be said that this is an article about a certain dialect of Rust, where we avoid those tools.
+
+
+# Observer
+
+To illustrate the more strategic costs of the borrow checker, let's look at a simple example: observers!
+
+

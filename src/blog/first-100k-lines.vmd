@@ -1,0 +1,413 @@
+---
+title: How to Survive Your First 100,000 Lines
+author: Evan Ovadia
+date: Apr 9, 2022
+realm: blog
+path: blog/first-100k-lines
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: us
+---
+
+
+
+The Vale compiler just hit its [100,000th line of code.](linkhere)
+
+
+This is an article about how we kept it from *collapsing under its own weight and exploding,* as many projects do.
+
+
+Ironically, most of these techniques didn't come from my time at Google, they instead came from my work on the Vale compiler and game development. [# Though I did later apply a lot of these architecture techniques to [Google Earth](https://earth.google.com/web/).] So, some of these will be surprising to a lot of my engineer comrades out there.
+
+
+These techniques range from determinism, to testing, to type-system techniques, to general architectural best-practices.
+
+
+And since I'm a language geek, I'll also throw in some nonsense about languages!
+
+
+# If you think you're using enough assertions, you're wrong.
+
+I'm not exaggerating when I say assertions are the greatest thing since sliced arrays, and have cut my debugging time by half.
+
+
+<div style="text-align: center"><a href="https://i.redd.it/e1ck7vngll811.png"><img src="/images/squirrel.jpg" width="60%"/></a></div><div style="opacity: .8; text-align: center"><a href="https://i.redd.it/e1ck7vngll811.png">In your darkest hour, the assertion arrives.</a></div>
+
+
+For those unfamiliar, an assertion is basically an if-statement with a panic:
+
+```
+if thing_that_i_assume_is_four != 4 {
+  // Prints "Thing isn't 4!" and halts the program.
+  panic("Thing isn't 4!");
+}
+```
+
+and a lot of languages have an `assert` function, so it can be written like:
+
+```
+assert(thing_that_i_assume_is_four == 4, "Thing isn't 4!");
+```
+
+
+
+Rule of thumb: Every time you _think_ something is true about your data, and it's not ensured by the type system, add an assertion that checks it.
+
+
+We once had a bug in the post-parser which caused some data corruption, and _thank goodness_ it was caught by an assertion in the final stage of the compiler. [# Previously known as the Hammer stage, though now it has the more boring name of FinalAstSimplifier.] If that assertion didn't catch it, it would have made it into the LLVM-generated code, and would have taken _hours_ to track down.
+
+
+Miracles like that are why the Vale compiler has an entire *1,795 assertions.*
+
+
+<slice/>
+
+
+# Lean on the Type System
+
+Even if you're using a statically typed language, you can still make youre code _more_ statically typed.
+
+
+For example, a string can serve many purposes: an ID, a first name, a URL, and so on. Make a separate wrapper class for each of these, so you don't accidentally pass an ID string into a parameter expecting a URL string.
+
+Any statically-typed language has that capability, make sure to lean on it!
+
+
+Languages like Vale and Rust are particularly strong in this regard because of their [type-state programming](http://cliffle.com/blog/rust-typestate/) [# Type-state programming is a way for the compiler to ensure that a particular class doesn't fall into an invalid state.]
+and especially Vale's [Higher RAII](https://verdagon.dev/blog/higher-raii-7drl). [# Higher RAII will make sure you never forget to call a particular function.]
+
+
+# A better way to comment
+
+In 2019, I came across some of our code for generational references. [# [Generational references](https://vale.dev/blog/generational-references) are an alternative mechanism for memory safety, like reference counting, garbage collection, or borrow checking.]
+
+"That's odd," I said, "This really should be simpler." and I started refactoring.
+
+However, I quickly ran into a wall, and discovered why our code looked odd: it was actually handling some pretty complicated requirements that required that odd approach.
+
+
+In 2021, I came across the same code.
+
+"That's odd," I said, "This really should be simpler." and I started refactoring.
+
+...and proceeded to run into _that same wall._ It was only then that I remembered my first attempt.
+
+
+*This is why we leave comments!*
+
+
+However, comments can become out-of-date, and you might not be lucky enough to stumble across the right comment before you embark on a refactoring adventure.
+
+
+For this reason, we also scatter *clues* around, like the below `see SAIRFU`.
+
+```
+// Here we used to check that the rule's runes were solved, but
+// we don't do that anymore because some rules leave their runes
+// as mysteries, see SAIRFU.
+```
+
+
+
+"See (acronym)" means to search our internal docs for more explanations and discussion. In this case, the documentation's SAIRFU section says:
+
+```
+# Send and Impl Rules For Upcasts (SAIRFU)
+
+`a MyInterface = MyStruct(1337);`
+
+Let's say a's coord rune is X. We can't say:
+`X = MyInterface`
+`X = MyStruct`
+because that's a conflict.
+
+We could just not feed the X = MyStruct into the solver, but then this breaks:
+`a = MyStruct(1337);`
+because it can't figure out what X should be.
+
+...
+```
+
+
+
+This is good for many reasons:
+
+ * We can paste "Some rules leave their runes as mysteries, see SAIRFU." into many comments across our codebase, anywhere that's relevant. This is much better than copying an entire lengthy explanation to a dozen places in the code.
+ * If we later decide SAIRFU wasn't wise, we can search the codebase for SAIRFU to find all of the places we need to update.
+
+
+*TL;DR:* Have many links to centralized documentation.
+
+
+
+# Avoid Nondeterminism
+
+Have you ever had a bug that you could only reproduce one out of every ten tries? What an adventure!
+
+And then there's the bugs that you might only reproduce every hundredth try... *a harrowing endeavor.* You try and you try, and eventually give up and close the bug report as "Cannot Reproduce".
+
+
+This unpredictability is caused by non-determinism, in other words, *when there are some random factors that make it hard to predict whether something will happen.* For example:
+
+ * You're using a random number generator, and the bug only happens when the random number is odd.
+ * The bug only happens when thread A happens to access data before thread B.
+ * The bug only happens when network response B comes before network response A.
+ * You're doing something if C#'s string.GetHashCode is odd. [# I was shocked when string.GetHashCode broke my determinism in the 2020 7DRL Challenge.]
+ * The bug only happens when item X appears before item Y in a hash map in Golang or Rust.
+
+
+If non-determinism creeps into your program, you'll be testing your application, find a bug, and then never be able to reproduce it... so avoid it when you can!
+
+
+<slice/>
+
+
+# ...except you can't really avoid nondeterminism.
+
+"Easy for you to say, you're working on a compiler! My app needs network requests, I can't just avoid them!"
+
+
+You're right, of course! Network requests, overlapping file I/O, animations, threads, and lots of nondeterministic things might be necessary for your program. [#nondgood]
+
+
+But if we have non-determinism, how do we reproduce bugs?
+
+
+The answer: *deterministic replayability!*
+
+ * Record any sources of non-determinism into a file. For example:
+    * Record all responses you get from the network.
+    * Record the seed number you used to initialize your random number generator.
+    * Record all inputs from the user.
+ * Have a "replay mode" where you read from that file instead. For example:
+    * Instead of requesting to the network, read from that file.
+    * Instead of initializing your random number generator with the current timestamp, initialize it with the number you previously wrote to the file.
+    * Instead of reading input from the user, read what you previously wrote to the file.
+
+
+While you're developing or testing, your program should be recording to these files. When you find a bug, fire up replay mode, and enjoy the time you saved!
+
+
+In the 2020 7DRL Challenge, on the penultimate evening, I launched thousands of games automatically played by a "random AI" player. Three of them crashed, and I was able to fix the bugs because I could reproduce those crashes with deterministic replayability.
+
+
+C#, Golang, and Rust are all intentionally nondeterministic, which makes this rather difficult.
+
+Vale is also intentionally nondeterministic, but completely solves the reproducibility problem with its [Deterministic Replayability](https://vale.dev/guide/deterministic-replayability); it will do the above recording and replaying for you, even in the presence of multithreading.
+
+
+<slice>
+#nondgood: And besides, nondeterminism can be good!
+
+ * Golang's [hash maps have a random order](https://go.dev/blog/maps) to prevent certain bugs and attacks.
+ * Random number generators make each run of a game different!
+</slice>
+
+
+# Stay on top of your testing
+
+In a small project, only a few thousand lines, it's easy to fix a bug without causing any more bugs because you know the system in and out.
+
+
+Once you start approaching 10,000 lines, fixing one bug will often cause multiple other bugs. Not just easy bugs, but obscure bugs that your users find six months later.
+
+
+However, with tests, you'll know _instantly_ whether your fix caused any other bugs. You can then try a better fix.
+
+
+If you don't have a vast suite of tests, your project probably won't survive its first 100,000 lines. [# There are exceptions to this. In game development, requirements change so much, that even end-to-end tests can have a negative return-on-investment. Other methods of testing are preferred, such as setting two random AI players against each other. Be sure to save the random seed!]
+
+
+Some languages are easier to test with. Javascript's [Monkey Patching](https://www.audero.it/blog/2016/12/05/monkey-patching-javascript/) is a wonderful alternative to mocking, and can make testing much easier.
+
+
+## Prefer End-to-End Tests
+
+In the early days of the Vale compiler, we had a lot of unit tests for our various components.
+
+For those unfamiliar, a *unit test* is one that specifically tests just one piece of code. You craft some inputs, feed those into your code, and check the outputs.
+
+Unit tests are nice because they tell you _exactly_ where the bug is, because they test only a small piece of your code.
+
+
+However, the data being passed between these components was changing very often, because the project was evolving rapidly in response to user feedback and experiments.
+
+*And unfortunately, every time this happened, we had to change the unit tests.* How irksome!
+
+
+Instead, we've switched over to *end-to-end tests.* An end-to-end test is where a script will open up your application and click on buttons and type inputs in the right sequence to indirectly run some specific code in your program.
+
+For the Vale compiler, it means we run the compiler with some Vale source code, then run it, and make sure it produces the right output. As of this writing, the Vale compiler has *1,033 end-to-end tests.*
+
+
+Some caveats on this advice:
+
+ * It not apply to larger endeavors, only ones that have rapidly shifting internals, as new projects often do. As a project becomes larger, other priorities dominate.
+ * If there's a piece of the program whose code changes often but the inputs and outputs are relatively stable, unit tests are still a good choice.
+
+
+
+# Prioritize Development Velocity
+
+If you're not careful, your development speed can slow to a crawl. Here are some ways to keep yourself nimble:
+
+
+*Use a language with good compile speeds.* If you go doomscrolling on reddit while you're building, you know your compile times are too long.
+
+
+*Write more tests!* The sooner you can find a bug, the easier it will be to fix.
+
+
+*Use a memory-safe language.* Memory safety doesn't just help with security, it helps you avoid bugs that are very difficult to diagnose.
+
+
+*Use a flexible language.* I know it's taboo to say this, but be wary of using functional programming languages or Rust, unless you have many years of experience architecting with them and know how to avoid the API churn and refactor shockwaves induced by the added constraints.
+
+
+*Prioritize looser coupling.* If you have to change code way over there to accommodate a feature way over here, take a step back.
+
+Find a way to harness object-oriented benefits:
+
+ * Dependency injection (the pattern, not the framework)
+ * Encapsulation
+ * Polymorphism
+
+...without incurring object-oriented drawbacks (implementation inheritance's brittleness).
+
+
+Statically-typed, garbage collected languages like Java [# And this is coming from me, who generally doesn't prefer garbage collection!] are the best in this regard. They may not be flashy but they're flexible, much more multi-paradigm, and have good compile speeds.
+
+
+# Bonus: Sanity Checking
+
+Let's take assertions to the next level!
+
+
+Let's say you have a `id_to_account HashMap<ID, UserAccount>`. Unfortunately, to find a user by name, you have to loop through the entire map, because it's keyed by ID, not by name.
+
+So then you add a separate `name_to_account HashMap<str, UserAccount>`, and you try to keep these two maps in sync. However, if you accidentally remove an account from only one, you now have a *data inconsistency.*
+
+
+After you add your normal assertions, also consider periodically calling a `sanityCheck` function:
+
+```vale
+func sanityCheck(
+    id_to_account &HashMap<ID, UserAccount>,
+    name_to_account &HashMap<str, UserAccount>) {
+  assert(id_to_account.size() == name_to_account_map.size());
+  assert(name_to_account.map(x => x.id) == id_to_account.keys());
+  // ... and even more assertions!
+}
+```
+
+
+
+In one case, we have an [80-line sanity check function](https://github.com/ValeLang/Vale/blob/f4ff0d4385484bced63a181c80bb2f81a48ab83f/Frontend/Solver/src/dev/vale/solver/OptimizedSolverState.scala) to check that all the state in the generics solver is consistent.
+
+
+When I worked on [Earth](https://earth.google.com/web/), I made a 200-line sanityCheck function run before and after every click, which made sure the application was in a sane state. It saved _countless_ hours of debugging.
+
+
+Lean hard on this technique, it will serve you well.
+
+
+
+# That's all!
+
+Thanks for visiting, and I wish you the best of luck in your first 100,000 lines!
+
+In the coming weeks, I'll be writing more about our "region borrow checker" which helps eliminate Vale's memory safety overhead, so subscribe to our [RSS feed](https://verdagon.dev/rss.xml) or the [r/Vale](https://reddit.com/r/vale) subreddit, and come hang out in the [Vale discord](https://discord.gg/SNB8yGH).
+
+
+If you found this interesting or entertaining, please consider sponsoring me:
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor me on GitHub!
+  </a>
+</center>
+
+With your help, I can write this kind of nonsense more often!
+
+
+
+<slice new-color="afterword"/>
+
+
+# About the Vale Language Project
+
+The Vale Language Project is not just about making Vale, it's about *exploring, discovering, and publishing* new programming language mechanisms that enable *speed*, *safety*, and *ease of use.*
+
+
+*The world needs more exploration here!* Currently, most programming language research is in:
+
+ * High-overhead languages involving reference counting and tracing garbage collection.
+ * Complex languages (Ada/Spark, Coq, Rust, Haskell, etc.) which impose a higher complexity burden on the average programmer.
+
+These are useful, but there is a *vast field of possibilities* in between, waiting to be explored!
+
+
+Our aim is to explore that space, discover what it has to offer, and make *speed and safety easier than ever before.*
+
+
+In this quest, we've discovered a lot of new techniques:
+
+ * [Region Borrow Checking](/blog/zero-cost-refs-regions), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Generational Memory](/blog/generational-references), for a language to ensure an object still exists at the time of dereferencing.
+ * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
+
+
+These techniques have also opened up some new emergent possibilities:
+
+ * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
+ * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
+ * [Fearless FFI](/blog/fearless#safe-externs), which allows us to call into C without risk of accidentally corrupting Vale objects.
+ * Deterministic replayability, to record all inputs and replay execution. Goodbye races and heisenbugs!
+ * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
+
+
+We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
+
+ * We can mix an `unsafe` block with Fearless FFI to make a much safer systems programming language!
+ * We can mix Erlang's isolation benefits with functional reactive programming to make much more resilient programs!
+ * We can mix region borrow checking with Pony's `iso` to support shared mutability.
+
+...plus a lot more interesting ideas to explore!
+
+
+The Vale programming language is only one combination of the features we've found. Our goal is to publish all the techniques we've found, even the ones that couldn't fit in Vale, so that other languages can make strides in this area.
+
+
+Our medium-term goals:
+
+ * Publish the Language Simplicity Manifesto, a collection of principles to keep programming languages' learning curves down.
+ * Publish the Memory Safety Grimoire, a collection of "memory safety building blocks" that languages can potentially use to make new memory models, just like Vale combined generational references and scope tethering.
+ * Prototype the Region Borrow Checker in Vale, to show the world that shared mutability can work with borrow checking!
+ * Prototype Hybrid-Generational Memory in Vale, to see how fast and easy we can make single ownership.
+
+
+We aim to publish articles biweekly on all of these topics, and inspire the next generation of fast, safe, and easy programming languages.
+
+
+If you want to support our work, please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+With enough sponsorship, we can:
+
+ * Work on this full-time.
+ * Turn the Vale Language Project into a 501(c)(3) non-profit organization.
+ * Make Vale into a production-ready language, and push it into the mainstream!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>
+
+
+

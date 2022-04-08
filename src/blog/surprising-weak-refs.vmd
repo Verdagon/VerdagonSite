@@ -110,14 +110,17 @@ But of course, it has drawbacks:
  * Each weak reference costs 16B, sometimes more. [#probably]
 
 <slice>
-#probably: It's hard to say for sure without access to the source code. But if the global map is an `unordered_map<void*, vector<void*>*>` hash map (in C++ terms) with a load factor of 0.5, then making the first weak reference to a new object could cost ~48B, and any subsequent weak references would cost 16B.
+#probably: I'm not certain, but if the global map is an `unordered_map<void*, vector<void*>*>` hash map (in C++ terms) with a load factor of 0.5, then making the first weak reference to a new object could cost ~48B, and any subsequent weak references would cost 16B. If anyone wants to dive in, the source code is available in [this repo](https://github.com/apple-oss-distributions/objc4/tree/objc4-838.1), likely somewhere around [objc-weak.h](https://github.com/apple-oss-distributions/objc4/blob/objc4-838.1/runtime/objc-weak.h). (Thanks to [mayoff](https://www.reddit.com/r/vale/comments/tuokkq/surprising_weakref_implementations_swift_objc_c/i38ln6f/?context=3) for the lead!)
 </slice>
 
 
 
-# Swift's Zombie Objects [# Source: [Mike Ash](https://mikeash.com/pyblog/friday-qa-2015-12-11-swift-weak-references.html)]
+# Swift's Zombie Objects
 
-When Swift isn't using the Objective-C approach for compatibility reasons, Swift actually does something pretty elegant.
+! Update: This description is actually outdated; this article describes how it worked before Swift 4. In Swift 4, they updated it to use "side tables", see [Mike Ash's Post](https://www.mikeash.com/pyblog/friday-qa-2017-09-22-swift-4-weak-references.html) describing them. [# Thanks to [electromaster666](https://www.reddit.com/r/swift/comments/tuoduj/surprising_weakref_implementations_swift_objc_c/i37d0u2/?context=3), [mayoff](https://www.reddit.com/r/vale/comments/tuokkq/surprising_weakref_implementations_swift_objc_c/i38ln6f/?context=3), and [jaredgrubb](https://www.reddit.com/r/cpp/comments/tuohau/surprising_weakref_implementations_swift_objc_c/i3b94ws/?context=3) for noticing this!] Stay tuned for a part 2, where we'll talk about side tables, "reference chaining", and Python's approach!
+
+
+When Swift isn't using the Objective-C approach for compatibility reasons, Swift actually does something pretty elegant. [# Source: [Mike Ash](https://mikeash.com/pyblog/friday-qa-2015-12-11-swift-weak-references.html)]
 
 A Swift object has two counters in it:
 
@@ -407,7 +410,7 @@ With your help, we can write articles like this more often!
 The Vale Language Project is not just about making Vale, it's about *exploring, discovering, and publishing* new programming language mechanisms that enable *speed*, *safety*, and *ease of use.*
 
 
-*The world needs more exploration here!* Currently, most programming language research is is in:
+*The world needs more exploration here!* Currently, most programming language research is in:
 
  * High-overhead languages involving reference counting and tracing garbage collection.
  * Complex languages (Ada/Spark, Coq, Rust, Haskell, etc.) which impose a higher complexity burden on the average programmer.

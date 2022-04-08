@@ -21,6 +21,9 @@ TL;DR:
  * We're adding a `parallel` keyword to [Vale](https://vale.dev/) to try it out!
 
 
+Note that this is a theoretical feature, and not implemented yet; this article is just to give a hint at the direction Vale is going.
+
+
 # Structured Concurrency
 
 
@@ -559,7 +562,7 @@ The user doesn't need to know about this distinction; if they ignore regions alt
 There are a couple drawbacks:
 
  * We can only _read_ the data outside the `parallel` block. [# This means no "immutability escape hatches" such as `RefCell`; immutable must really mean immutable.]
-    * We relax this restriction is Part 2, using mutexes, channels, splitting, atomics, and something called "region shifting".
+    * We relax this restriction is Part 2, using mutexes, channels, splitting, atomics, isolated sub-regions, and something called "region shifting".
  * All globals must be channels, mutexes, atomics, or immutable. [# Though, this might be good practice anyway.]
 
 
@@ -576,7 +579,7 @@ As we saw, we can combine...
 ...into a new and interesting *fearless, seamless, structured concurrency* feature.
 
 
-And in Part 2, we'll enable fearlessly sharing mutable data too. Stay tuned!
+And in Part 2, we'll enable fearlessly sharing mutable data too, using channels, `iso`lated subgraphs, "region-shifting", and mutexes. Stay tuned!
 
 
 Thanks for reading! If you want to discuss more, come by the [r/Vale](http://reddit.com/r/vale) subreddit or the [Vale discord](https://discord.gg/SNB8yGH), and if you enjoy these articles or want to support our work on Vale, you're welcome to [sponsor us on GitHub!](https://github.com/sponsors/ValeLang)

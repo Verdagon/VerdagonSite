@@ -55,7 +55,7 @@ Eventually, you teach them how to walk, how to do basic math, how to follow inst
 It's a complex mix of emotions: embarassment because you were wrong, sorrow because they no longer need you, and pride because you taught them well.
 
 
-In the 7DRL challenge, Vale [found a bug in one of my caches at compile time](verdagon.dev/blog/higher-raii-7drl) because it uses something called "Higher RAII" which doublechecks we actually fulfill our responsibilities. [# [This was me at the time.](http://i0.kym-cdn.com/photos/images/newsfeed/000/917/464/752.jpg)]
+In the 7DRL challenge, Vale [found a bug in one of my caches at compile time](https://verdagon.dev/blog/higher-raii-7drl) because it uses something called "Higher RAII" which doublechecks we actually fulfill our responsibilities. [# [This was me at the time.](http://i0.kym-cdn.com/photos/images/newsfeed/000/917/464/752.jpg)]
 
 
 <slice />
@@ -74,13 +74,13 @@ There's a freedom one feels when not slowed down by garbage collection or refere
 
 
 <<<<
-It was also nice to see that Vale is heading in the right direction. I found a lot of places that were just begging to harness [Hybrid-Generational Memory](verdagon.dev/blog/hybrid-generational-memory) and [seamless structured concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency).
+It was also nice to see that Vale is heading in the right direction. I found a lot of places that were just begging to harness [Hybrid-Generational Memory](https://verdagon.dev/blog/hybrid-generational-memory) and [seamless structured concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency).
 ////
 <video autoplay loop muted controls src="/images/ValePrototypeFleeing.mp4" style="width:100%; max-width: 100%; aspect-ratio: 1.7;" />
 >>>>
 
 
-For example, those two features would make it so there's *zero memory safety overhead* for the entire below function. For a language with shared mutability to have that is _unheard of_ and makes me quite excited for Vale's future.
+For example, those two features would make it so there's *zero memory safety overhead* for the entire below function, by my estimation. [#theoretical] For a language with shared mutability to have that is _unheard of_ and makes me quite excited for Vale's future.
 
 
 ```vale
@@ -116,13 +116,20 @@ PatternMap<bool> {
 
 
 <slice>
+#theoretical: To reiterate, these features are not yet complete, and we only have a theoretical understanding of how many generation-checks they eliminate. Currently:
+
+ * Hybrid-generational memory is 60% complete; [Generational Memory is complete](https://github.com/ValeLang/Vale/blob/master/Backend/src/region/resilientv3/resilientv3.cpp), plus [basic scope tethering](https://github.com/ValeLang/Vale/blob/master/Backend/src/region/resilientv4/resilientv4.cpp).
+
+ * Regions are [30% complete](https://github.com/ValeLang/Vale/tree/master/Backend/src/region).
+
+
 #concurrency: If we add `parallel` in front of this loop, it can perform these iterations in parallel on multiple threads, using [seamless structured concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency).
 
 
 #immaccess: Because we're accessing data that was a parameter to a pure function, it doesn't have to check that the data is still alive or increment any reference counters, see [Zero-Cost References with Regions](/blog/zero-cost-refs-regions).
 
 
-#hgm: [Hybrid-Generational Memory](verdagon.dev/blog/hybrid-generational-memory) would notice that we're iterating over a piece of data we own, so it wouldn't have to keep checking it still exists.
+#hgm: [Hybrid-Generational Memory](https://verdagon.dev/blog/hybrid-generational-memory) would notice that we're iterating over a piece of data we own, so it wouldn't have to keep checking it still exists.
 
 
 #isocontents: PatternMap would contain an "*iso*" HashMap, which means nobody outside has any references to it. Because of this, PatternMap can freely mutate it without memory safety overhead.
@@ -187,7 +194,7 @@ With your help, I can write this kind of nonsense more often!
 The Vale Language Project is not just about making Vale, it's about *exploring, discovering, and publishing* new programming language mechanisms that enable *speed*, *safety*, and *ease of use.*
 
 
-*The world needs more exploration here!* Currently, most programming language research is is in:
+*The world needs more exploration here!* Currently, most programming language research is in:
 
  * High-overhead languages involving reference counting and tracing garbage collection.
  * Complex languages (Ada/Spark, Coq, Rust, Haskell, etc.) which impose a higher complexity burden on the average programmer.

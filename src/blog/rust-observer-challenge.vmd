@@ -1,0 +1,162 @@
+---
+title: The Rust Observer Challenge
+author: Evan Ovadia
+date: Apr 8, 2022
+realm: blog
+path: blog/rust-observer-challenge
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+This is a borrow checking challenge. Test your skills!
+
+
+Here is a tiny HTML+Typescript page with multiple user accounts.
+
+Each user account has some money, and a button to add some money.
+
+There is also a button to get the sum of all accounts' money.
+
+<div id="observer-example"></div><script>let myPage = document.getElementById("observer-example").appendChild(document.createElement("div"));</script><script src="rust-observer-challenge-example.js"></script>
+
+
+```ts
+// Make some accounts.
+let accounts = [];
+accounts.push({ name: "Bob", money: 100, labelView: null });
+accounts.push({ name: "Cindy", money: 100, labelView: null });
+accounts.push({ name: "Reginald", money: 100, labelView: null });
+accounts.push({ name: "Jim Argalax", money: 100, labelView: null });
+accounts.push({ name: "Valerian Vast", money: 100, labelView: null });
+accounts.push({ name: "Archonicus Auriarch", money: 100, labelView: null });
+
+// Add each account to the document. It will look like:
+// Bob: 100 [Pay!]
+accounts.forEach(account => {
+  let row = myPage.appendChild(document.createElement("div"));
+  row.appendChild(document.createTextNode(account.name + ":"));
+
+  account.labelView = row.appendChild(document.createElement("span"));
+  account.labelView.textContent = account.money;
+
+  let payButton = row.appendChild(document.createElement("button"));
+  payButton.textContent = "Pay!";
+  payButton.onclick = function() {
+    // Update account and then re-display.
+    account.money = account.money + 10;
+    account.labelView.textContent = account.money;
+    // Note how we've captured the account object, and are modifying
+    // it from inside this observer.
+  };
+});
+
+let printSumButton = myPage.appendChild(document.createElement("button"));
+printSumButton.textContent = "Print Total!";
+printSumButton.onclick = function() {
+  let sum = 0;
+  for (account of accounts) {
+    sum += account.money;
+  }
+  alert("Sum: " + sum);
+};
+```
+
+
+(Note that it's very easy to nit-pick this example, but we're optimizing for clarity here.)
+
+
+Now, let's see the same program in Rust:
+
+```rs
+struct Account {
+  name: String,
+  money: i64
+}
+
+struct Button<'a> {
+  onclick: Box<dyn FnMut() + 'a>
+}
+
+fn main() {
+    // Make some accounts.
+    let mut accounts = vec![
+      Account { name: "Bob".to_string(), money: 100 },
+      Account { name: "Cindy".to_string(), money: 100 },
+      Account { name: "Reginald".to_string(), money: 100 },
+      Account { name: "Jim Argalax".to_string(), money: 100 },
+      Account { name: "Valerian Vast".to_string(), money: 100 },
+      Account { name: "Archonicus Auriarch".to_string(), money: 100 }
+    ];
+
+    // Add a button for each, which gives more money.
+    let mut page = Vec::new();
+    for account in &mut accounts {
+        let button = Button { onclick: Box::new(|| {
+            account.money = account.money + 10;
+        })};
+        page.push(button);
+    }
+
+    // Add a button that will print out the total.
+    page.push(Button { onclick: Box::new(|| {
+        let mut sum = 0;
+        for account in &accounts {
+            sum += account.money;
+        }
+        println!("Account contains {}", sum);
+    })});
+}
+```
+
+([Playground link](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=9a0961efceedaf7316ce546fbb1be0f8))
+
+
+
+The borrow checker rejects this program, of course:
+
+```
+error[E0502]: cannot borrow `accounts` as immutable because it is also borrowed as mutable
+  --> src/main.rs:30:42
+   |
+23 |     for account in &mut accounts {
+   |                    ------------- mutable borrow occurs here
+...
+30 |     page.push(Button { onclick: Box::new(|| {
+   |                                          ^^ immutable borrow occurs here
+31 |         let mut sum = 0;
+32 |         for account in &accounts {
+   |                         -------- second borrow occurs due to use of `accounts` in closure
+...
+37 | }
+   | - mutable borrow might be used here, when `page` is dropped and runs the `Drop` code for type `Vec`
+
+For more information about this error, try `rustc --explain E0502`.
+error: could not compile `playground` due to previous error
+```
+
+
+
+
+The root problem: An observer is not allowed to modify something while anyone else has a reference to it.
+
+
+Your challenge: make this work, using observers, without working around the borrow checker!
+
+
+The rules of the challenge:
+
+ * You must use observers; an observer that adds money to an account, and an observer that sums and prints all accounts' money.
+ * You cannot change the definition of `Button` because, [like in TypeScript, that trait is likely defined by someone else](https://www.htmlelements.com/docs/typescript/button/).
+    * You can, however, change `FnMut` to `Fn` and you can add/remove lifetime annotations.
+ * This is an exercise of working _within_ the borrow checker, so you cannot use `unsafe`, `RefCell`, or `Cell`. [# Many will object to not using `Cell` here. It may work for this particular example, but often does not in real life; `Cell` is too situational to be regarded as a general solution to the general challenge we're presenting here.]
+ * You cannot use any framework or third-party library.
+
+
+This challenge may or may not have a solution.
+
+
+Good luck!
+
+
+([Playground link](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=9a0961efceedaf7316ce546fbb1be0f8))

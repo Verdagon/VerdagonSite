@@ -137,6 +137,17 @@ if [ $TARGET == "hgm-static-analysis-part-1" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
+if [ $TARGET == "rust-observer-challenge" ] || [ $TARGET == "all" ] ; then
+  echo "Doing rust-observer-challenge"
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/rust-observer-challenge src/blog/rust-observer-challenge.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/rust-observer-challenge src/blog/rust-observer-challenge.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+  cp src/blog/rust-observer-challenge-example.js public/blog/rust-observer-challenge-example.js
+fi
+
 # if [ $TARGET == "beyond-rust-innovations" ] || [ $TARGET == "all" ] ; then
 #   echo "Doing beyond-rust-innovations"
 #   echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/beyond-rust-innovations src/blog/beyond-rust-innovations.vmd
@@ -191,6 +202,16 @@ if [ $TARGET == "higher-raii-7drl" ] || [ $TARGET == "all" ] ; then
   echo "Doing higher-raii-7drl"
   echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/higher-raii-7drl src/blog/higher-raii-7drl.vmd
   eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/higher-raii-7drl src/blog/higher-raii-7drl.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
+if [ $TARGET == "first-100k-lines" ] || [ $TARGET == "all" ] ; then
+  echo "Doing first-100k-lines"
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/first-100k-lines src/blog/first-100k-lines.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/first-100k-lines src/blog/first-100k-lines.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
