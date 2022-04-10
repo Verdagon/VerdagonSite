@@ -11,7 +11,7 @@ sponsor: us
 
 
 
-The Vale compiler just hit its [100,000th line of code.](linkhere)
+After many years of development, the Vale compiler just hit its [100,000th line of code!](linkhere)
 
 
 This is an article about how we kept it from *collapsing under its own weight and exploding,* as many projects do.
@@ -28,27 +28,10 @@ And since I'm a language geek, I'll throw in some nonsense about languages!
 
 # If you think you're using enough assertions, you're wrong
 
-I'm not exaggerating when I say assertions are the greatest thing since sliced arrays, and have cut my debugging time by half.
+I'm not exaggerating when I say [assertions](https://www.programiz.com/java-programming/assertions) are the greatest thing since sliced arrays, and have cut my debugging time by half.
 
 
 <div style="text-align: center"><a href="https://i.redd.it/e1ck7vngll811.png"><img src="/images/squirrel.jpg" width="60%"/></a></div><div style="opacity: .8; text-align: center"><a href="https://i.redd.it/e1ck7vngll811.png">In your darkest hour, the assertion arrives.</a></div>
-
-
-For those unfamiliar, an assertion is basically an if-statement with a panic:
-
-```
-if thing_that_i_assume_is_four != 4 {
-  // Prints "Thing isn't 4!" and halts the program.
-  panic("Thing isn't 4!");
-}
-```
-
-and a lot of languages have an `assert` function, so it can be written like:
-
-```
-assert(thing_that_i_assume_is_four == 4, "Thing isn't 4!");
-```
-
 
 
 Rule of thumb: Every time you _think_ something is true about your data, and it's not ensured by the type system, add an assertion that checks it.
@@ -65,12 +48,12 @@ Such miracles are why the Vale compiler has an entire *1,795 assertions.*
 <slice/>
 
 
-# Lean on the Type System
+# Lean on the type system
 
 Even if you're using a statically typed language, you can still make youre code _more_ statically typed.
 
 
-For example, a string can serve many purposes: an ID, a first name, a URL, and so on. Make a separate wrapper class for each of these, so you don't accidentally pass an ID string into a parameter expecting a URL string.
+For example, a string can serve many purposes: an ID, a first name, a URL, and so on. Make a separate wrapper class for each of these, so you don't accidentally pass an ID string into a parameter expecting a URL string. This is sometimes called the [New Type pattern](https://doc.rust-lang.org/rust-by-example/generics/new_types.html).
 
 Any statically-typed language has that capability, make sure to lean on it!
 
@@ -83,16 +66,16 @@ and especially Vale's [Higher RAII](https://verdagon.dev/blog/higher-raii-7drl).
 
 In 2019, I came across some of our code for generational references. [# [Generational references](https://vale.dev/blog/generational-references) are an alternative mechanism for memory safety, like reference counting, garbage collection, or borrow checking.]
 
-"That's odd," I said, "This really should be simpler." and I started refactoring.
+"That's odd," I said, "This really should be simpler," and I started refactoring.
 
 However, I quickly ran into a wall, and discovered why our code looked odd: it was actually handling some pretty complicated requirements that required that odd approach.
 
 
 In 2021, I came across the same code.
 
-"That's odd," I said, "This really should be simpler." and I started refactoring.
+"That's odd," I said, "This really should be simpler," and I started refactoring.
 
-...and proceeded to run into _that same wall._ It was only then that I remembered my first attempt.
+Then I proceeded to run into _that same wall._ It was only then that I remembered my first attempt.
 
 
 *This is why we leave comments!*
@@ -142,23 +125,23 @@ This is good for many reasons:
 
 
 
-# Avoid Nondeterminism
+# Avoid nondeterminism
 
 Have you ever had a bug that you could only reproduce one out of every ten tries? What an adventure!
 
-And then there's the bugs that you might only reproduce every hundredth try... *a harrowing endeavor.* You try and you try, and eventually give up and close the bug report as "Cannot Reproduce".
+And then there's the bugs that you might only reproduce every hundredth try. *A harrowing endeavor.* You try and you try, and eventually give up and close the bug report as "Cannot Reproduce".
 
 
 This unpredictability is caused by non-determinism, in other words, *when there are some random factors that make it hard to predict whether something will happen.* For example:
 
- * You're using a random number generator, and the bug only happens when the random number is odd.
+ * The bug only happens when a random number generator produces an odd number.
  * The bug only happens when thread A happens to access data before thread B.
  * The bug only happens when network response B comes before network response A.
- * You're doing something if C#'s string.GetHashCode is odd. [# I was shocked when string.GetHashCode broke my determinism in the 2020 7DRL Challenge.]
+ * The bug only happens when your string's .GetHashCode() produces an odd number. [# I was shocked when C#'s string.GetHashCode broke my determinism in the 2020 7DRL Challenge.]
  * The bug only happens when item X appears before item Y in a hash map in Golang or Rust.
 
 
-If non-determinism creeps into your program, you'll be testing your application, find a bug, and then never be able to reproduce it... so avoid it when you can!
+If non-determinism creeps into your program, you'll be testing your application, find a bug, and then never be able to reproduce it. Avoid it when you can!
 
 
 <slice/>
@@ -193,16 +176,13 @@ While you're developing or testing, your program should be recording to these fi
 In the 2020 7DRL Challenge, on the penultimate evening, I launched thousands of games automatically played by a "random AI" player. Three of them crashed, and I was able to fix the bugs because I could reproduce those crashes with deterministic replayability.
 
 
-C#, Golang, and Rust are all intentionally nondeterministic, which makes this rather difficult.
+Unfortunately, most languages have some nondeterminism. Some languages (C#, Golang, Rust) even add it in intentionally, which can make this a bit challenging.
 
-Vale is also intentionally nondeterministic, but completely solves the reproducibility problem with its [Deterministic Replayability](https://vale.dev/guide/deterministic-replayability); it will do the above recording and replaying for you, even in the presence of multithreading.
+Vale is also nondeterministic, but solves the reproducibility problem with its [Deterministic Replayability](https://vale.dev/guide/deterministic-replayability); it will do the above recording and replaying for you, even in the presence of multithreading.
 
 
 <slice>
-#nondgood: And besides, nondeterminism can be good!
-
- * Golang's [hash maps have a random order](https://go.dev/blog/maps) to prevent certain bugs and attacks.
- * Random number generators make each run of a game different!
+#nondgood: And besides, nondeterminism can be good, such as when games use random number generators to make each run of a game different.
 </slice>
 
 
@@ -223,7 +203,7 @@ If you don't have a vast suite of tests, your project probably won't survive its
 Some languages are easier to test with. Javascript's [Monkey Patching](https://www.audero.it/blog/2016/12/05/monkey-patching-javascript/) is a wonderful alternative to mocking, and can make testing much easier.
 
 
-## Prefer End-to-End Tests
+## Prefer end-to-end tests
 
 In the early days of the Vale compiler, we had a lot of unit tests for our various components.
 
@@ -249,7 +229,7 @@ Some caveats on this advice:
 
 
 
-# Prioritize Development Velocity
+# Prioritize development velocity
 
 If you're not careful, your development speed can slow to a crawl. Here are some ways to keep yourself nimble:
 
@@ -263,18 +243,19 @@ If you're not careful, your development speed can slow to a crawl. Here are some
 *Use a memory-safe language.* Memory safety doesn't just help with security, it helps you avoid bugs that are very difficult to diagnose.
 
 
-*Use a flexible language.* I know it's taboo to say this, but be wary of using functional programming languages or Rust, unless you have many years of experience architecting with them and know how to avoid the API churn and refactor shockwaves induced by the added constraints.
-
-
 *Prioritize looser coupling.* If you have to change code way over there to accommodate a feature way over here, take a step back.
 
 Find a way to harness object-oriented benefits:
 
- * Dependency injection (the pattern, not the framework)
+ * Dependency injection (the pattern, not the kind of framework)
  * Encapsulation
  * Polymorphism
 
 ...without incurring object-oriented drawbacks (implementation inheritance's brittleness).
+
+
+*Use a flexible language.* Functional programming languages and Rust have added constraints which can cause extra refactoring or API churn. You'll likely be able to move a lot faster with a multi-paradigm language such as Swift, Scala, etc.
+
 
 
 Statically-typed, garbage collected languages like Java [# And this is coming from me, who generally doesn't prefer garbage collection!] are the best in this regard. They may not be flashy but they're flexible, much more multi-paradigm, and have good compile speeds.
@@ -304,7 +285,7 @@ func sanityCheck(
 
 
 
-In one case, we have an [80-line sanity check function](https://github.com/ValeLang/Vale/blob/f4ff0d4385484bced63a181c80bb2f81a48ab83f/Frontend/Solver/src/dev/vale/solver/OptimizedSolverState.scala) to check that all the state in the generics solver is consistent.
+In one case, we have an [80-line sanity check function](https://github.com/ValeLang/Vale/blob/f4ff0d4385484bced63a181c80bb2f81a48ab83f/Frontend/Solver/src/dev/vale/solver/OptimizedSolverState.scala#L547) to check that all the state in the generics solver is consistent.
 
 
 When I worked on [Earth](https://earth.google.com/web/), I made a 200-line sanityCheck function run before and after every click, which made sure the application was in a sane state. It saved _countless_ hours of debugging.
