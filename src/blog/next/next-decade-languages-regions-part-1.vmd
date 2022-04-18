@@ -1,0 +1,196 @@
+Next Decade in Languages: Regions
+Part 1 of the Next Decade in Programming Languages series
+
+
+"Surely, we've perfected programming languages! It's hard to really imagine anything else past this."
+
+Indeed, we're likely around where physics was, in 1878, when Philipp von Jolly said that *"in this field, almost everything is already discovered, and all that remains is to fill a few unimportant holes"* about physics.
+
+Of course, since then, we've invented transistors, integrated circuits, lasers, superconductivity, microwave devices, jets, chemical rockets, ion propulsion, and nuclear energy.
+
+It's hard to imagine what comes next!
+
+Welcome to the *Next Decade in Programming Languages* series, which aims to describe interesting innovations the everyday programmer will see in the next decade.
+
+
+In this article, we'll talk about regions. A region is *a bunch of memory such that nothing outside can point inside, and vice versa.* I'll explain what that means further below, and how we can bend that rule.
+
+
+# What can they do?
+
+I'm going to drop a bombshell: *regions can eliminate memory safety overhead.* No reference counting increments, and no garbage collection pauses, no complicated borrow checking. There are a few ways they do this, which I'll go into later.
+
+Regions can also help *keep our programs stable;* we can separate our program into different regions, and if one of them has a problem, we can blast it away and leave the others in a sane state.
+
+Regions can *eliminate data races,* making multi-threading much easier.
+
+Regions can also help keep our programs deterministic and *eliminate heisenbugs.*
+
+Regions can also help garbage collected languages, *prevent stop-the-world events* and instead localizing pauses to particular actors.
+
+
+*How is this possible?* Read on to find out!
+
+
+# You've seen regions before!
+
+In modern operating systems, every process has its own memory; when I use `malloc` to make a `Spaceship`, it will only live in that process, and no other processes can see it. A pointer in process A cannot point to something in process B.
+
+
+In this way, *every process has its own region:* a bunch of memory such that nothing outside can point inside, and vice versa.
+
+
+Much like how processes can use pipes to send data back and forth, a region can send a message to another region. 
+
+
+# Show me a region!
+
+A lot of languages are starting to introduce regions. Cone, Pony, Vale, Verona, and Rust all have various flavors of them. Let's look at Pony's!
+
+
+```pony
+let s = firstSpaceship.clone()
+```
+
+For clarity, let's explicitly specify the type of `s`:
+
+```pony
+let s: Spaceship iso = firstSpaceship.clone()
+```
+
+As we see here, the `clone` method on `mySpaceship` returns a `Spaceship iso`, which means:
+
+ * `s` contains no references to the outside world.
+ * The outside world has no references to anything inside `s`.
+ * `s` is the only reference to the `Spaceship`.
+
+In other words, `s` forms its own *region*.
+
+This has some pretty amazing benefits, explained below.
+
+
+# Fearless Concurrency
+
+An actor can send an `iso` to another actor. [# An actor is like a thread, but more efficient.] The sending actor no longer has access to it, because there can only be one reference to an `iso` object at a time.
+
+
+In other words, we can use `iso` objects to ensure that only one actor has access to some mutable data at any given time.
+
+
+Because of this, Pony has *fearless concurrency,* which means it doesn't suffer data races. [# A data race is basically when two threads don't take turns accessing mutable data, which leads to a lot of CPU confusion, odd behavior, and bugs.]
+
+
+# Eliminating Memory-Safety Overhead
+
+## Temporarily Immutable Regions
+
+Vale is a language that aims to be the fastest memory-safe language, while still remaining easy to use. To do this, it would use a blend of memory techniques, including "region-aware borrow checking". [# It also uses something called [Hybrid-Generational Memory](https://verdagon.dev/blog/hybrid-generational-memory) for mutable regions, and rarely falls back on generation checking.]
+
+
+Vale has a concept of `pure` functions, which cannot modify any pre-existing memory.
+
+For any given object, the compiler knows whether it's in the "pre-existing region", or in "the function's region".
+
+The compiler also knows that *the pre-existing region is immutable.*
+
+
+The compiler knows that it doesn't need to do any reference counting increments or decrements, and doesn't need to do any generation-checks, when accessing immutable data. [# A generation-check is when the language checks that the object still exists.]
+
+Consider the below example:
+
+```
+pure func CellularAutomata(map 'r &PatternMap<bool>) PatternMap<bool> {
+  rand = RandomNumberGenerator();
+  new_map = PatternMap<bool>(make_pentagon_9_pattern());
+
+  foreach [loc, tile] in &map.tiles {
+    neighbors = map.GetAdjacentExistingLocations(loc);
+    num_walkable_neighbors = 0;
+    foreach neighbor in &neighbors {
+      if map.tiles.get(neighbor).get() {
+        set num_walkable_neighbors = num_walkable_neighbors + 1;
+      }
+    }
+    new_impassable =
+      if num_walkable_neighbors * 2 == neighbors.len() {
+        (rand.Next() mod 2i64) == 0i64
+      } else {
+        num_walkable_neighbors > neighbors.len() / 2
+      };
+
+    new_map.tiles.add(loc, new_impassable);
+  }
+
+  return new_map;
+}
+```
+
+The compiler knows that `map` is from an immutable region, and therefore we can eliminate almost all reference counting increments/decrements and generation checks for data in that region.
+
+This eliminates all memory-safety overhead for every line in the above function, except for the `new_map.tiles.add` call near the end. Further below, I'll explain another region-based technique to eliminate that overhead too, giving the entire function zero-cost memory safety.
+
+
+Immutable regions also enable something called [Seamless Fearless Structured Concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), which gives us safe parallelism without refactoring our existing code or data.
+
+
+We can also temporarily see the contents of an `iso` object immutably.
+
+
+## Region Kinds in the Type System
+
+[Cone](cone.jondgoodwin.com/) is a systems programming language that aims to give the user ultimate power over their memory safety strategies, so that users can match their strategy to the situation and unlock incredible speeds.
+
+
+In Cone, a function can know that an argument comes from a certain type of allocator. For example, this function knows that the 
+
+
+## 
+
+(Need a title that highlights the improvement over Pony's system)
+
+In [A Flexible Type System for Fearless Concurrency](https://www.cs.cornell.edu/andru/papers/gallifrey-types/gallifrey-types.pdf), the authors show how the type system can track objects' regions, and send entire regions to other threads, similar to Pony.
+
+
+Note to self: Look into that paper's sources?
+
+
+## Verona
+
+
+
+## Preventing Global GC Spikes
+
+Orca is the memory management system underlying Pony. Every actor has its own region, and we run GC separately for each region.
+
+This prevents "stop the world" events, like what [caused Discord to switch](https://discord.com/blog/why-discord-is-switching-from-go-to-rust) from Go to Rust.
+
+
+## Type-Stability
+
+This is something we explored for Vale, but it conflicted with another language feature. I hope other languages will look into this!
+
+
+
+## Semi-Isolated Regions
+
+In Vale, a region can point to the outside world.
+
+struct MyController<'outside> iso {
+
+}
+
+However, we can't own anything outside this region. For that, we need a layer.
+
+
+Vale's HashMap contains a "layer":
+
+struct HashMap<K, V, H, E> 'outside {
+  entries layer Array<?Node<K, V 'outside>>;
+}
+
+
+
+## Error Isolation
+
+In Vale, every thread (and green thread) has its own region. If there's a panic in it, we'll blast away the entire region. Because this region is isolated from others, we know that we won't leave other memory in an inconsistent state.
+

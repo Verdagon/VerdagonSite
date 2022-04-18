@@ -1,0 +1,10 @@
+
+Here we have an "actor", which is like a thread.
+
+We can create an actor like `myActor = new MyActor()`. Each actor has some memory, and one actor cannot see another actor's memory. In other words, each actor has a *region.*
+
+When we call a method on an actor, like `myActor.add_engine_part(new_part)`, it's actually sending a message to the actor asynchronously. The data leaves the sender's region, and is added to the receiver's region.
+
+
+Actors are very cheap, [only about 256 bytes](https://tutorial.ponylang.io/types/actors.html#actor-finalisers), which is much better than the memory cost of a thread, which 
+

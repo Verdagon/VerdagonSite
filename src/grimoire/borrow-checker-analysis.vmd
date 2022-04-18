@@ -1,6 +1,69 @@
 
-- not much simplicity to be found
+
+Benefits are, of course, extreme speed and good memory safety! The drawbacks are subtle and pervasive.
+
+
 - not very resilient to needed changes
+
+borrow checker's &mut and & are leaky abstractions, they force you to propagate them.
+lack of encapsulation.
+
+https://golang-nuts.narkive.com/qe8H9kU1/composability-and-leaky-abstractions
+a rust function is not as composable as a go function, because that color will change what you do to your caller
+
+https://www.silasreinagel.com/blog/2019/09/03/compose-your-software/
+> In uncomposed software, there is no separations of concerns. There typically are problematic crossings of domain boundaries. Leaky abstractions.
+
+https://www.reddit.com/r/rust/comments/2581s5/comment/cheq9fu/?utm_source=reddit&utm_medium=web2x&context=3
+> &mut appears to be a very leaky abstraction
+
+
+
+faster to iterate with (statically typed) python than rust:
+https://news.ycombinator.com/item?id=31063493
+
+
+
+1. AxM is worked around too often, it only fits in some cases
+
+2. we can get these same benefits from region borrow checking, which doesnt require an object be AxM
+
+3. we can translate a program to C and it will be just as memory safe. it's a technique, not a groundbreaking new technology.
+
+3. real world rust programs have overhead
+
+
+
+
+
+There are many patterns in Rust that don't require unsafe. Looping, matching, etc. Is RAII one of them? Does the borrow checker allow RAII?
+
+Most cases of RAII (aside from trivial examples that just assert a contained boolean) affect the outside world. Examples:
+- Via FFI; call fclose() on a file, println! to print, free() to deallocate.
+- Via RefCell, such as here: https://aloso.github.io/2021/03/18/raii-guards.html
+- Via other kinds of unsafe, such as how Rc mutates a counter that lives outside of it.
+
+It seems that these all require some form of escaping the borrow checker. Why is that?
+
+It's because the normal way we accomplish shared mutability within the borrow checker is to hold a "handle", such as an index, and use it to index into a &mut parameter. Here, it might look like:
+
+// Decrements a spaceship's fuel on drop()
+struct FuelDecrementer {
+  myIndex: usize,
+}
+fn drop(&mut self, ships: &mut Vec<Spaceship>) {
+  ships[self.myIndex].fuel -= 1;
+}
+
+However, it's impossible, because drop() can't take additional parameters. So, we're forced into other mechanisms, such as unsafe or RefCell.
+
+Conclusion: the borrow checker doesn't allow RAII; we have to work around the borrow checker to accomplish RAII.
+
+
+
+
+- not much simplicity to be found
+
 
 
 goal: rust aint perfect, we can't improve until we know what the drawbacks are.

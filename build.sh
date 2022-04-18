@@ -137,15 +137,25 @@ if [ $TARGET == "hgm-static-analysis-part-1" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
-if [ $TARGET == "rust-observer-challenge" ] || [ $TARGET == "all" ] ; then
-  echo "Doing rust-observer-challenge"
-  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/rust-observer-challenge src/blog/rust-observer-challenge.vmd
-  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/rust-observer-challenge src/blog/rust-observer-challenge.vmd
+if [ $TARGET == "observer-challenge" ] || [ $TARGET == "all" ] ; then
+  echo "Doing observer-challenge"
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/observer-challenge src/blog/observer-challenge.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/observer-challenge src/blog/observer-challenge.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
   fi
-  cp src/blog/rust-observer-challenge-example.js public/blog/rust-observer-challenge-example.js
+  cp src/blog/observer-challenge-example.js public/blog/observer-challenge-example.js
+fi
+
+if [ $TARGET == "observer-challenge-conclusions" ] || [ $TARGET == "all" ] ; then
+  echo "Doing observer-challenge-conclusions"
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/observer-challenge-conclusions src/blog/observer-challenge-conclusions.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/observer-challenge-conclusions src/blog/observer-challenge-conclusions.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
 fi
 
 # if [ $TARGET == "beyond-rust-innovations" ] || [ $TARGET == "all" ] ; then
@@ -217,6 +227,19 @@ if [ $TARGET == "first-100k-lines" ] || [ $TARGET == "all" ] ; then
     exit 1
   fi
 fi
+
+if [ $TARGET == "on-removing-let-let-mut" ] || [ $TARGET == "all" ] ; then
+  echo "Doing on-removing-let-let-mut"
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/on-removing-let-let-mut src/blog/on-removing-let-let-mut.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/on-removing-let-let-mut src/blog/on-removing-let-let-mut.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
+
+
 
 if [ $MODE == "build" ] ; then
   echo "Copying..."

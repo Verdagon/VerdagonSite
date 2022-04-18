@@ -1,5 +1,5 @@
 ---
-title: The Rust Observer Challenge
+title: The Observer Challenge
 author: Evan Ovadia
 date: Apr 8, 2022
 realm: blog
@@ -18,7 +18,7 @@ Each user account has some money, and a button to add some money.
 
 There is also a button to get the sum of all accounts' money.
 
-<div id="observer-example"></div><script>let myPage = document.getElementById("observer-example").appendChild(document.createElement("div"));</script><script src="rust-observer-challenge-example.js"></script>
+<div id="observer-example"></div><script>let myPage = document.getElementById("observer-example").appendChild(document.createElement("div"));</script><script src="observer-challenge-example.js"></script>
 
 
 ```ts
@@ -149,14 +149,18 @@ The rules of the challenge:
  * You must use observers; an observer that adds money to an account, and an observer that sums and prints all accounts' money.
  * You cannot change the definition of `Button` because, [like in TypeScript, that trait is likely defined by someone else](https://www.htmlelements.com/docs/typescript/button/).
     * You can, however, change `FnMut` to `Fn` and you can add/remove lifetime annotations.
- * This is an exercise of working _within_ the borrow checker, so you cannot use `unsafe`, `RefCell`, or `Cell`. [# Many will object to not using `Cell` here. It may work for this particular example, but often does not in real life; `Cell` is too situational to be regarded as a general solution to the general challenge we're presenting here.]
+ * This is an exercise of working _within_ the borrow checker, so you cannot use `unsafe`, FFI, `RefCell`, or `Cell`. [# Many will object to not using `Cell` here. It may work for this particular example, but often does not in real life; `Cell` is too situational to be regarded as a general solution to the general challenge we're presenting here.]
  * You cannot use any framework or third-party library.
 
 
 This challenge may or may not have a solution.
 
 
+In doing this challenge, you will learn some important things about the borrow checker. When you think you have the answer, take a look at the [Observer Challenge Conclusion](/blog/observer-challenge-conclusions). *Before you look at the conclusion,* make sure you've read the above rules! It's easy to miss them.
+
+
 Good luck!
 
 
 ([Playground link](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=9a0961efceedaf7316ce546fbb1be0f8))
+

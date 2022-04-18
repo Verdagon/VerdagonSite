@@ -1,0 +1,218 @@
+---
+title: The Observer Challenge, Conclusions
+author: Evan Ovadia
+date: Apr 12, 2022
+realm: blog
+path: blog/observer-challenge-conclusions
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+In the [Observer Challenge](/blog/observer-challenge), the reader must use a basic observer with the borrow checker, without falling back on Rust's workarounds:
+
+ * "Intrusively" refactoring our dependency's `Button`'s `dyn FnMut() + 'a`.
+ * `Rc<RefCell<T>>` and other solutions with runtime overhead.
+ * `Cell<T>` and other situational workarounds.
+ * `unsafe`, FFI
+
+
+These restrictions are so that we can more accurately see the limitations of the borrow checker, highlight its costs, and appreciate Rust's workarounds.
+
+
+*The conclusion:* it's actually impossible to make this pattern work purely within the borrow checker. One _must_ use one of the above workarounds.
+
+
+This article will explore these workarounds, so that we can design with open eyes.
+
+
+In exploring these solutions' tradeoffs, we can come to some broader conclusions about Rust and the borrow checker:
+
+ * When following the borrow checker's lead, one can naturally incur *artificial complexity.*
+ * All of these options involve *run-time costs*; having a borrow checker doesn't mean our program has zero overhead.
+
+
+
+# Cell&lt;T&gt;
+
+`Cell<T>` is often not an option in real-world scenarios. However, in this case it is!
+If we make our `accounts` list into a `Vec<Cell<Account>>`, we're suddenly able to replace our accounts with other accounts.
+
+
+However, `Cell<T>` can incur a lot of copying overhead if the object is large, especially if it contains any heap allocations, such as trait objects.
+
+
+# Rc&lt;RefCell&lt;T&gt;&gt;
+
+`Rc<RefCell<T>>` incurs some extra overhead. However, as we'll see below, the other approaches have at least as much overhead.
+
+
+# Intrusive Refactoring
+
+Below, we'll explore how to refactor the program to make it work.
+
+
+Keep in mind that we often cannot refactor. In the challenge, the Button struct was defined outside our crate, defined by the UI library, so we couldn't refactor it. That's why it's called "intrusive" refactoring; we'd often need to change the code of our dependencies to work with our use-cases.
+
+
+For kicks, let's assume that we're lucky enough to be able to refactor our dependencies.
+
+
+Before we dive into our refactoring options, let's see the costs.
+
+
+## The First Cost: Architectural Freedom
+
+
+Before continuing, let's also take a second to note that the challenge shows the borrow checker isn't compatible with some basic, valid patterns. It's often hard to see it, but there are a lot of patterns that we just cannot express within the borrow checker's confines:
+
+ * *Observer pattern,* as we saw.
+ * Most *RAII,* which requires member borrow references to outside data, because drop() cannot take additional parameters. To achieve RAII, one has to use one of the above workarounds, or FFI, to change global mutable resources.
+ * *Dependency injection,* the pattern of taking in a dependency through the constructor, and storing it as a member. (Note this is talking about the _pattern,_ not dependency injection _frameworks_ which can take the pattern too far.) Because of the borrow checker, if we have a member borrow reference to some outside data, nobody else can change that data, often making that data useless.
+ * *Doubly Linked Lists* or any other non-tree-structured graph.
+ * The *flyweight* pattern, the *prototype* pattern, and anything else that involves a member borrow reference.
+
+
+Once we turn to refactoring, we decide that appeasing the borrow checker is more important than using the simplest tool for the job, and the borrow checker has incurred *artificial complexity.*
+
+
+> "But these are design patterns, and those are bad, a thing of the past!"
+
+A "design pattern" is just a named, naturally occurring pattern of code. Other examples are for-loops, if-statements, newtypes, RAII, actors, etc., so calling all design patterns bad is a tad silly.
+
+
+> "But these all rely on shared mutability, which is bad!"
+
+As we refactor below, note how we're not removing shared mutability, we're just hiding it, moving it somewhere else.
+
+
+> "But these patterns all have run-time overhead, and can have use-after-free!"
+
+As we refactor below, note how all of the approaches have these same problems. Once again, the borrow checker is not making these problems go away, it's just moving them.
+
+
+## The Second Cost: Leaky Abstractions Cause Widespread Refactors
+
+When we need to refactor an interface to accommodate a particular "subclass" (so to speak), we're suffering a *leaky abstraction*.
+
+If we refactor our dependencies, we'll need to refactor everywhere else that uses them. This is a *widespread refactor,* and can cause some churn in our codebases if we're not careful.
+
+
+> "But refactoring is just a part of programming. What's wrong with it?"
+
+Refactoring can be a good thing, when it's caused by inherent complexity.
+
+However, this refactoring is caused by the borrow checker's restrictions; it's caused by artificial complexity.
+
+
+# Taking a Mutable Argument
+
+([Playground link](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=0f939d376f9d9405e860a1f3178fcd4f))
+
+
+A common refactor would be to change `Button`'s `dyn FnMut() + 'a` to `dyn FnMut(&mut Vec<Account>) + 'a`, or better yet, make `Button` generic over the type:
+
+```rs
+struct Button<'a, T> {
+  onclick: Box<dyn FnMut(T) + 'a>
+}
+```
+
+Or, instead of taking in a `T`, another approach is to instead return a closure which takes in that same `T`:
+
+```rs
+struct Button<'a, T> {
+  onclick: Box<dyn Fn() -> Box<dyn FnMut(T)> + 'a>
+}
+```
+
+([Playground link](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=8aa87825cf987ed9500605153840379e))
+
+These two approaches are mostly equivalent, though the latter callback is able to remove the button that was just clicked. The rest of the tradeoffs are the same.
+
+
+The tradeoffs come around the decision of what that `T` should be. It can either be:
+
+ * Nearby data.
+ * A god object.
+
+
+## Nearby Data
+
+([Playground Link](https://play.rust-lang.org/?version=nightly&mode=debug&edition=2021&gist=12bce6d30032e0273ba7053d494e6ec7))
+
+In this case, the observer (or its returned closure) can take in a `&mut MyComponent`, where `MyComponent` contains our `Vec<Button<&mut MyComponent>>`.
+
+There are a couple problems with this approach:
+
+ * Our event loop now needs to know which data to supply for that argument, which will incur *run-time overhead* (branching, bounds checking, or hashing).
+ * We have to often change which data is handed in, as explained below.
+
+
+As the second point alludes, we'll need to change that argument.
+
+If we decide that our component needs to send a network request, we'll need to hand in a `NetworkThrottler`, and change it to: `(&mut NetworkThrottler, &mut MyComponent)`.
+
+Later we might need the `SoundPlayer` as well, causing us to take in a `(&mut NetworkThrottler, &mut SoundPlayer, &mut MyComponent)`.
+
+
+This is called the *brittle API* problem, and can cause the aforementioned widespread refactors, as a program evolves.
+
+
+From here, there are two options:
+
+ * Store `Rc<RefCell<NetworkThrottler>>`, `Rc<RefCell<SoundPlayer>>` etc.
+ * Also take in a "god object" through which we can access the `NetworkThrottler`, `SoundPlayer`, etc.
+
+
+Let's explore that second approach!
+
+
+## The God Object
+
+Instead of handing in a `&mut MyComponent`, We can take in an entire `&mut MyApp`, in other words a "god object" containing everything.
+
+
+There are often other names for the god object, such as a "context" or "service", but it suffers the same problem: we now have free access to our entire application's data.
+
+
+This has the same problem as global data: it becomes very difficult to reason about who changed what data.
+
+
+Additionally, we'll need to dig down into it to get to our specific component's data, which will likely involve cache misses and indexing costs. For example, the [Yew](https://yew.rs/) framework will queue and route messages to the right component.
+
+
+## The God-Object/Nearby-Data Blend
+
+We can take in both a god object and some nearby data:
+
+```rust
+struct Button<'a, G, T> {
+  onclick: Box<dyn FnMut(G, T) + 'a>
+}
+```
+
+This can be more usable, though it does incur the drawbacks of both approaches.
+
+
+
+# The Conclusion
+
+We saw a handful of solutions:
+
+ * Take in mutable arguments, which has run-time overhead. Some variants:
+    * Take in a mutable argument to nearby data, which can also suffer the brittle API problem.
+    * Take in a mutable god object, which can also make our program harder to reason about.
+ * Use `Rc<RefCell<T>>` which has some reference-counting run-time overhead.
+ * Use `Cell<T>` which potentially has a lot of copying run-time overhead for large objects.
+
+
+Some key takeaways:
+
+ * All of these options involve run-time overhead, which hints at an even broader conclusion: *interconnected state will always involve run-time overhead,* even in the presence of a borrow checker.
+    * When comparing Rust to other languages, it's important to keep in mind that there will always be memory safety overhead, it's just a question of where it happens.
+ * When following the borrow checker's lead, one can incur more artificial complexity.
+ * If you instinctively avoid `Rc<RefCell<T>>`, it might be time to revisit that habit. As we can see, the alternatives also have their drawbacks.
+
+
+Thanks for reading, now go forth and design with open eyes!
