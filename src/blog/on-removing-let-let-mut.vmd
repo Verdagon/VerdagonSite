@@ -38,7 +38,7 @@ However, it recently changed to a fourth option, which was so nice that it becam
 
 # The Fourth Option
 
-Most languages can't just use `x = 4;`, because that already meant something; that's the *re-assignment statement*, which modify an existing variable that we already declared.
+Most languages can't just use `x = 4;`, because that already meant something; that's the *re-assignment statement*, which modifies an existing variable that we already declared.
 
 And alas, Python tried combining those two statements. It didn't go well. [# This leads to problems; if you rename your `x = 1;` declaration to `y = 1;`, but forget to modify `x = 42;` re-assignment below, you now accidentally have two variables!]
 
@@ -228,13 +228,11 @@ For that reason, we kept the `!` on struct members.
 # Conclusion
 
 
-Of course, we can't generalize too much. Every language is different, so we can't say that every new language should use this new scheme. There are a _lot_ of other factors that come into play in, for example, Rust's variable declaration decisions.
-
-Still, newer languages should give it some thought!
+Of course, we can't generalize too much. Every language is different, so we can't say that every new language should use this new scheme. Still, newer languages should give it some thought!
 
 
 
-Thanks for visiting, and we hope you enjoyed it!
+Thanks for visiting, and we hope you enjoyed this article!
 
 
 In the coming weeks, we'll be writing more about our "region borrow checker" which helps eliminate Vale's memory safety overhead, so subscribe to our [RSS feed](https://verdagon.dev/rss.xml) or the [r/Vale](https://reddit.com/r/vale) subreddit, and come hang out in the [Vale discord](https://discord.gg/SNB8yGH)!
