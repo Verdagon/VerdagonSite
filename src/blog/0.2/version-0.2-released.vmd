@@ -1,0 +1,135 @@
+---
+title: Vale Programming Language v0.2 Released: Fearless FFI, Modules, Higher RAII, Const Generics, Concept Functions, Faster Compile Times, set Keyword
+author: Evan Ovadia
+date: Apr 18, 2022
+realm: blog
+path: blog/version-0.2-released
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: us
+---
+
+Well met!
+
+
+
+### Fearless FFI
+
+What really makes Vale shine is how much it helps us prevent and detect bugs in our programs.
+
+
+To that end, version 0.2 (beta) enables Fearless FFI, which prevents our unsafe code from causing undefined behavior problems in our safe code.
+
+
+In other words, if we accidentally mishandle memory in C, it won't corrupt any Vale objects.
+
+
+Normally, when mixing a safe language with an unsafe language, any bugs in the unsafe language can cause problems in the safe language. For example:
+
+ * When Python code sends a Python object into C, if the C code doesn't correctly call `Py_INCREF`, it will corrupt Python's memory and cause some mysterious behavior later on in the Python code.
+ * When Rust hands a reference into C, the C code can type-cast it at will to write arbitrary memory to the Rust object, causing confounding bugs later on in the safe Rust code.
+ * When Javascript hands the wrong kind of object to a Typescript function, it causes bugs down the line deep in the Typescript code, even though Typescript has static typing.
+
+This is called "leaky safety", and its bugs are very difficult to track down.
+
+
+In both cases, we know that unsafe code was involved *somewhere* in the chain of events, but since the bugs actually happen later on, in supposedly safe code, there's no easy way to identify _which_ unsafe code was the original culprit.
+
+
+Vale protects against this, with *region boundary hardening*, or as we call it, Fearless FFI.
+
+
+Region boundary hardening is a combination of three techniques:
+
+ * Using a different stack for the unsafe region.
+ * Encrypting references to safe regions' objects.
+ * Copying immutable data between the safe and unsafe regions.
+
+
+
+
+ * When Rust calls into C, and C does a buffer overrun on a stack-allocated array, it can cause mysterious behavior in the Rust code later on.
+
+
+
+
+
+With FFI, [# FFI stands for Foreign Function Interface, it lets us call functions written in other languages.] we can call into functions written in other languages, like C.
+
+However, for most languages, problems in C can cause problems in otherwise safe code.
+
+For example, in Python, if we forget to call 
+
+
+
+Vale takes a different approach to memory safety.
+
+
+
+Normally, for a language to have FFI, it needs to sacrifice some memory safety.
+
+Vale took a much different approach from other low-level languages.
+
+
+
+
+### Const Generics
+
+We're happy to announce that Vale now has "const generics", where generic parameters can contain not only types (like the `T` in `List<T>`) but also integers, booleans, and other types.
+
+For example, we can make a generic class for physics vectors:
+
+```vale
+struct Vec<N int, T> {
+  elements [#N]T;
+}
+```
+
+And we can use them like `Vec<2, int>`.
+
+
+This allows for *much faster code*, because the compiler knows the size of the contained array up-front, and doesn't have to figure it out at run-time.
+
+
+Besides types and integers, we can also have generic parameters that are:
+
+ * Booleans
+ * Strings
+ * Functions
+ * Mutability (`imm` vs `mut`)
+ * Ownership (`own`, `borrow`, `share`, `weak`)
+ * Location (`inl`, `heap`)
+ * Variability (`vary`, `final`)
+ * Type Lists
+
+That last one is particularly interesting, as it allows us to implement tuples in Vale:
+
+```
+struct Tup<T RefList> {
+  _ ..T;
+}
+```
+
+`_` means the field is unnamed, and `..T` means "use all of these types as fields".
+
+When we say `(4, 5, 6)` to make a tuple, it's actually syntactic sugar for this `Tup` struct.
+
+
+### Concept Functions
+
+Something unexpected happened, once we implemented const generics. We discovered that we effectively enabled *concepts*, a way to specify constraints on certain generic parameters.
+
+
+TODO: pull from concept-functions article.
+
+
+### Faster Compile Times
+
+This version of the compiler is more than thrice as fast as the previous version, after we did some optimizations:
+
+ * Memoized all of our .hashCode() calls, and used interning to speed up .equals() calls.
+ * Wrote a newly optimized generics solver, which operates on primitives instead of heap-allocated classes.
+ * Migrated from Scala parser combinators to a hand-written recursive descent parser.
+
+
+

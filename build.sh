@@ -32,6 +32,8 @@ if [ $MODE == "build" ] ; then
     mkdir public/components
     mkdir public/images
     mkdir public/blog
+    mkdir public/blog/0.2
+    mkdir public/blog/next
     mkdir public/grimoire
     mkdir public/releases
   fi
@@ -220,8 +222,8 @@ fi
 
 if [ $TARGET == "first-100k-lines" ] || [ $TARGET == "all" ] ; then
   echo "Doing first-100k-lines"
-  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/first-100k-lines src/blog/first-100k-lines.vmd
-  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/first-100k-lines src/blog/first-100k-lines.vmd
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/0.2/first-100k-lines src/blog/0.2/first-100k-lines.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/0.2/first-100k-lines src/blog/0.2/first-100k-lines.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -230,8 +232,18 @@ fi
 
 if [ $TARGET == "on-removing-let-let-mut" ] || [ $TARGET == "all" ] ; then
   echo "Doing on-removing-let-let-mut"
-  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/on-removing-let-let-mut src/blog/on-removing-let-let-mut.vmd
-  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/on-removing-let-let-mut src/blog/on-removing-let-let-mut.vmd
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/0.2/on-removing-let-let-mut src/blog/0.2/on-removing-let-let-mut.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/0.2/on-removing-let-let-mut src/blog/0.2/on-removing-let-let-mut.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
+if [ $TARGET == "concept-functions" ] || [ $TARGET == "all" ] ; then
+  echo "Doing concept-functions"
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/0.2/concept-functions src/blog/0.2/concept-functions.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/0.2/concept-functions src/blog/0.2/concept-functions.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1

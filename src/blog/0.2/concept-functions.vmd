@@ -1,0 +1,165 @@
+---
+title: Vale Programming Language v0.2 Released: Fearless FFI, Modules, Higher RAII, Const Generics, Concept Functions, Faster Compile Times, set Keyword
+author: Evan Ovadia
+date: Apr 18, 2022
+realm: blog
+path: blog/version-0.2-released
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: us
+---
+
+Well met!
+
+
+
+Something unexpected happened, once we implemented const generics. We discovered that we effectively enabled *concepts*, a way to specify constraints on certain generic parameters.
+
+
+For example, let's say we already have a `Ship` struct and a `fire` function:
+
+```vale
+struct Ship {
+  strength int;
+}
+func fire(ship &Ship, target &Ship) int {
+  ship.strength - target.strength
+}
+```
+
+We can write a function that works on any type that has a `fire` function, by using `where func fire(&T, &T)int`:
+
+```vale
+func battle<T>(attacker T, defender T)
+where func fire(&T, &T)int
+{
+  damage = fire(attacker, defender);
+  return damage;
+}
+```
+
+
+This seems to be a much cleaner approach than the ones used by most other languages.
+
+
+For example, in Rust, if we had an existing `Ship` and `fire` function, we would have to make a trait to describe the bounds and then have the callers make an `impl` for every type that they want to supply:
+
+```rs
+trait Fireable {
+  fn fire(&self, target: &Self) -> i32;
+}
+fn battle<T: Fireable>(attacker: &T, defender: &T) -> i32 {
+  let damage = attacker.fire(defender);
+  return damage
+}
+
+// Must be `impl`d for every type we want to feed into `battle`
+impl Fireable for Ship {
+    fn fire(&self, target: &Self) -> i32 {
+        return fire(&self, &target);
+    }
+}
+```
+
+
+The story is pretty similar for any other imperative language with generic bounds, such as Java: we need to make an interface, and then add an `implements` clause (or an `impl`) for every type we wish to supply.
+
+
+It's slightly easier in Go, which automatically knows which structs `impl` which interfaces. It could be said that Vale's mechanism is a compile-time version of that!
+
+
+There are only two languages today which can accomplish something like this. The first is C++:
+
+```c++
+template<typename T>
+requires requires(T a) { { fire(&a, &a) } -> std::same_as<int>; }
+int battle(T* attacker, T* defender) {
+    return fire(attacker, defender);
+}
+```
+
+and the second one is Zig:
+
+```zig
+fn battle(T* attacker, T* defender, comptime int(T*, T*) fireCallback) {
+    return fireCallback(attacker, defender);
+}
+```
+
+
+TODO: maybe dont mention c++ and zig?
+
+
+# Unexpected Resonance from the Ancients
+
+After using this for a few weeks, I had a shocking realization: this is similar in spirit to how we did things in C!
+
+
+<<<<
+This snippet in Vale...
+
+```vale
+struct Ship {
+  strength int;
+}
+func fire(ship &Ship, target &Ship) int {
+  ship.strength - target.strength
+}
+
+func battle<T>(attacker T, defender T)
+where func fire(&T, &T)int
+{
+  damage = fire(attacker, defender);
+  return damage;
+}
+```
+////
+...would be this in C:
+
+```c
+struct Ship {
+  int strength;
+};
+int fire(Ship* ship, target &Ship) {
+  return ship.strength - target.strength;
+}
+
+typedef int (*Fire)(void*, void*);
+int battle(
+    void* attacker,
+    void* defender,
+    Fire fire) {
+  int damage = fire(attacker, defender);
+  return damage;
+}
+```
+>>>>
+
+
+The only real difference is that Vale passes the `fire` function in at compile-time, and C passes it in at run-time via a function pointer. Aside from that, these approaches are the same.
+
+
+Note how neither requires that `fire` be a method of the type, they can be free functions. I think this is a much cleaner approach, that allows us to decouple the type from the functions we use on it.
+
+TODO: add reasoning, compelling use case
+
+
+
+# One step further
+
+Let's take this to the next level.
+
+```vale
+func battle<F, T>(attacker T, defender T, fireCallable F)
+where func __call(&F, &T, &T)int
+{
+  damage = fireCallable(attacker, defender);
+  return damage;
+}
+```
+
+We can still pass in fire, but now we can pass in a closure as well, if we wanted to.
+
+TODO: add motivation, compelling use case
+
+
