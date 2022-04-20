@@ -9,21 +9,21 @@ namespace: c-blog m-annotated
 sponsor: us
 ---
 
-We're going to commit a cardinal sin today and talk about *syntax design!* [# Normally we talk about new memory management schemes, yak shaving contests, and other nonsense. It feels weird to be talking about something other people usually talk about!]
+We're going to commit a cardinal sin today and talk about *syntax design!* [# It's such a travesty to be talking about something as mundane as _syntax_ during the week we're prototyping [deterministic replayability](https://github.com/ValeLang/Vale/blob/master/docs/DeterministicReplayability.md)!]
 
 
 <div><img src="/images/bikeshed.jpg" width="100%" style="opacity: .8"/><center><span style="opacity: .8"><a href="https://en.wikipedia.org/wiki/Law_of_triviality">(Also, while we have you here, what color should we paint this shed?)</a></span></center></div>
 
 
-We often think that there are only three alternatives for variable declaration:
+There are three main alternatives for variable declaration:
 
- * One keyword to declare a variable, such as:
-    * In C++, `auto x = 4;`
-    * Swift's `var x = 4`
-    * Go's `x := 4` (though it's not really a keyword per se)
  * Specifying whether the variable can change, such as:
-    * Rust's `let x = 4;` vs `let mut x = 4;`
-    * Javascript's `let x = 4` vs `const x = 4`
+    * Javascript's `let x = 4` vs. `const x = 4`
+    * Rust's `let x = 4` vs. `let mut x = 4`
+ * Not specifying whether the variable can change, such as:
+    * Swift's `let x = 4`
+    * Java's `int x = 4`
+    * Go's `x := 4` (though it's not really a keyword per se)
  * Leaving it off completely, such as:
     * Python's `x = 4`
 
@@ -38,12 +38,12 @@ However, it recently changed to a fourth option, which was so nice that it becam
 
 # The Fourth Option
 
-Most languages can't just use `x = 4;`, because that already meant something; that's the *re-assignment statement*, which modifies an existing variable that we already declared.
+Most languages can't just use `x = 4`, because that already meant something. That's the *assignment statement*, which modifies an existing variable that we already declared.
 
-And alas, Python tried combining those two statements. It didn't go well. [# This leads to problems; if you rename your `x = 1;` declaration to `y = 1;`, but forget to modify `x = 42;` re-assignment below, you now accidentally have two variables!]
+And alas, Python tried combining those two statements. It didn't go well. [# This leads to problems; if you rename your `x = 1` declaration to `y = 1`, but forget to modify `x = 42` assignment below, you now accidentally have two variables!]
 
 
-However, there's another option here: *let's change the re-assignment statement!*
+However, there's another option here: *let's change the assignment statement!*
 
 
 <<<<
@@ -78,13 +78,13 @@ func main() {
 ```
 >>>>
 
-In other words, `x = 3;` declares a variable, and `set x = 42;` re-assigns it.
+In other words, `x = 3` declares a variable, and `set x = 42` assigns it.
 
 
 It was odd at first, but after using it for a few weeks, we think this is a huge improvement.
 
 
-Syntax design can be a tricky endeavor. When exploring new syntax, we had to suppress the knee-jerk "unfamiliarity avoidance", and actually experiment. Without experimenting, it's easy to get stuck with what's familiar, even if there are better options.
+Syntax design can be a tricky endeavor. When exploring new syntax, we had to suppress the knee-jerk unfamiliarity avoidance, and actually experiment. Without experimenting, it's easy to get stuck with what's familiar, even if there are better options.
 
 
 <slice/>
@@ -92,15 +92,15 @@ Syntax design can be a tricky endeavor. When exploring new syntax, we had to sup
 
 # Why We Like It
 
-To our great surprise, we've found that *our codebases have a lot more declarations than re-assignments,* so it makes sense to require the extra keyword on re-assignments because they're rarer.
+To our great surprise, we've found that *our codebases have a lot more declarations than assignments,* so it makes sense to require the extra keyword on assignments because they're rarer.
 
 
-We sampled three Vale projects. One had 111 declarations, and only 35 re-assignments. That's only *21%* re-assignments! The other two were even lower, at *20%* and *6%*.
+We sampled three Vale projects. One had 111 declarations, and only 35 assignments. That's only *21%* assignments! The other two were even lower, at *20%* and *6%*.
 
 This isn't just Vale either. A randomly chosen Rust library, [Rocket](https://github.com/SergioBenitez/Rocket), had about *8%*. [#rocket]
 
 
-*When did this happen?* We used to re-assign variables all the time!
+*When did this happen?* We used to assign variables all the time!
 
 <slice>
 #rocket: This is approximate; I used `let(\s+mut)?` (4437 results) and `^\s*[\w\[\]\.]+\s*[\+\-\*\/]?=\s+` (351 results) and which may have missed some corners, such as lambdas and mutating call returned values.
@@ -109,10 +109,10 @@ Parsing with regular expressions is fun!
 </slice>
 
 
-We suspect three things contributed to this shift over the past couple decades.
+We suspect moving towards more declarative patterns has contributed to this shift. Let's see some examples!
 
 
-First, we no longer need re-assignment to return a value from an if-statement. Compare these two snippets in Scala:
+First, we no longer need assignment to return a value from an if-statement. Compare these two snippets in Scala:
 
 <<<<
 ```scala
@@ -134,7 +134,7 @@ val weight =
 ```
 >>>>
 
-Second, our for-loops became foreach loops, removing that pesky `i++`:
+Second, our for-loops became foreach loops, removing that pesky `i++`. Compare these two snippets in Java:
 
 <<<<
 ```java
@@ -170,7 +170,7 @@ let foundIndex =
 >>>>
 
 
-Either way, we seem to have a lot less re-assignments nowadays, so it makes sense to have the extra keyword on the rarer statement, not the more common one.
+Nevertheless, we seem to have a lot less assignments nowadays, so it makes sense to have the extra keyword on the rarer statement, not the more common one.
 
 
 <slice/>
@@ -178,16 +178,16 @@ Either way, we seem to have a lot less re-assignments nowadays, so it makes sens
 
 # Another Factor
 
-Note how the declaration doesn't specify whether we can change the variable, like `let` vs `let mut`.
+Note how the declaration doesn't specify whether we can change the variable, like `let` vs. `let mut`.
 
 
 One of the benefits of that distinction was that we could easily know whether the variable could change in the future.
 
 
 <<<<
-We actually kept that distinction for a while; we used the `!` symbol, such as `d! = 3;`.
+We actually kept that distinction for a while; we used the `!` symbol, such as `d! = 3`.
 
-However, we decided to not require it for local variables, because the `set` keyword makes re-assignment more noticeable than it was before.
+However, we decided to not require it for local variables, because the `set` keyword makes assignment more noticeable than it was before.
 
 ////
 
@@ -206,7 +206,7 @@ func main() {
 >>>>
 
 
-For example, if we want to know whether the variable `d = 3;` can change, we just need to look for a `set d = 7;` keyword somewhere in the function, which is much more noticeable now than the previous re-assignment syntax was.
+For example, if we want to know whether the variable `d = 3` can change, we just need to look for a `set d = 7` keyword somewhere in the function, which is much more noticeable now than the previous assignment syntax was.
 
 
 <<<<
@@ -219,7 +219,7 @@ struct MyStruct {
 ```
 >>>>
 
-For that reason, we kept the `!` on struct members.
+For that reason, we kept the `!` on struct members. Other languages do this as well, such as [OCaml](https://dev.realworldocaml.org/records.html), and it seems to be a pretty good balance.
 
 
 <slice/>
