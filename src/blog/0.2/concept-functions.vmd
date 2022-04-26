@@ -10,7 +10,7 @@ sponsor: us
 ---
 
 
-Something unexpected happened, once we implemented [const generics](/blog/const-generics-spread). We discovered that by enabling functions as generic parameters, we also effectively enabled *concepts*, a way to specify constraints on certain generic parameters, without making them implement any traits.
+Something unexpected happened, once we implemented [const generics](/blog/const-generics-spread). We discovered that by enabling passing functions as generic parameters, we also effectively enabled *concepts*, a way to specify constraints on certain generic parameters, without making them implement any traits.
 
 
 For example, let's say we already have a `Ship` struct and a `calcDamage` function:
@@ -53,10 +53,22 @@ int battle(T* attacker, T* defender) {
 Vale makes it wonderfully easy to use this approach. We already use it about fifty times in our standard library!
 
 
-It also makes certain things a lot easier, compared to previous approaches.
+For example, in [optutils.vale](https://github.com/Verdagon/Vale/blob/master/stdlib/src/optutils/optutils.vale#L27), we have a function `Opt<T>.clone` that's only enabled if `T` also has a `clone` method:
+
+```
+func clone<T>(self &Opt<T>) Opt<T>
+where func clone(&T)T {
+  ...
+}
+```
+
+This can be a lot easier, compared to previous approaches.
 
 
-For example, in Rust, if we had a pre-existing `Ship` and `calcDamage` function, we would have to make a trait to describe the bounds and then have the callers make an `impl` for every type that they want to supply:
+For example, in Java or C# or Rust, if we had a pre-existing `Ship` and `calcDamage` function, we would have to make an interface (or trait) to describe the bounds and then require all callers to to make their arguments extend that interface (or make an `impl`, in Rust's case) for every type that they want to supply.
+
+
+Here's an example in Rust:
 
 ```rs
 // Let's say we had a pre-existing function and a struct...
@@ -87,14 +99,10 @@ impl Fireable for Ship {
 }
 ```
 
-
-The story is pretty similar for any other imperative language with generic bounds, such as Java: we need to make an interface, and then add an `implements` clause (or an `impl`) for every type we wish to supply.
-
-
-If we can't modify the existing type (such as if it's defined by a third-party library) we have to make a wrapper class (sometimes known as a typeclass or a newtype) which _can_ implement the required interface.
+If we can't modify the existing type (such as if it's defined by a third-party library) we sometimes need to make a wrapper class (sometimes known as a typeclass or a newtype) which _can_ implement the required interface.
 
 
-# Unexpected Resonance from the Ancients
+# Unexpected Déjà Vu from C
 
 After using this for a few weeks, I had a shocking realization: this is similar in spirit to how we did things in C!
 
