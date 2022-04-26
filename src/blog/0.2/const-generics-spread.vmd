@@ -1,7 +1,7 @@
 ---
 title: Const Generics and the Compile Time Spread Operator
 author: Evan Ovadia
-date: Apr 17, 2022
+date: Apr 19, 2022
 realm: blog
 path: blog/const-generics-spread
 layout: annotated
@@ -65,22 +65,22 @@ Besides types and integers, we can also have generic parameters that are:
 
 That last one is particularly interesting, as it allows us to implement tuples in Vale:
 
-```
+```vale
 struct Tup<T RefList> {
-  _ T..;
+  _ ..T;
 }
 ```
 
-`_` means the field is unnamed, and `T..` means "use each of these types".
+`_` means the field is unnamed, and `..T` means "use each of these types".
 
 
 That `..` is known as the *spread operator.* It can basically be thought of as the "compile-time for-each loop".
 
 
-`Tup<RefList(int, bool, str)>` will expand to this:
+`(int, bool, str)` is syntactic sugar for `Tup<RefList[int, bool, str]>` which expands to this:
 
 ```
-struct Tup<T RefList> {
+struct Tup {
   0 int; // an int named 0
   1 bool; // a boolean named 1
   2 str; // a string named 2
