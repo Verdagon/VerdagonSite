@@ -53,7 +53,7 @@ You can find our experimental implementation in [genHeap.c](https://github.com/V
 <slice>
 #resilient: Vale has three release modes:
 
- * *Resilient:* Fast and 100% safe.
+ * *Resilient:* Fast and safe.
  * *Assist:* for development, detects logic problems.
  * *Unsafe:* turns off all safety.
 
@@ -256,7 +256,7 @@ This is cheaper because *programs dereference less than they alias and dealias:*
 
 ## More Cache Friendly
 
-Reference counting is not very "cache friendly". Adding and subtracting integers is basically free on modern CPUs, but the real bottleneck in modern programs is how _far_ those integers are: if it's been recently accessed, it's in the nearby cache, and only takes a few CPU cycles to fetch. Otherwise the CPU will "cache miss" and have to bring it in all the way from RAM, which could take *hundreds* of cycles. [#caching]
+Reference counting is not very "cache friendly". Adding and subtracting integers is basically free on modern CPUs compared to the real bottleneck, which is how _far_ those integers are: if it's been recently accessed, it's in the nearby cache, and only takes a few CPU cycles to fetch. Otherwise the CPU will "cache miss" and have to bring it in all the way from RAM, which could take *hundreds* of cycles. [#caching]
 
 In our reference-counted `launchShip` example, the `ship.__ref_count++` could take a few cycles if `ship` is already in the cache, or hundreds of cycles if it's not.
 

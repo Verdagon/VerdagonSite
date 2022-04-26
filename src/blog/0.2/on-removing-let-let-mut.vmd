@@ -20,9 +20,9 @@ There are three main alternatives for variable declaration:
  * Specifying whether the variable can change, such as:
     * Javascript's `let x = 4` vs. `const x = 4`
     * Rust's `let x = 4` vs. `let mut x = 4`
+    * Java's `int x = 4` vs. `final int x = 4`
  * Not specifying whether the variable can change, such as:
     * Swift's `let x = 4`
-    * Java's `int x = 4`
     * Go's `x := 4` (though it's not really a keyword per se)
  * Leaving it off completely, such as:
     * Python's `x = 4`
@@ -49,7 +49,7 @@ However, there's another option here: *let's change the assignment statement!*
 <<<<
 Instead of this:
 
-```vale
+```
 func main() {
   let a = 3;
   let b = 3;
@@ -191,7 +191,7 @@ However, we decided to not require it for local variables, because the `set` key
 
 ////
 
-```vale
+```
 func main() {
   a = 3;
   b = 3;
@@ -259,7 +259,7 @@ With your help, we can write nonsense like this more often!
 
 # About the Vale Language Project
 
-The Vale Language Project is not just about making Vale, it's about *exploring, discovering, and publishing* new programming language mechanisms that enable *speed*, *safety*, and *ease of use.*
+The Vale Language Project is not just about making Vale, it's also about *exploring, discovering, and publishing* new programming language mechanisms that enable *speed*, *safety*, and *ease of use.*
 
 
 *The world needs more exploration here!* Currently, most programming language research is in:

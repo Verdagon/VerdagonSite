@@ -11,6 +11,11 @@
         "source": "/",
         "destination": "/home",
         "type": 302
+      },
+      {
+        "source": "/blog/0.2/on-removing-let-let-mut",
+        "destination": "/blog/on-removing-let-let-mut",
+        "type": 302
       }
     ]
   }

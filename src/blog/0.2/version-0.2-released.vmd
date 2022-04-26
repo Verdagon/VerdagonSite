@@ -1,5 +1,5 @@
 ---
-title: Vale Programming Language v0.2 Released: Fearless FFI, Modules, Higher RAII, Const Generics, Concept Functions, Faster Compile Times, set Keyword
+title: Vale 0.2 Released: Concept Functions, Higher RAII, Const Generics, FFI, Modules, Faster Compiles, set Keyword
 author: Evan Ovadia
 date: Apr 18, 2022
 realm: blog
@@ -9,75 +9,66 @@ namespace: c-blog m-annotated
 sponsor: us
 ---
 
+
 Well met!
 
 
+# Higher RAII
 
-### Fearless FFI
-
-What really makes Vale shine is how much it helps us prevent and detect bugs in our programs.
-
-
-To that end, version 0.2 (beta) enables Fearless FFI, which prevents our unsafe code from causing undefined behavior problems in our safe code.
+This release enables [Higher RAII](https://verdagon.dev/blog/higher-raii-7drl), a form of linear typing that helps the compiler enforce that we "never forget to call that function".
 
 
-In other words, if we accidentally mishandle memory in C, it won't corrupt any Vale objects.
+To use Higher RAII, just add a `#!DeriveStructDrop` above your struct or `#!DeriveInterfaceDrop` above your interface, and then add your own function, which takes any number of arguments, returns whatever you'd like, and does `destruct self;` somewhere in its body.
 
 
-Normally, when mixing a safe language with an unsafe language, any bugs in the unsafe language can cause problems in the safe language. For example:
-
- * When Python code sends a Python object into C, if the C code doesn't correctly call `Py_INCREF`, it will corrupt Python's memory and cause some mysterious behavior later on in the Python code.
- * When Rust hands a reference into C, the C code can type-cast it at will to write arbitrary memory to the Rust object, causing confounding bugs later on in the safe Rust code.
- * When Javascript hands the wrong kind of object to a Typescript function, it causes bugs down the line deep in the Typescript code, even though Typescript has static typing.
-
-This is called "leaky safety", and its bugs are very difficult to track down.
+For a real-world use case, check out [Vale's Higher RAII, the pattern that saved me a vital 5 hours in the 7DRL Challenge](https://verdagon.dev/blog/higher-raii-7drl).
 
 
-In both cases, we know that unsafe code was involved *somewhere* in the chain of events, but since the bugs actually happen later on, in supposedly safe code, there's no easy way to identify _which_ unsafe code was the original culprit.
+# Concept Functions
+
+Vale now supports *concept functions*, a way to specify that certain functions must exist for given generic parameters, without making them implement any traits.
 
 
-Vale protects against this, with *region boundary hardening*, or as we call it, Fearless FFI.
+For example, List's `clone` function can require that there exists a `clone` function for its elements:
+
+```vale
+func clone<T>(self &List<T>) List<T>
+    where func clone(&T)T
+{
+  result = List<T>();
+  foreach x in self {
+    result.add(clone(x));
+  }
+  return result;
+}
+```
+
+This is often much easier than what we normally see in mainstream languages, which is to require the element to implement a certain trait.
+
+Read more at [Concept Functions](/blog/concept-functions)!
 
 
-Region boundary hardening is a combination of three techniques:
-
- * Using a different stack for the unsafe region.
- * Encrypting references to safe regions' objects.
- * Copying immutable data between the safe and unsafe regions.
-
-
-
-
- * When Rust calls into C, and C does a buffer overrun on a stack-allocated array, it can cause mysterious behavior in the Rust code later on.
-
-
-
-
-
-With FFI, [# FFI stands for Foreign Function Interface, it lets us call functions written in other languages.] we can call into functions written in other languages, like C.
-
-However, for most languages, problems in C can cause problems in otherwise safe code.
-
-For example, in Python, if we forget to call 
-
-
-
-Vale takes a different approach to memory safety.
-
-
-
-Normally, for a language to have FFI, it needs to sacrifice some memory safety.
-
-Vale took a much different approach from other low-level languages.
-
-
-
-
-### Const Generics
+# Const Generics 
 
 We're happy to announce that Vale now has "const generics", where generic parameters can contain not only types (like the `T` in `List<T>`) but also integers, booleans, and other types.
 
-For example, we can make a generic class for physics vectors:
+
+<<<<
+Now, instead of repeating classes...
+
+```vale
+struct Vec2<T> {
+  elements [#2]T; // 2-element array of T
+}
+struct Vec3<T> {
+  elements [#3]T; // 3-element array of T
+}
+struct Vec4<T> {
+  elements [#4]T; // 4-element array of T
+}
+```
+////
+...we can have one:
 
 ```vale
 struct Vec<N int, T> {
@@ -85,51 +76,118 @@ struct Vec<N int, T> {
 }
 ```
 
-And we can use them like `Vec<2, int>`.
+We'd use it like `Vec<2, int>`.
+>>>>
 
 
-This allows for *much faster code*, because the compiler knows the size of the contained array up-front, and doesn't have to figure it out at run-time.
+We also now have the *compile-time spread operator* `..` for structs, which enabled us to implement tuples in the standard library, instead of in the compiler.
 
 
-Besides types and integers, we can also have generic parameters that are:
+We have some interesting things planned for const generics, see [Const Generics and the Compile-Time Spread Operator](/blog/const-generics-spread) for more!
 
- * Booleans
- * Strings
- * Functions
- * Mutability (`imm` vs `mut`)
- * Ownership (`own`, `borrow`, `share`, `weak`)
- * Location (`inl`, `heap`)
- * Variability (`vary`, `final`)
- * Type Lists
 
-That last one is particularly interesting, as it allows us to implement tuples in Vale:
+# Removing Let and Let Mut
 
-```
-struct Tup<T RefList> {
-  _ ..T;
+The 0.2 release removes the `let` and `let mut` keywords, making our syntax cleaner and more readable.
+
+<<<<
+Before:
+
+```vale
+func main() {
+  let a = 3;
+  let b = 3;
+  let c = 3;
+  let mut d = 3;
+  d = 7;
+  println(d);
 }
+```stdout
+7
 ```
+////
+After:
 
-`_` means the field is unnamed, and `..T` means "use all of these types as fields".
+```vale
+func main() {
+  a = 3;
+  b = 3;
+  c = 3;
+  d = 3;
+  set d = 7;
+  println(d);
+}
+```stdout
+7
+```
+>>>>
 
-When we say `(4, 5, 6)` to make a tuple, it's actually syntactic sugar for this `Tup` struct.
+Read more at [On Removing Let and Let Mut](https://verdagon.dev/blog/on-removing-let-let-mut)!
 
 
-### Concept Functions
+# Faster Compile Times
 
-Something unexpected happened, once we implemented const generics. We discovered that we effectively enabled *concepts*, a way to specify constraints on certain generic parameters.
-
-
-TODO: pull from concept-functions article.
-
-
-### Faster Compile Times
-
-This version of the compiler is more than thrice as fast as the previous version, after we did some optimizations:
+This version of the compiler is 3x as fast as the previous version, after we did some optimizations:
 
  * Memoized all of our .hashCode() calls, and used interning to speed up .equals() calls.
  * Wrote a newly optimized generics solver, which operates on primitives instead of heap-allocated classes.
  * Migrated from Scala parser combinators to a hand-written recursive descent parser.
+
+We plan on taking this optimization spree even further!
+
+
+# Modules
+
+Vale has a new take on modules, which is as easy to use as Java's packages and provides the flexibility of Rust's crates.
+
+
+Check out the [https://vale.dev/guide/modules](Modules Guide) to see them!
+
+
+We're also making use of our module system in a new standard library, stay tuned for more on that!
+
+
+# Downcasting
+
+We can now downcast interfaces to a specified struct, using the `as` function.
+
+See the [Interfaces Guide](https://vale.dev/guide/interfaces) for more!
+
+
+# Foreach and Break
+
+
+<<<<
+Vale now supports `foreach` loops, and the `break` statement as well.
+
+
+Here's an example with both of them.
+
+
+See the [Collections Guide](https://vale.dev/guide/collections#loops) for more!
+////
+
+```vale
+exported func main() {
+  l = List<int>().add(1).add(3).add(7);
+  foreach [i, x] in l.entries() {
+    println(i + ": " + x);
+    if i == 1 {
+      break;
+    }
+  }
+}
+```stdout
+0: 1
+1: 3
+```: `import stdlib.*; import stdlib.collections.list.*;`
+>>>>
+
+
+# Fearless FFI
+
+We've laid the groundwork for [Fearless FFI](/blog/next-fearless-ffi), by stabilizing how the user calls into external code.
+
 
 
 

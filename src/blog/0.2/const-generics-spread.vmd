@@ -1,156 +1,145 @@
 ---
-title: Added to Vale 0.2 Beta: Concept Functions
+title: Const Generics and the Compile Time Spread Operator
 author: Evan Ovadia
-date: Apr 18, 2022
+date: Apr 17, 2022
 realm: blog
-path: blog/version-0.2-released
+path: blog/const-generics-spread
 layout: annotated
 namespace: c-blog m-annotated
 sponsor: us
 ---
 
 
-Something unexpected happened, once we implemented [const generics](/blog/const-generics-spread). We discovered that by enabling functions as generic parameters, we also effectively enabled *concepts*, a way to specify constraints on certain generic parameters, without making them implement any traits.
+We're happy to announce that Vale now has *const generics*! Generic parameters can contain not only types (like the `T` in `List<T>`) but also integers, booleans, and other interesting substances.
 
 
-For example, let's say we already have a `Ship` struct and a `calcDamage` function:
+This might be familiar from other languages, like C++ and Rust. However, Vale's taking them in a different direction, to enable something called the *compile-time spread operator*, which will serve as a useful metaprogramming tool for Vale.
 
-```vale
-struct Ship {
-  strength int;
-}
-func calcDamage(ship &Ship, target &Ship) int {
-  ship.strength - target.strength
-}
-```
 
-We can write a function that works on any type that has a `calcDamage` function, by using `where func calcDamage(&T, &T)int`:
+This article gives a quick overview of const generics, and then where Vale plans to take them.
+
+
+# Const Generics
+
+Before const generics, we often had a lot of similar classes:
 
 ```vale
-func battle<T>(attacker T, defender T)
-    where func calcDamage(&T, &T)int
-{
-  damage = calcDamage(attacker, defender);
-  // ... other logic
-  return damage;
+struct Vec2<T> {
+  elements [#2]T; // 2-element array of T
+}
+struct Vec3<T> {
+  elements [#3]T; // 3-element array of T
+}
+struct Vec4<T> {
+  elements [#4]T; // 4-element array of T
 }
 ```
 
-
-The only existing language today which can accomplish something like this is C++, with its `requires requires` clause:
-
-```c++
-template<typename T>
-requires requires(T a) { { calcDamage(&a, &a) } -> std::same_as<int>; }
-int battle(T* attacker, T* defender) {
-    int damage = calcDamage(attacker, defender);
-    // ... other logic
-    return damage;
-}
-```
+It would be nice if we could pass that `2`, `3`, `4` in as a generic parameter like we did `T`!
 
 
-Vale makes it wonderfully easy to use this approach. We already use it about fifty times in our standard library!
-
-
-It also makes certain things a lot easier, compared to previous approaches.
-
-
-For example, in Rust, if we had a pre-existing `Ship` and `calcDamage` function, we would have to make a trait to describe the bounds and then have the callers make an `impl` for every type that they want to supply:
-
-```rs
-// Let's say we had a pre-existing function and a struct...
-struct Ship {
-  strength: i32
-}
-fn calcDamage(ship: &Ship, target: &Ship) -> i32 {
-  return ship.strength - target.strength;
-}
-
-// And we want a function that can take any type.
-// We'll need a trait for the functions we want to call on it.
-trait Fireable {
-  fn calcDamage(&self, target: &Self) -> i32;
-}
-fn battle<T: Fireable>(attacker: &T, defender: &T) -> i32 {
-  let damage = attacker.calcDamage(defender);
-  // ... other logic
-  return damage
-}
-
-// And the caller must make an `impl` for every type we want to feed into `battle`
-impl Fireable for Ship {
-    fn calcDamage(&self, target: &Self) -> i32 {
-        // (Can optionally inline this, if this is the only usage.)
-        return calcDamage(&self, &target);
-    }
-}
-```
-
-
-The story is pretty similar for any other imperative language with generic bounds, such as Java: we need to make an interface, and then add an `implements` clause (or an `impl`) for every type we wish to supply.
-
-
-If we can't modify the existing type (such as if it's defined by a third-party library) we have to make a wrapper class (sometimes known as a typeclass or a newtype) which _can_ implement the required interface.
-
-
-# Unexpected Resonance from the Ancients
-
-After using this for a few weeks, I had a shocking realization: this is similar in spirit to how we did things in C!
-
-
-<<<<
-This snippet in Vale...
+Enter *const generics*, which enables just that.
 
 ```vale
-struct Ship {
-  strength int;
-}
-func calcDamage(ship &Ship, target &Ship) int {
-  ship.strength - target.strength
-}
-
-func battle<T>(attacker T, defender T)
-where func calcDamage(&T, &T)int
-{
-  damage = calcDamage(attacker, defender);
-  // ... other logic
-  return damage;
+struct Vec<N int, T> {
+  elements [#N]T;
 }
 ```
-////
-...would be this in C:
 
-```c
-struct Ship {
-  int strength;
-};
-int calcDamage(Ship* ship, target &Ship) {
-  return ship.strength - target.strength;
-}
+They're used like `Vec<2, int>`. Much better!
 
-typedef int (*Fire)(void*, void*);
-int battle(
-    void* attacker,
-    void* defender,
-    Fire calcDamage) {
-  int damage = calcDamage(attacker, defender);
-  // ... other logic
-  return damage;
+
+Besides types and integers, we can also have generic parameters that are:
+
+ * Booleans
+ * Strings
+ * Functions
+ * Mutability (`imm` vs `mut`)
+ * Ownership (`own`, `borrow`, `share`, `weak`)
+ * Location (`inl`, `heap`)
+ * Variability (`vary`, `final`)
+ * Type Lists
+
+
+# Compile-time Spread Operator
+
+That last one is particularly interesting, as it allows us to implement tuples in Vale:
+
+```
+struct Tup<T RefList> {
+  _ T..;
 }
 ```
->>>>
+
+`_` means the field is unnamed, and `T..` means "use each of these types".
 
 
-The only real difference is that Vale passes the `calcDamage` function in at compile-time, and C passes it in at run-time via a function pointer. Aside from that, these approaches are the same.
+That `..` is known as the *spread operator.* It can basically be thought of as the "compile-time for-each loop".
 
 
-Note how neither requires that `calcDamage` be a method of the type, they can be free functions. I think this is a much cleaner approach, that allows us to decouple the type from the functions we use on it.
+`Tup<RefList(int, bool, str)>` will expand to this:
+
+```
+struct Tup<T RefList> {
+  0 int; // an int named 0
+  1 bool; // a boolean named 1
+  2 str; // a string named 2
+}
+```
 
 
-# That's all!
 
-Thanks for reading, we hope you enjoyed this article! And if you believe in the direction we're heading, please consider sponsoring us on github:
+# Spread Operator In Action
+
+The above works today, in version 0.2. Now we'll show you a sneak peek of where we're heading with this delightful little operator.
+
+
+We want to be able to use it for function arguments, and in expressions. For example, we could use it to implement a zero-cost variadic `println` function:
+
+```
+func println<T RefList>(args T..) {
+  ..print(args..);
+  print("\n");
+}
+```
+
+If we called this with `println(4, " hello ", true)`, it's as if the `println` function contains:
+
+```
+func println(args0 int, args1 str, args2 bool) {
+  print(args0);
+  print(args1);
+  print(args2);
+  print("\n");
+}
+```stdout
+4 hello true
+```
+
+In the previous snippet, the prefix `..` (before `print`) marks the beginning of the "loop", and the postfix `..` (after `args`) specifies what should change in each iteration.
+
+
+## Spread Method Call
+
+When combined with UFCS, another interesting capability emerges, which we'll call the *spread method call*. The above snippet can be rewritten as:
+
+```
+func println<T RefList>(args T) {
+  args..print();
+  print("\n");
+}
+```
+
+It's fascinating how one little symbol can enable such a powerful capability!
+
+
+Thanks for visiting, hope you enjoyed it!
+
+
+In the coming weeks, I'll be writing more about our "Fearless FFI" plans which will help us more safely use external C code, so subscribe to our [RSS feed](https://verdagon.dev/rss.xml) or the [r/vale](https://reddit.com/r/vale) subreddit, and come hang out in the [Vale discord](https://discord.gg/SNB8yGH)!
+
+
+If you found this interesting, please consider sponsoring us:
 
 <center>
   <a href="https://github.com/sponsors/ValeLang" class="donate-button">
@@ -161,8 +150,12 @@ Thanks for reading, we hope you enjoyed this article! And if you believe in the 
   </a>
 </center>
 
-With your support, we can bring easier generics to programmers worldwide!
+With your help, we can write this kind of nonsense more often!
 
+
+
+
+- Evan Ovadia
 
 
 <slice new-color="afterword"/>
@@ -238,5 +231,3 @@ With enough sponsorship, we can:
      Sponsor us on GitHub!
   </a>
 </center>
-
-

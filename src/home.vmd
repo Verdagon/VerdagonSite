@@ -16,6 +16,7 @@ I use this site to blog about my endeavors. Enjoy!
 
 # Recent posts:
 
+ * [On Removing Let and Let Mut](/blog/on-removing-let-let-mut)
  * [A Tale of Yak Shaving: Accidentally Making a Language, for an Engine, for a Game
 ](/blog/yak-shave-language-engine-game)
  * [Surprising Weak-Ref Implementations: Swift, Obj-C, C++, Rust, and Vale](/blog/surprising-weak-refs)

@@ -1,0 +1,6 @@
+
+
+talk about futhark
+
+talk about a possible `pure unsafe gpu parallel` loop that could use cuMemMap under the hood
+

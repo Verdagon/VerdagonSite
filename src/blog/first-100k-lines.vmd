@@ -149,10 +149,13 @@ If non-determinism creeps into your program, you'll be testing your application,
 
 # ...except you can't really avoid nondeterminism.
 
-Even in a compiler, which needs no network requests or animations, [# Hold my beer. A compiler... with animations. Best error messages ever! Who's with me?] we still have plenty of nondeterminism from asynchronous file IO and thread scheduling.
+"Easy for you to say, you're working on a compiler! My app needs network requests, I can't just avoid them!"
 
 
-So if we have non-determinism, how do we reproduce bugs?
+You're right, of course! Network requests, overlapping file I/O, animations, threads, and lots of nondeterministic things might be necessary for your program. [#nondgood]
+
+
+But if we have non-determinism, how do we reproduce bugs?
 
 
 The answer: *deterministic replayability!*
@@ -175,10 +178,12 @@ In the 2020 7DRL Challenge, on the penultimate evening, I launched thousands of 
 
 Unfortunately, most languages have some nondeterminism. Some languages (C#, Golang, Rust) even add it in intentionally, which can make this a bit challenging.
 
-Vale aims to solve this problem completely by adding [Perfect Replayability](https://verdagon.dev/blog/next-perfect-replayability), which would do the above recording and replaying for you, even in the presence of multithreading.
+Vale is also nondeterministic, but solves the reproducibility problem with its [Deterministic Replayability](https://vale.dev/guide/deterministic-replayability); it will do the above recording and replaying for you, even in the presence of multithreading.
 
 
-<slice/>
+<slice>
+#nondgood: And besides, nondeterminism can be good, such as when games use random number generators to make each run of a game different.
+</slice>
 
 
 # Stay on top of your testing
