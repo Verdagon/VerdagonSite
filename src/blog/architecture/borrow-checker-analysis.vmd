@@ -1,6 +1,10 @@
 
 
-Benefits are, of course, extreme speed and good memory safety! The drawbacks are subtle and pervasive.
+Benefits are, of course, extreme speed and good memory safety! The drawbacks are subtle and pervasive, though.
+
+
+rust isn't perfect.
+http://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=rust
 
 
 - not very resilient to needed changes

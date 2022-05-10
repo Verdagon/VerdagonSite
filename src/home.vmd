@@ -16,12 +16,13 @@ I use this site to blog about my endeavors. Enjoy!
 
 # Recent posts:
 
+ * [Added to Vale 0.2 Beta: Concept Functions](/blog/concept-functions)
+ * [Const Generics and the Compile Time Spread Operator](/blog/const-generics-spread)
  * [On Removing Let and Let Mut](/blog/on-removing-let-let-mut)
  * [A Tale of Yak Shaving: Accidentally Making a Language, for an Engine, for a Game
 ](/blog/yak-shave-language-engine-game)
  * [Surprising Weak-Ref Implementations: Swift, Obj-C, C++, Rust, and Vale](/blog/surprising-weak-refs)
  * [Vale's Higher RAII, the pattern that saved me a vital 5 hours in the 7DRL Challenge](/blog/higher-raii-7drl)
- * [Data Races in Python, Despite the Global Interpreter Lock](/blog/python-data-races)
  * [Seamless, Fearless, Structured Concurrency](/blog/seamless-fearless-structured-concurrency)
  * [Generational References](/blog/generational-references)
  * [Hybrid-Generational Memory](/blog/hybrid-generational-memory)

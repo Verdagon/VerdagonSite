@@ -1,0 +1,376 @@
+
+BE EXTREMELY CAREFUL to not talk about rust, just talk about the borrow checker. make it very clear up-front that youre not counting the use of Rc/RefCell.
+there's a lot of useful things that cant work within the borrow checker, and require us to work around it.
+
+
+OR this is a counter argument to when someone says rust has zero cost memory safety. this is the downside.
+
+
+"The downside to zero-cost memory safety" perhaps
+"What we sacrifice for zero-cost memory safety"
+"What we gave up for zero-cost memory safety"
+
+
+understand this before writing this article: https://news.ycombinator.com/item?id=31252229
+
+
+
+A Letter to My Past Self: Borrow Checking vs. Garbage Collection
+
+
+This is a letter to my past self, the self of 2012, who had *very* strong opinions about borrow checking and garbage collection.
+
+
+Since then, I've worked on three products with tens of millions of users, worked on codebases that were millions of lines long, and with teams of hundreds of people. I learned what actually matters when writing software. And, surprise, the picture is more complicated than I thought back in 2012.
+
+
+we want starships. we want them sooner. id rather have them 300 years sooner, and use something like lobster or swift
+
+
+It seems to me that these crusaders (and I've seen a few) think that because you shouldn't build a big bridge out of wood, you shouldn't build anything out of wood. Is the thinking more sophisticated than that? Honest question (and I code in Rust).
+-tayistay
+
+
+sour grapes: if my favorite language doesnt handle it, it must not be a good idea
+if my favorite language is the only one that can do something, it is the most important thing in the world.
+if my language is the best at X, then X is the most important factor.
+
+
+we often think that we should achieve speed and memory safety, at all costs. let me show you what those costs are, and you can ask yourself if an extra 1% of speed is worth it.
+
+
+
+
+the iter invalidation bug is a p3 cuz it only happens in an edge case
+
+use the starship goal. talk about how the cto decided that the combat systems use rust, and the rest of the systems use GC.
+
+talk about the ideal rust code that uses zero rc/refcell. its considered unidiomatic to use them. whats idiomatic mean? dont know. but give it a shot, youll see. okay, well, had to refactor a ton of code. but theres no guidance on when to use rc/refcell. if its okay to use, why does none of our code use it?
+
+
+
+
+
+
+The rust folks and the GC folks are talking past each other. years ago, there was a stretch of my life where i didn't understand why anyone wasn't using rust. this is a letter to my past self, and to all others who have the same mindset I used to. I hope this will help us have a more informed discussion!
+
+
+Note that this post is mainly focusing on memory management: borrow checking, manual memory management, and garbage collection.
+
+
+I think there are three main kinds of people in this debate: Chase, Mason, and Archie. Archie will come in later. Let's meet Chase and Mason!
+
+
+# Chase
+
+There's a certain kind of person. I'll call them Chase. Many years ago, I was a Chase.
+
+
+I was the kind of person who *loved* to solve puzzles. I wanted my code to be beautiful, elegant, and I wanted it to go as fast as possible.
+
+
+Rust came out, and I fell _hard_ for it. A language that made me solve puzzles, and rewarded me with that good feeling of zero cost memory safety? Yes please! That was like crack to me. I chased perfection. I *needed* it. I spent a lot of free time just playing around with it, learning how to use the borrow checker. I loved it, it was a language that finally didn't make me choose between memory safety and speed.
+
+I despised garbage collection, and saw it as a temporary weakness, that humanity needs to move past.
+
+
+I also learned that if we follow the borrow checker's teachings, we'd naturally end up refactoring into patterns that are fast. So not only does it have all the other benefits, but it actively encourages us into better architectures!
+
+
+I evangelized. And I wondered, why is nobody jumping on this? We've solved it! We've solved memory safety with zero cost! Why isn't everybody using this for everything? Why is nobody listening?
+
+
+# Mason
+
+
+Enter Mason, who had been using C++ for their day job, and then was told to start using Rust.
+
+
+These are pretty rare, because not many people have been forced to switch to Rust. The Rust user population has been pretty self-selecting, so there's a natural bias against Mason, for now. As Rust has gained adoption, I've been seeing a shift, for example in Hacker News comments, towards more Masons.
+
+
+To Mason, *Rust is a pain.* It's likely worth it, because we have less vulnerabilities, but working within the confines of the borrow checker is a never-ending battle, even after it "clicks".
+
+
+Chase will never understand Mason. Chase loves the thrill of making it work right. Mason wants to get this feature into production as soon as possible, so they can move onto the next goal.
+
+
+After working at Google on large, real-world projects, I had an awakening, and was more Mason. We had a mission. We wanted to make it so people all over the world could easily make geographic data sets, and share them with others. We were helping with education, with global warming, and generally doing really good things that I believed in. Mason programs not for the joy of the puzzle, but for the joy of helping the user.
+
+
+# The Timeline
+
+
+Chase and Mason experience the same learning curve, but interpret it differently. Below are some examples.
+
+
+### The Mutable Parameter
+
+*Scenario:* A function takes a mutable reference. I want to call it, but I only have a shared reference (an immutable borrow, in other words).
+
+
+*Mason:* Wait, I have to eliminate every single other reference to this data? It shouldn't matter that other objects have references to this object, because we have a proper top-down architecture, with encapsulation and non-reentrancy. Yet somehow, this function is supposed to impose mutability requirements on all its callers, like a *viral leaky abstraction*. I get that it's necessary to convince the compiler that it's safe, but wow, that seems a bit excessive.
+
+
+*Chase:* This makes a lot of sense. One can't have memory safety *and* speed *and* shared mutability. We just have to make our code not use any shared mutability. What an interesting system! I wonder what the implications are?
+
+
+Mason starts to wonder whether the borrow checker should be trusted.
+
+
+## The Observer
+
+*Scenario:* We want to add an observer to a button. However, every real-world observer needs to mutably capture some data. In other words, the classic [Observer Challenge](https://verdagon.dev/blog/observer-challenge).
+
+
+*Mason:* We cant do a basic observer pattern? That doesnt seem right. They said we wouldn't be able to do shared mutability, but nobody mentioned that that means we can't use observers. Apparently, I have to go back to the drawing board, and add a message passing queue that's so wide-reaching it's almost global. Why am I adding pseudo-globals?
+
+
+At this point, they go onto the Rust Discord server, asking for help. They are told that "You can use Rc<RefCell<T>> when you really need to, but it's usually unidiomatic, usually you would refactor your way around the problem."
+
+
+At this point, Mason becomes hopeful. A way around the borrow checker? And asks, "How do I know when I should refactor, and when I should use Rc<RefCell<T>>? Have you ever seen a case where it's appropriate to use Rc<RefCell<T>>?"
+
+
+"Nope. It's okay in theory, but I've never found a case where I needed it. And I suspect your program is organized wrong, if it's architected well, you shouldn't be running into this problem."
+
+
+Mason, a 10-year veteran, comes away not knowing what he did wrong, and not knowing when Rc<RefCell<T>> is appropriate. He goes to refactor his program to use message queues, and find that they have the same problems observers did, just shifted elsewhere.
+
+
+Mason is confused. All the Rust users in the Discord say that the borrow checker is a force for good. "Surely, they must be right. Surely, there's just something I don't understand yet."
+
+
+*Chase:* Fascinating! I never realized it, but observers are inherently unsound. And in hindsight, I can see the symptoms. I once had a bug where I tried to remove an observer from within its handler, and got a crash. By disallowing observers, Rust prevents me from ever facing that bug again. Who needs observers anyway! The world would have been better off if they were never invented. Why have we been using them the whole time?
+
+
+## The Backward Reference
+
+*Situation:* We're writing a class that has a pointer to its parent, to "communicate upwards" things that happen. In other words, the iOS delegate pattern.
+
+
+*Mason:* Ah shoot, the borrow checker doesn't like this. Apparently, a mutable reference to the parent means nothing else can have a reference to it. I have to add a message passing framework, _again._ This is like linked lists all over again. I should just stop trying, and put every class into a bunch of pseudo-global arrays at the top of my program, and pass them down into every function. But... that would mean a _lot_ of functions have access to a _lot_ of objects, throwing away our encapsulation. It will be very tempting for our newhires to add hacks and spooky action at a distance, which they can now.
+
+
+*Chase:* Ah I see! This makes perfect sense. This was unsound, and it always was. But I'm starting to see the pattern: I should put these classes into arrays at the top of my program, and pass these arrays down into every function. They can refer to each other by ID. This feels right, because it's familiar: relational databases work like this. Besides, it's more honest, the borrow checker forces you to pass in anything we might modify, and now it's explicitly there, in all these functions that might indirectly modify these objects.
+
+
+
+## RAII
+
+*Situation:* We want a `Transaction` struct that, when it `drop()`s, will automatically commit the transaction.
+
+
+*Mason:* Wait, I literally can't make this struct. I can't pass in a `&mut Database` to `drop()` because `drop()` can't take parameters. I also can't hold it in a struct field because I have multiple `Transaction`s, and I can't have multiple `&mut Database`. The borrow checker isn't letting me do RAII?
+
+
+At this point, Mason knows that something is wrong. RAII is incredibly helpful, and they'll pry RAII out of Mason's cold, dead hands. How could it be that the borrow checker rejects RAII? There's no way around it. Mason wraps the `Database` in a `Rc<RefCell<T>>`.
+
+
+And Mason then realizes: sometimes the borrow checker is just not a good influence. It took a clash between the borrow checker and RAII to show it, but Mason now realizes that he needs to be wary of blindly following the borrow checker.
+
+
+Mason also begins to suspect the borrow checker isn't really in touch with real-world requirements.
+
+
+At this point, Mason sees that the borrow checker is just a tool, and shouldn't always be used. One should be open to complementing it with other memory management strategies.
+
+
+*Chase:* I see what's happening here. Hmm. I can't use `Cell` here because `Database` is a pretty hefty class, with heap allocations that might be cloned when moving to/from a `Cell`. Okay, I guess this is one of the rare cases I'm forced to use a `Rc<RefCell<T>>`. See, this is why Rust is so well designed, it offers escape hatches like this.
+
+
+
+## Dependency Injection
+
+*Situation:* We have an existing class that sends an email whenever we call `fire()`. We also want it to play a sound.
+
+
+*Mason:* No problem, I'll just add a `&mut AudioManager` as a struct member. Shoot, that doesn't work, of course it doesn't. Looks like I'll have to pass it as a parameter to every function that indirectly calls `fire()`. Ah shoot, at some point our very widely-used `IEntity` trait's `OnEnemyDetected(...)` method calls `fire()`! Now we have to modify *every single caller of `OnEnemyDetected` to pass in the `&mut AudioManager`.
+
+Wait, I just realized, we can't do that! `OnEnemyDetected` is a trait defined by a library we brought in via Cargo, we can't change it. Looks like we have to fall back to `Rc<RefCell<T>>` again.
+
+
+*Chase:* This library designed their code wrong! They shouldn't be using callbacks like `OnEnemyDetected`. Time to go file an issue and make them figure out a better way to do this. Hopefully they'll have time.
+
+
+# Mason's Perspective
+
+Mason feels like everything they want to do is just rejected by the borrow checker. Good, useful patterns. Observers, dependency injection, backward references, and RAII have served him well for decades.
+
+
+Mason feels like he's refactoring Rust code a _lot._ He's also filing a lot of issues against other teams in his same company, to get them to restructure their parts of the code, to better support him. The old codebase didn't seem to have this problem. What happened?
+
+
+And why does nobody else seem to have these problems with Rust at scale? Are they even using Rust, or are they just signaling that they believe in rust's theoretical benefits?
+
+
+Mason's company finally finishes their Rust rewrite. Sure enough, their vulnerabilities go down. *Perhaps it was worth all the struggle!*
+
+
+# Chase and Mason
+
+Chase and Mason are actually old friends from college, and they talk a lot. They've been learning Rust at the same time, and faced the same issues.
+
+
+Chase was doing this as a hobby in his spare time, building a library that he could put on Cargo. Chase loved every second of it. He made something beautiful, that he was proud to put his name on.
+
+
+Mason didn't enjoy it so much. He had to give up a lot more time and freedom than he originally thought.
+
+
+Still, they both agree, it was probably worth it, to reduce those vulnerabilities.
+
+
+
+# Archie
+
+Archie works at a different company down the street, but gets lunch every day with Mason. He's followed along closely with Mason's travails and troubles.
+
+
+Archie uses a garbage collected language at work, and has listened in horror every day as Mason explained what he went through.
+
+
+He knows that Mason couldn't use garbage collection due to some latency constraints. Archie is very glad his own company doesn't have those same latency constraints, and instead uses a garbage collected language.
+
+
+
+# Chase, Archie, and Mason Meet
+
+All three of them meet for drinks at their favorite bar, Nackerhews, and get to talking about programming languages.
+
+
+*Chase:* I've been using Rust for almost a year now, and it's _by far_ the best programming language. Memory safety, zero overhead, no garbage collection pauses. I've never enjoyed programming so much. I'm glad your company rewrote everything in Rust, Mason, it solved all those vulnerabilities you kept finding.
+
+
+Mason looks down into his drink and nods.
+
+
+*Chase:* Hey Archie, didn't you say that your company uses a garbage collected language? You guys should totally rewrite it in Rust. You won't have any garbage collection pauses!
+
+
+*Archie:* What's wrong with garbage collection?
+
+
+*Chase:* Oh man, don't get me started! Those pauses eat a lot of time. Seems like such a waste! Why not just use a better language?
+
+
+*Archie:* A better language? It sounded pretty miserable, hearing Mason this past year.
+
+
+Mason nods again, still looking down into his drink.
+
+
+*Chase:* Nahhh that's just the learning curve talking. Mason _knows_ Rust now. Now that I know Rust, I'm just as fast as I was before.
+
+
+Mason looks up at Chase. "You're fast? It took you ten days to do that last refactor you told me about this morning."
+
+
+*Chase:* Sure, that's true, but my code came out healthier and more correct in the end. And the borrow checker's restrictions revealed a bug I was about to add.
+
+
+*Archie:* What bug?
+
+
+Chase explains the bug for a few minutes.
+
+
+*Chase:* ...so you can see how I might have modified a collection while I was iterating. It would have been catastrophic. Other languages don't do that.
+
+
+*Archie:* Don't languages detect that? I think Java throws an exception when you try that.
+
+
+*Chase:* Yes, but at run-time! With Rust, we catch it at compile time.
+
+
+*Archie:* So you wasted ten days dealing with a compiler error? I'd rather get the feature done in a day, hit the bug at run-time, and then spend another day fixing it.
+
+
+*Chase:* But it might have slipped into production!
+
+
+*Archie:* I remember you had nineteen bugs in your latest version. It sounds to me like delayed your launch and wasted eight days to have 5% less bugs in production for a few days. It doesn't seem worth it. I'd rather spend those days adding another feature, not refactoring my code.
+
+
+*Chase:* A true craftsman will make something as high quality as possible. It seems like the responsible thing to do, to make the most correct code possible, no matter how long it takes.
+
+
+*Archie:* "A true engineer won't let perfection push launch dates. It sounds like perfect is the enemy of good here. 99% of people don't need "correctly" working projects. Trillion dollar companies run on "incorrect" software, and it works."
+
+
+*Chase:* But what about the CPU and memory usage? Go is usually 2-4x slower than Rust on [the benchmarks](https://benchmarksgame-team.pages.debian.net/benchmarksgame/fastest/rust-go.html), and even 8x slower in one case.
+
+
+*Archie:* You realize that those Benchmarks Game programs are tiny, right? Real-world workloads are nothing like that. In our company, servers are spending most of their time waiting on IO. Switching to Rust would give very little speedup.
+
+
+*Chase:* What about tail latencies? If we stop the entire world to do a garbage collection pause, all ongoing requests will be very delayed.
+
+
+*Archie:* First of all, I don't mind if my requests are delayed by under a millisecond. We're not a high-frequency trading platform. Also, garbage collection has gotten vastly better in the past decade, and is [still getting better](https://github.com/golang/go/issues/44167).
+
+
+*Chase:* I think you should at least try it out. Your users will thank you.
+
+
+*Archie:* I'll pass. I'd rather spend the time working on more features, that _actually_ make our users happier. I prefer when the language works for me, rather than beating me into submission, like it did poor Mason. It sounded like a nightmare.
+
+
+Mason nods again, still looking down into his cup.
+
+
+*Chase:* If we keep staying with the approaches of the past, we'll never make any progress though. We have to try new things eventually.
+
+
+*Archie:* These new things aren't actually better, though. I'm trying to get things done, and ship value to users. You're just trying to make things fast. I would rather have a product that works, right now.
+
+
+*Chase:* Alright, alright. I get it. I hope your CTO eventually sees the light though.
+
+
+# So Here We Are
+
+It should be pretty clear from the above conversation that *borrow checking and garbage collection are for different use cases.*
+
+If you need speed at all costs, like on an HFT platform or a game server, your best bet is Rust. But be prepared, you may be refactoring a lot more than you intended.
+
+Otherwise, if you're trying to get features and improvements out the door to make users happy, garbage collection is likely you best bet.
+
+
+
+
+
+
+
+
+
+"a design perspective on golang's priorities"
+
+an article comparing go to rust, thisll be good.
+
+using go is like accruing some technical debt.
+
+"technical debt is bad! never accrue technical debt!" says the junior programmer. then the tech lead pulls them aside and tells them that perfect is the enemy of good; if we try to wait for our product to be perfect we will never ship a product.
+
+rust solves problems with c++. it does not solve problems with java/go.
+
+"but iterator invalidation!"
+
+but java has a concurrentmodificationexception. im sorry, but if an error rarely happens in practice, it shouldnt be prioritized in language design.
+
+"but correctness!"
+
+"99% of people don't need "correctly" working projects. Trillion dollar companies run on "incorrect" software." (search hn for sayer) makes you think.
+
+go gives you simplicity. it gives you time-to-market.
+
+it also gives you freedom. rust often forces one into certain top-down systems, such as ECS. go lets you do what makes sense.
+
+its easier to do encapsulation, which is a big boon. rust makes mutability into a viral leaky abstraction. rust also makes async a leaky abstraction. it maxed out its complexity budget a long time ago.
+
+go prioritizes simplicity and thats amazing. i strive for the same thing in vale.
+
+then praise rust a bit. talk about how it doesnt have zero values or nil or goto. it truly learns from past mistakes. scala is another great example.
+
+its also great for niche cases where GC pauses are unacceptable. (i say this as someone making a language with no gc pauses lol)

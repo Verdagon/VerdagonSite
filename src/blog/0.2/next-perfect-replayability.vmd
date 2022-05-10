@@ -196,14 +196,14 @@ These techniques have also opened up some new emergent possibilities:
 
  * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
  * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
- * [Fearless FFI](/blog/fearless#safe-externs), which allows us to call into C without risk of accidentally corrupting Vale objects.
+ * [Separated FFI](/blog/fearless#safe-externs), which allows us to call into C without risk of accidentally corrupting Vale objects.
  * Deterministic replayability, to record all inputs and replay execution. Goodbye races and heisenbugs!
  * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
 
 
 We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
 
- * We can mix an `unsafe` block with Fearless FFI to make a much safer systems programming language!
+ * We can mix an `unsafe` block with Separated FFI to make a much safer systems programming language!
  * We can mix Erlang's isolation benefits with functional reactive programming to make much more resilient programs!
  * We can mix region borrow checking with Pony's `iso` to support shared mutability.
 

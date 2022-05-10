@@ -1,0 +1,484 @@
+---
+title: Zero-Cost Memory Safety with Vale Regions, Part 1
+subtitle: Watch regions eliminate memory safety overhead for pure functions!
+author: Evan Ovadia
+date: Apr 29, 2022
+realm: blog
+path: blog/zero-cost-memory-safety-regions-part-1-pure-functions
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: us
+---
+
+
+TODO: finish BenchmarkRL, estimate how many checks are eliminated by pure functions.
+
+
+Vale has an interesting challenge, to be *fast, safe, and easy.*  There are a lot of stellar languages that have two, and we think it's possible to really maximize all three.
+
+
+Vale is built on an unusual approach to memory safety, called [generational references](/blog/generational-references). It's memory-safe, it's easy, [# It also enables something called [Higher RAII](https://verdagon.dev/blog/higher-raii-7drl), which helps us remember to call any function at some point in the future.] and it's fast: in its most basic form it's [already halfway](/blog/generational-references) between the memory overhead of reference counting and borrow checking.
+
+
+We plan to close that gap with some novel memory techniques which let us skip the memory-safety overhead:
+
+ * [Hybrid-Generational Memory](https://verdagon.dev/blog/hybrid-generational-memory), to guarantee that an object we point to won't be deallocated within a certain scope.
+ * Permissions such as `uni`, for objects that don't need shared mutability.
+ * Memory-safe allocators!
+ * *Regions, which give the borrow checker's speed without the complexity.*
+
+Let's talk about that last one!
+
+
+! Generational references are complete but *the rest of these mechanisms are works in progress.* We'll be implementing these features over the next two years, per the [roadmap](https://vale.dev/roadmap).
+
+
+# Immutable References are Zero Cost
+
+Regions are incredibly versatile and powerful. Not only do they enable [Seamless Concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency) and [Separated FFI](https://verdagon.dev/blog/next-separated-ffi), they also allow us to *temporarily freeze* data to make it immutable.
+
+
+This is good because *references to immutable data don't have any memory-safety overhead.*
+
+
+That may seem surprising, but it's been done before: Rust's borrow checker makes it so we can access immutable data freely without reference counting or tracing garbage collection.
+
+
+*In this article, I'll show you how it can be done without the borrow checker.*
+
+
+<slice/>
+
+
+# An Example: Pure Function
+
+Regions can eliminate memory safety overhead for impure functions [# Most functions are impure. A function is only pure if it doesn't modify any data that existed before the call.] and for groups of data marked `iso`, but let's start with the simplest example, a pure function.
+
+
+For example, this snippet of code previously had 20 memory-safety-related operations:
+
+```vale
+pure func printShipNames(tenShips &List<Ship>) {
+  foreach ship in tenShips {
+    println(ship.name);
+  }
+}
+```
+
+But when regions are added to the language, that *drops to zero.*
+
+
+# What just happened?
+
+Let's rewrite the above snippet to clarify where the 20 memory-safety-related operations used to happen:
+
+```vale
+pure func printShipNames(tenShips &List<Ship>) {
+  foreach i in 0..tenShips.len() {
+    ship = tenShips[i]; // Generation check here
+    name = ship.name; // Generation check here
+    println(name);
+  }
+}
+```
+
+These operations are called "generation checks", and they make our program memory-safe.
+
+
+What are they, and how do regions eliminate them?
+
+
+# Generation Checks
+
+Vale doesn't have reference counting or garbage collection, it uses [generational references](/blog/generational-references).
+
+
+To summarize generational references: Each allocation [# An allocation can contain multiple objects, not every object has a generation.] has a "current generation number". Each non-owning reference is made of a pointer to the object, plus the "remembered generation number" of the object at the time the reference was created.
+
+
+Whenever we dereference a non-owning reference, we do a "generation check." It's as if the reference is saying:
+
+> "Hello! I'm looking for the 11th inhabitant of this house, are they still around?"
+
+and the person who opens the door says:
+
+> "No, sorry, I'm the 12th inhabitant of this house, the 11th inhabitant is no more." [#whatthen]
+
+or instead:
+
+> "Yes! That is me. Which of my fields would you like to access?"
+
+
+As you can imagine, we have to do generation checks whenever we suspect that the target object might have disappeared since the time we made the reference.
+
+
+*However, if the data is immutable and it was alive before the call, we don't need to do a generation check on it.*
+
+
+<slice>
+#whatthen: This will halt the program. This is pretty rare in practice, and will become even rarer as we more eagerly detect problems before they happen, as part of [Hybrid-Generational Memory](/blog/hybrid-generational-memory).
+</slice>
+
+
+# How Regions Work
+
+Here's the above snippet again:
+
+```vale
+pure func printShipNames(tenShips &List<Ship>) {
+  foreach i in 0..tenShips.len() {
+    ship = tenShips[i]; // Generation check here
+    name = ship.name; // Generation check here
+    println(name);
+  }
+}
+```
+
+
+
+Vale knows that we don't have to do these generation checks. We explain in more detail below, but here's a whirlwind, high-level overview:
+
+ 1. *Callers automatically predetermine* whether the `List<Ship>` is alive when we call the function. [# This can either be determined by seeing the still-alive owning reference, or by doing a single generation check before the function.]
+ 1. *The function is pure*, so no pre-existing data will change.
+ 1. *Vale tracks what region data comes from*; it knows `ship` and therefore `name` both refer to something in the pre-existing memory "region".
+ 1. It concludes that if the `List<Ship>` is still alive, *its indirectly owned objects are still alive.* It owns the contained `Ship`s, so they are still alive. [# The `List<Ship>` is a list of owning references. Nobody can destroy a `Ship` while the `List<Ship>` still has its owning reference.]
+
+
+If it helps, feel free to imagine we're applying regions to a reference-counted language. Though, #2 only works if threads are isolated from each other (as they are in e.g. Vale, Rust, and Lobster).
+
+
+The above is very high-level. Read on, it gets clearer!
+
+
+## How a caller passes a known-live object
+
+In #1 above, we mention that the caller will determine whether the List<Ship> is alive. Let's add a caller function, to see it in action.
+
+
+<<<<
+In the following example, the `callerFuncA` function adds some `Ship`s to a list, and then passes it to `printShipNames`.
+
+
+The Vale compiler sees these two facts:
+
+ * `myShips` is an owning reference, so the memory it's pointing to must still be alive.
+ * We're making a non-owning reference from `myShips` which we know is alive, so we know this non-owning reference points to something alive.
+
+
+It then creates a raw pointer (without a generation) pointing to `ship`, and passes it to `printShipNames`.
+////
+```vale
+func callerFuncA() {
+  myShips = List<Ship>();
+  myShips.add(Ship(10));
+  myShips.add(Ship(20));
+  ...
+  printShipNames(&myShips);
+}
+
+// Same function as before
+pure func printShipNames(
+  tenShips &List<Ship>
+) {
+  foreach i in 0..tenShips.len() {
+    ship = tenShips[i]; // No gen check!
+    name = ship.name; // No gen check!
+    println(name);
+  }
+}
+```
+>>>>
+
+
+To reiterate, `printShipNames` *takes a raw pointer* for its `tenShips` parameter, not a generational reference.
+
+
+## How a caller passes a non-owning reference
+
+The above was the easy case. We knew `myShips` was alive because we had an owning reference. That's basically cheating! What if we have a non-owning reference?
+
+
+Note that Vale often _does_ know whether a non-owning reference is alive, via static analysis or [hybrid-generational memory](/blog/hybrid-generational-memory). But sometimes, it might not.
+
+
+In the following example, the `callerFuncB` function has a non-owning reference, which is a generational reference under the hood.
+
+
+<<<<
+However, a non-owning references _into an immutable region_ is *not* a generational reference, it is actually just a *raw pointer* under the hood, which may or may not be null. [# Nullable raw pointers, just as our fathers did, and their fathers before them! But don't worry, Vale has no nulls, it's just an implementation detail.] [# There are extra considerations here for embedded devices where NULL is a valid memory address. On those, we'd supply a known invalid address, such as 0xFFFFFFFF00000000, or the address of some reserved, unmapped virtual address space. There are also language implications about the sizes of large non-array objects, feel free to swing by the discord server to learn more!]
+
+
+To turn a generational reference (like `theirShips`) into a raw pointer, we do a *generation pre-check*. We compare the generational reference to the object it points at, and:
+
+ * If the check passes, we create a raw pointer to the object.
+ * If there's a mismatch instead, we create a raw pointer to null.
+
+
+We then hand this raw pointer to `printShipNames`, in this example.
+
+////
+```vale
+func callerFuncB() {
+  myShips &List<Ship> = ...;
+  ...
+  // Generation pre-check here
+  printShipNames(&myShips);
+}
+
+// Same function as before
+pure func printShipNames(
+  tenShips &List<Ship>
+) {
+  foreach i in 0..tenShips.len() {
+    ship = tenShips[i]; // Gen check here
+    name = ship.name; // Gen check here
+    println(name);
+  }
+}
+```
+>>>>
+
+
+
+! Note that even if there are nulls under the hood, there's no such thing as null in Vale. They are just a compiler implementation detail.
+
+
+So why a pointer, instead of a generational reference?
+
+
+Recall that Vale will detect any use-after-free by doing a generation check, and halt the program. The same thing happens when dereferencing null pointers. So, dereferencing a null pointer is equivalent to dereferencing a generational reference.
+
+
+However, it's faster to dereference a pointer than a generational reference, so we prefer to use pointers when we can. We can inside a pure function, because we know the target object won't be destroyed during the call, so we can trust the pointer to accurately know whether the object is alive.
+
+
+Summarizing how a non-pure function calls a pure function:
+
+ * If it's positive the object is still alive, just pass the raw pointer.
+ * If it's not sure, do a generation pre-check, and pass the raw pointer.
+
+
+## Tracking Immutable Data
+
+Recall that `printShipNames` was *pure*.
+
+
+The compiler enforces that data from before the `pure` function is immutable, at least while we're still in the call.
+
+
+<<<<
+For example, if we tried to put `tenShips.add(Ship(42));` in the function, the compiler would reject it.
+
+
+The compiler tracks which variables point into that immutable region. It knows that whenever we dereference an immutable object, its members will also be immutable.
+////
+```vale
+// Same function as before
+pure func printShipNames(
+  tenShips &List<Ship>
+) {
+  foreach i in 0..tenShips.len() {
+    ship = tenShips[i];
+    name = ship.name;
+    println(name);
+  }
+}
+```
+>>>>
+
+
+It can help to imagine an immutability boolean that travels along with the pointer, but at compile time.
+
+
+Above, it knew that `tenShips` points to immutable data, so therefore `tenShips[i]` is immutable, and therefore `ship` and `name` point to immutable data too.
+
+
+<<<<
+The user doesn't have to annotate which regions data came from, but it can be helpful for clarity. The following example shows the `printShipNames` with the optional explicit region annotations.
+
+ * The `<'r>` names a region. Named regions are immutable by default.
+ * `tenShips 'r &List<Ship>` declares that this argument is coming from the immutable region `'r`.
+ * `'b` names the function's own private mutable region.
+////
+```vale
+pure func printShipNames<'r>(
+  tenShips 'r &List<'r Ship>
+) 'b {
+  foreach i in 0..tenShips.len() {
+    ship 'r &Ship = tenShips[i];
+    name 'r str = ship.name;
+    println(name);
+  }
+}
+```
+>>>>
+
+
+<<<<
+Note that even though pre-existing memory is immutable, the compiler still allows us to change anything else.
+
+
+Here's the same example, with the foreach loop expanded, to illustrate that `i` is changing.
+
+
+In other words, a pure function can change anything except the memory that came before the call.
+////
+```vale
+// Same function as before
+pure func printShipNames<'r>(
+  tenShips 'r &List<'r Ship>
+) 'b {
+  i 'b int = 0;
+  while i < tenShips.len() {
+    ship 'r &Ship = tenShips[i];
+    name 'r str = ship.name;
+    println(name);
+    set i = i + 1; // Valid!
+  }
+}
+```
+>>>>
+
+
+
+That covers it! That's how the compiler knows `ship` and `name` are immutable, and `i` is mutable.
+
+
+This tracking is called *region borrow checking,* because it tracks the region each piece of data comes from, and checks that we don't modify immutable regions.
+
+
+# Conclusion
+
+We've only covered one basic example, showing how pure functions use regions to eliminate memory safety overhead. There are a lot of other ways regions help, covered in parts 2 and 3:
+
+ * We can eliminate overhead for *mutable* regions too if we specify they are "type-stable": backed by a bump allocator or pool allocator, where memory is only reused for objects of the same type, and therefore use-after-free is safe.
+ * We don't need a pure function to establish an immutable region, we can have an `iso`lated subgraph (we have the only reference to it) and open it immutably. [# Though, the isolated subgraph can have references out, thanks to the region borrow checker.]
+
+
+Regions don't just help performance, they also enable some *novel features:*
+
+ * [Seamless, Fearless, Structured Concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), a way to parallelize any loop with a single keyword, with zero risk of data races.
+ * [Separated FFI](verdagon.dev/blog/next-separated-ffi) which allows a function to operate on a safe region and an unsafe region simultaneously, without risk of corrupting the safe region's data.
+ * The ability to "protect" data with a mutex, without a classic borrow checker.
+
+
+There are some surprising details which aren't covered in this article:
+
+ * Pure functions can call impure functions; pure is not a viral function color. [# All globals are contained in mutexes. When we lock a mutex, we first assert that we're not inside any pure function calls. That assert is only one load and compare instruction, so a negligible cost.]
+ * We can have a function that take some parameters from an immutable region, and some parameters from a mutable region.
+ * We can have a function that take parameters from a "read-only" region, which can be either mutable or immutable. This function is then monomorphized into both variants.
+ * When we return data from a pure function, it may need to be "re-generationed", turned from a raw pointer back into a generational reference. [# This is a pretty light operation on likely cache-hot memory, so it's not too bad. It can also be avoided by returning data in an `iso`.]
+ * It does sometimes perform a generation pre-check when reading a non-owning reference from inside an immutable region. This is equivalent to the occasional extra bounds-check encountered in Rust, to turn an index into a reference.
+
+
+Regions might sounds pretty crazy, but there has been a lot of exploration of these concepts!
+
+ * The Pony language introduced the [iso permission](https://tutorial.ponylang.io/reference-capabilities/reference-capabilities.html#isolated-data-is-safe) which represents an isolated region of objects.
+ * Marco Servetto's [Forty2](http://forty2.is/) language shows how a type system can track objects from multiple regions simultaneously.
+ * [Milano, Turcotti, and Myers](https://www.cs.cornell.edu/andru/papers/gallifrey-types/gallifrey-types.pdf) show how we can use this for concurrency.
+
+
+Vale's contribution to the regions world is in showing how:
+
+ * We can blend regions with single ownership (generational references) for better performance than other memory management techniques.
+ * Objects in isolated regions can point to objects outside.
+ * We can monomorphize "read-only" regions into mutable and immutable regions.
+
+
+*That's all for now!* We hope you enjoyed this article. Stay tuned for the next article, which shows how isolated sub-regions work.
+
+
+If you're impressed with our [track record](https://vale.dev/roadmap#recent-additions) and believe in the [direction we're heading](https://vale.dev/roadmap), please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>
+
+With your support, we can bring regions to programmers worldwide.
+
+
+See you next time!
+
+- Evan Ovadia
+
+
+
+<slice new-color="afterword"/>
+
+# About the Vale Language Project
+
+The Vale Language Project is not just about making Vale, it's also about *exploring, discovering, and publishing* new programming language mechanisms that enable *speed*, *safety*, and *ease of use.*
+
+
+*The world needs more exploration here!* Currently, most programming language research is in:
+
+ * High-overhead languages involving reference counting and tracing garbage collection.
+ * Complex languages (Ada/Spark, Coq, Rust, Haskell, etc.) which impose a higher complexity burden on the average programmer.
+
+These are useful, but there is a *vast field of possibilities* in between, waiting to be explored!
+
+
+Our aim is to explore that space, discover what it has to offer, and make *speed and safety easier than ever before.*
+
+
+In this quest, we've discovered a lot of new techniques:
+
+ * [Region Borrow Checking](/blog/zero-cost-refs-regions), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Generational Memory](/blog/generational-references), for a language to ensure an object still exists at the time of dereferencing.
+ * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
+
+
+These techniques have also opened up some new emergent possibilities:
+
+ * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
+ * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
+ * [Separated FFI](/blog/fearless#safe-externs), which allows us to call into C without risk of accidentally corrupting Vale objects.
+ * Deterministic replayability, to record all inputs and replay execution. Goodbye races and heisenbugs!
+ * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
+
+
+We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
+
+ * We can mix an `unsafe` block with Separated FFI to make a much safer systems programming language!
+ * We can mix Erlang's isolation benefits with functional reactive programming to make much more resilient programs!
+ * We can mix region borrow checking with Pony's `iso` to support shared mutability.
+
+...plus a lot more interesting ideas to explore!
+
+
+The Vale programming language is only one combination of the features we've found. Our goal is to publish all the techniques we've found, even the ones that couldn't fit in Vale, so that other languages can make strides in this area.
+
+
+Our medium-term goals:
+
+ * Publish the Language Simplicity Manifesto, a collection of principles to keep programming languages' learning curves down.
+ * Publish the Memory Safety Grimoire, a collection of "memory safety building blocks" that languages can potentially use to make new memory models, just like Vale combined generational references and scope tethering.
+ * Prototype the Region Borrow Checker in Vale, to show the world that shared mutability can work with borrow checking!
+ * Prototype Hybrid-Generational Memory in Vale, to see how fast and easy we can make single ownership.
+
+
+We aim to publish articles biweekly on all of these topics, and inspire the next generation of fast, safe, and easy programming languages.
+
+
+If you want to support our work, please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+With enough sponsorship, we can:
+
+ * Work on this full-time.
+ * Turn the Vale Language Project into a 501(c)(3) non-profit organization.
+ * Make Vale into a production-ready language, and push it into the mainstream!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>
+

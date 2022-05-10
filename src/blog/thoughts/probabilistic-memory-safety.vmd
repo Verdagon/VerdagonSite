@@ -1,0 +1,39 @@
+---
+title: On Probabilistic Memory Safety
+author: Evan Ovadia
+date: Apr 29, 2022
+realm: blog
+path: blog/probabilistic-memory-safety
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: me
+---
+
+
+> Regarding the probabilistic behavior of collisions - to me this seems really sketchy to have as a foundational part of a language. What exactly is this doing and what are (were) the consequences of a collision  that made it worthwhile to do that? [# Thank you Blake Anderson for the question!]
+
+
+A good question!
+
+
+Recall that whenever we dereference a generational reference, it will do a check to make sure the "remembered generation" matches the "actual generation". [# See [Generational References](https://verdagon.dev/blog/generational-references) for more details.]
+
+
+In a theoretical alternate language, if a check failure just printed something out to stderr and continued, it would be a memory-unsafe language, because the program proceeds to corrupt memory. As the program continues, these corruptions might build up, and we'd have a lot of weird behavior, like C/C++.
+
+
+However, in Vale, a check failure will halt and blast away the entire program. So, if your program is still running, you can be pretty confident there were no memory corruptions, meaning Vale is a memory-safe language.
+
+
+Now, about the probabilities involved. In theory, there is currently a 1/2^64 chance, 1 in 18 billion billion, 0.000000000000000005%, that an unsafe access won't be detected.
+
+
+To put that in perspective:
+
+ * This is about the chance of a cosmic bit-flip or RAM failure; we take this risk every day anyway.
+ * Unsafe memory access can't really stay hidden in your code, because the first time they're run, there's a 1-(1/2^64) chance (99.9999999999999999%) that will be detected, and then likely fixed. It's not like C++ where an unsafe access will probably still work.
+ * This isn't exploitable, because the actual generation numbers are randomized every run.
+
+
+In fact, these factors made it clear that 64 bits is probably too much, so we could even reduce it to 32 bits, which is more reasonable.
+

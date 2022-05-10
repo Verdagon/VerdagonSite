@@ -1,7 +1,7 @@
 ---
 title: Const Generics and the Compile Time Spread Operator
 author: Evan Ovadia
-date: Apr 19, 2022
+date: Apr 27, 2022
 realm: blog
 path: blog/const-generics-spread
 layout: annotated
@@ -10,7 +10,7 @@ sponsor: us
 ---
 
 
-We're happy to announce that Vale now has *const generics*! Generic parameters can contain not only types (like the `T` in `List<T>`) but also integers, booleans, and other interesting substances.
+We're happy to announce that the [Vale 0.2 beta](https://vale.dev/download) now has *const generics*! Generic parameters can contain not only types (like the `T` in `List<T>`) but also integers, booleans, and other interesting substances.
 
 
 This might be familiar from other languages, like C++ and Rust. However, Vale's taking them in a different direction, to enable something called the *compile-time spread operator*, which will serve as a useful metaprogramming tool for Vale.
@@ -89,7 +89,7 @@ struct Tup {
 
 
 
-# Spread Operator In Action
+# The Spread Operator's Future
 
 The above works today, in version 0.2. Now we'll show you a sneak peek of where we're heading with this delightful little operator.
 
@@ -136,7 +136,7 @@ It's fascinating how one little symbol can enable such a powerful capability!
 Thanks for visiting, hope you enjoyed it!
 
 
-In the coming weeks, I'll be writing more about our "Fearless FFI" plans which will help us more safely use external C code, so subscribe to our [RSS feed](https://verdagon.dev/rss.xml) or the [r/vale](https://reddit.com/r/vale) subreddit, and come hang out in the [Vale discord](https://discord.gg/SNB8yGH)!
+In the coming weeks, I'll be writing more about our "Separated FFI" plans which will help us more safely use external C code, so subscribe to our [RSS feed](https://verdagon.dev/rss.xml) or the [r/vale](https://reddit.com/r/vale) subreddit, and come hang out in the [Vale discord](https://discord.gg/SNB8yGH)!
 
 
 If you found this interesting, please consider sponsoring us:
@@ -187,14 +187,14 @@ These techniques have also opened up some new emergent possibilities:
 
  * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
  * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
- * [Fearless FFI](/blog/fearless#safe-externs), which allows us to call into C without risk of accidentally corrupting Vale objects.
+ * [Separated FFI](/blog/fearless#safe-externs), which allows us to call into C without risk of accidentally corrupting Vale objects.
  * Deterministic replayability, to record all inputs and replay execution. Goodbye races and heisenbugs!
  * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
 
 
 We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
 
- * We can mix an `unsafe` block with Fearless FFI to make a much safer systems programming language!
+ * We can mix an `unsafe` block with Separated FFI to make a much safer systems programming language!
  * We can mix Erlang's isolation benefits with functional reactive programming to make much more resilient programs!
  * We can mix region borrow checking with Pony's `iso` to support shared mutability.
 

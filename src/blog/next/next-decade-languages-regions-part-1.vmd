@@ -150,6 +150,9 @@ In Cone, a function can know that an argument comes from a certain type of alloc
 
 In [A Flexible Type System for Fearless Concurrency](https://www.cs.cornell.edu/andru/papers/gallifrey-types/gallifrey-types.pdf), the authors show how the type system can track objects' regions, and send entire regions to other threads, similar to Pony.
 
+once we disconnect something, we can call "if disconnected" to do some runtime checks to convince the compiler.
+
+iso fields can become temporarily "tracked"
 
 Note to self: Look into that paper's sources?
 

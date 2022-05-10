@@ -1,0 +1,144 @@
+---
+title: Zero-Cost Memory Safety with Vale Regions, Part 2
+subtitle: Watch how we split our memory into regions, for more performance!
+author: Evan Ovadia
+date: Apr 29, 2022
+realm: blog
+path: blog/zero-cost-memory-safety-regions-part-1-pure-functions
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: us
+---
+
+
+TODO: finish BenchmarkRL, estimate how many checks are eliminated by iso regions. pay particular attention to hash maps.
+
+
+Vale has an interesting challenge, to be *fast, safe, and easy.*  There are a lot of stellar languages that have two, and we think it's possible to really maximize all three.
+
+
+In the last article, we talked about how [pure functions can use regions](/blog/zero-cost-memory-safety-regions-part-1-pure-functions) to eliminate memory-safety overhead for pre-existing memory.
+
+
+We managed to eliminate NUMBER HERE generation checks from our sample program.
+
+
+Now, we're going to eliminate NUMBER HERE more, by using isolated regions.
+
+
+! Generational references are complete but *the rest of these mechanisms are works in progress.* We'll be implementing these features over the next two years, per the [roadmap](https://vale.dev/roadmap).
+
+
+# Isolated Regions
+
+
+lets show a game example, where we mutate in AI phase and read in render phase. show it in an iso local. first opening mutably, then opening immutably.
+
+
+# One-way Iso Regions
+
+this could be like how we spawn a seamless concurrency thread? or maybe just talk about regular threads.
+
+would be nice to have a better example. lets keep an eye out for one.
+
+the benefit is that they can be opened immutably even though the outside is still mutable.
+
+or, they can be opened mutably even though the outside is still immutable. SUPER useful.
+
+
+# One-way Layer Regions
+
+hash map is an example of how regions can have objects pointing outward.
+
+it's a layer, since we want to allow owning things.
+
+
+the benefit is that they can be opened immutably even though the outside is still mutable. but wait, we cant modify the outside... ah we can. we just cant move the owning references.
+
+they cannot be opened mutably even though the outside is still immutable. others might be relying on those positions to be stable.
+
+but maybe its not always a problem?
+
+ * if its a hash map of references, we can fall back on regular one-way isos.
+ * if its a hash map of heap owned data, doesnt matter, its all still stable.
+ * if its a hash map of inline owned data, we have a problem.
+
+hmmm.
+
+does it even make sense to inline own another region's data? its weird.
+
+perhaps we can allow it if the contained data is uni, or cloneable. but then we're moving and copying things in an immutable region, which strikes me as odd. doesnt it need to remain stable? maybe not?
+
+also, would it even make sense to have a map of owning references to an immutable region? how would that come to be? i guess they would both be mutable at first. hmm.
+
+
+
+
+actually lets not talk about mutexes and refcells. if we do talk about them, mention them at the very end, saying RefCell is just a wrapper around it. actually, dont, people weirdly think refcell is bad.
+
+
+
+
+
+
+## Explicit Locking
+
+Implicit locking locked all existing memory, and made a small new region called `'i` which we could modify. There's a more precise way to manage regions: mutexes! [# They aint just for multi-threading anymore!]
+
+The Vale compiler itself has a great example of when we'd want explicit locking. Six transformation stages translate the source code into intermediate ASTs [# Stands for Abstract Syntax Tree, which is a simplified version of code, after we've parsed it from the original text.] and eventually into an executable binary. [# If you're curious, the six stages are named Scout, Seer, Astronomer, Templar, Hammer, and Midas.] Each stage takes in the previous AST, read-only, and constructs the next AST.
+
+One of those is the "Templar" stage, which reads the `inAst` and builds the `outAst`. We can put the `inAst` in a Mutex, and the `outAst` in another Mutex. The Templar gets *read-only* access to the `inAstMutex`, while it uses it's *read-write* access to the `outAstMutex` to build it up.
+
+In the below code, we have an example.
+
+<<<<
+
+Here, the `templar` function takes in the `inAstMutex`.
+
+The `inAstMutex` starts closed, so we call `openro` to open it for read-only access.
+
+We then create a new Mutex containing an empty `OutAst`. We immediately open it in read-write mode.
+
+We give both the `outAst` and a function from the `inAst` to translateFunction, so it can make a translated function and add it to `outAst`.
+
+At the end of `templar`, the locks are dropped, automatically closing the mutexes, and we return the now-closed `outAstMutex`.
+
+With our `Mutexes` and region annotations, the compiler can give us free, zero-cost access to everything in the `inAst`.
+////
+```vale
+func templar(
+    inAstMutex &Mutex<InAst>) {
+  inAstLock = inAstMutex.openro();
+  inAst = inAstLock.contents;
+
+  outAstMutex = Mutex({ OutAst() }); 
+  outAstLock =
+    outAstMutex.openrw(); «345»
+  outAst = outAstLock.contents;
+
+  translateFunction(
+      inAst.functions[0], &outAst);
+
+  ...
+
+  return outAstMutex;
+}
+
+func translateFunction<'a, 't>(
+  func 'a &InAstFunction,
+  outAst 't &OutAst)
+OutASTFunction {
+  // Read func, add things to outAst.
+  ...;
+}
+```: notest
+>>>>
+
+We still increment and decrement the ref-counts of objects inside `'i`, but we just made those objects, so they'll likely be hot in the cache.
+
+We can take this even further: we can combine explicit locking and implicit locking, and even do implicit locks from within implicit locks. By layering these locking techniques, we can compound our benefits and speed up our program even more!
+
+<slice>
+#345: Mutex takes a function which it will call to get its initial value.
+</slice>
+

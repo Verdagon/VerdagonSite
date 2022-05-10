@@ -354,7 +354,7 @@ We implemented generational references, and found them to be [at least 2.3x fast
 Compared to the other weak reference approaches, this has benefits:
 
  * Making or destroying new weak references is free, no reference counters need to be incremented.
- * It enables [Fearless FFI](https://vale.dev/fearless#safe-externs); C code cannot corrupt Vale objects. [# Reference-counting approaches such as Python suffer from this. We give a reference to C code, the C code has to manually remember to increment/decrement it. Forgetting to do so will corrupt the Python object. No such incrementing is needed for generational references!]
+ * It enables [Separated FFI](https://vale.dev/fearless#safe-externs); C code cannot corrupt Vale objects. [# Reference-counting approaches such as Python suffer from this. We give a reference to C code, the C code has to manually remember to increment/decrement it. Forgetting to do so will corrupt the Python object. No such incrementing is needed for generational references!]
  * It doesn't suffer the zombie object problem.
  * Supporting generational references costs an allocation only 8B!
 
@@ -432,14 +432,14 @@ These techniques have also opened up some new emergent possibilities:
 
  * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
  * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
- * [Fearless FFI](/blog/fearless#safe-externs), which allows us to call into C without risk of accidentally corrupting Vale objects.
+ * [Separated FFI](/blog/fearless#safe-externs), which allows us to call into C without risk of accidentally corrupting Vale objects.
  * Deterministic replayability, to record all inputs and replay execution. Goodbye races and heisenbugs!
  * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
 
 
 We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
 
- * We can mix an `unsafe` block with Fearless FFI to make a much safer systems programming language!
+ * We can mix an `unsafe` block with Separated FFI to make a much safer systems programming language!
  * We can mix Erlang's isolation benefits with functional reactive programming to make much more resilient programs!
  * We can mix region borrow checking with Pony's `iso` to support shared mutability.
 

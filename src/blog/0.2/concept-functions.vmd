@@ -3,14 +3,20 @@ title: Added to Vale 0.2 Beta: Concept Functions
 author: Evan Ovadia
 date: Apr 27, 2022
 realm: blog
-path: blog/version-0.2-released
+path: blog/concept-functions
 layout: annotated
 namespace: c-blog m-annotated
 sponsor: us
 ---
 
 
-Something unexpected happened, once we implemented [const generics](/blog/const-generics-spread). We discovered that by enabling passing functions as generic parameters, we also effectively enabled *concepts*, a way to specify constraints on certain generic parameters, without making them implement any traits.
+Something unexpected happened, once we added [const generics](/blog/const-generics-spread) to the [0.2 beta](https://vale.dev/download).
+
+
+We discovered that by enabling passing functions as generic parameters, we also effectively enabled *concepts*, a way to *specify constraints* on parameters, without making them implement any traits.
+
+
+# Behold, a Concept Function!
 
 
 For example, let's say we already have a `Ship` struct and a `calcDamage` function:
@@ -24,7 +30,9 @@ func calcDamage(ship &Ship, target &Ship) int {
 }
 ```
 
-We can write a function that works on any type that has a `calcDamage` function, by using `where func calcDamage(&T, &T)int`:
+
+
+Now we want a `battle` function, which can take *any type* as long as it has a `calcDamage` function:
 
 ```vale
 func battle<T>(attacker T, defender T)
@@ -35,6 +43,11 @@ func battle<T>(attacker T, defender T)
   return damage;
 }
 ```
+
+
+
+*There it is!* That `where func calcDamage(&T, &T)int` specifies that there _must_ be a `calcDamage` function that takes in two `&T`s.
+
 
 
 The only existing language today which can accomplish something like this is C++, with its `requires requires` clause:
@@ -50,19 +63,23 @@ int battle(T* attacker, T* defender) {
 ```
 
 
-Vale makes it wonderfully easy to use this approach. We already use it about fifty times in our standard library!
+
+As you can see, Vale makes it wonderfully easy to use this approach.
 
 
-For example, in [optutils.vale](https://github.com/Verdagon/Vale/blob/master/stdlib/src/optutils/optutils.vale#L27), we have a function `Opt<T>.clone` that's only enabled if `T` also has a `clone` method:
+We already use it thoroughly in our standard library. For example, in [optutils.vale](https://github.com/Verdagon/Vale/blob/master/stdlib/src/optutils/optutils.vale#L27), we have a function `Opt<T>.clone` that's only enabled if `T` also has a `clone` method:
 
-```
+```vale
 func clone<T>(self &Opt<T>) Opt<T>
-where func clone(&T)T {
+    where func clone(&T)T {
   ...
 }
 ```
 
 This can be a lot easier, compared to previous approaches.
+
+
+# Previous Approaches, Traits and Interfaces
 
 
 For example, in Java or C# or Rust, if we had a pre-existing `Ship` and `calcDamage` function, we would have to make an interface (or trait) to describe the bounds and then require all callers to to make their arguments extend that interface (or make an `impl`, in Rust's case) for every type that they want to supply.
@@ -142,7 +159,8 @@ int battle(
     void* attacker,
     void* defender,
     Fire calcDamage) {
-  int damage = calcDamage(attacker, defender);
+  int damage =
+      calcDamage(attacker, defender);
   // ... other logic
   return damage;
 }
@@ -158,7 +176,7 @@ Note how neither requires that `calcDamage` be a method of the type, they can be
 
 # That's all!
 
-Thanks for reading, we hope you enjoyed this article! And if you believe in the direction we're heading, please consider sponsoring us on github:
+Thanks for reading, we hope you enjoyed this article! And if you're impressed with our [track record](https://vale.dev/roadmap) and believe in the direction we're heading, please consider sponsoring us on github:
 
 <center>
   <a href="https://github.com/sponsors/ValeLang" class="donate-button">
@@ -202,14 +220,14 @@ These techniques have also opened up some new emergent possibilities:
 
  * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
  * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
- * [Fearless FFI](/blog/fearless#safe-externs), which allows us to call into C without risk of accidentally corrupting Vale objects.
+ * [Separated FFI](/blog/fearless#safe-externs), which allows us to call into C without risk of accidentally corrupting Vale objects.
  * Deterministic replayability, to record all inputs and replay execution. Goodbye races and heisenbugs!
  * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
 
 
 We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
 
- * We can mix an `unsafe` block with Fearless FFI to make a much safer systems programming language!
+ * We can mix an `unsafe` block with Separated FFI to make a much safer systems programming language!
  * We can mix Erlang's isolation benefits with functional reactive programming to make much more resilient programs!
  * We can mix region borrow checking with Pony's `iso` to support shared mutability.
 

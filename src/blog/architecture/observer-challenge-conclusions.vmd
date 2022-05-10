@@ -12,8 +12,7 @@ namespace: c-blog m-annotated
 In the [Observer Challenge](/blog/observer-challenge), the reader must use a basic observer with the borrow checker, without falling back on Rust's workarounds:
 
  * "Intrusively" refactoring our dependency's `Button`'s `dyn FnMut() + 'a`.
- * `Rc<RefCell<T>>` and other solutions with runtime overhead.
- * `Cell<T>` and other situational workarounds.
+ * Solutions with runtime overhead (`Rc<RefCell<T>>`'s ref counts, `Cell<T>`'s copying).
  * `unsafe`, FFI
 
 
@@ -29,22 +28,19 @@ This article will explore these workarounds, so that we can design with open eye
 In exploring these solutions' tradeoffs, we can come to some broader conclusions about Rust and the borrow checker:
 
  * When following the borrow checker's lead, one can naturally incur *artificial complexity.*
- * All of these options involve *run-time costs*; having a borrow checker doesn't mean our program has zero overhead.
+ * All options involve *run-time costs*; having a borrow checker doesn't mean our program has zero overhead. We shouldn't always shy away from run-time costs.
 
 
 
-# Cell&lt;T&gt;
+# Rc&lt;RefCell&lt;T&gt;&gt; and Cell&lt;T&gt;
 
-`Cell<T>` is often not an option in real-world scenarios. However, in this case it is!
-If we make our `accounts` list into a `Vec<Cell<Account>>`, we're suddenly able to replace our accounts with other accounts.
+These two approaches have some run-time overhead, but are otherwise good approaches.
+
+ * `Rc<RefCell<T>>` incurs ref-counting overhead, which can be bad for performance, as the ref count might incur an additional cache-miss.
+ * `Cell<T>` is very situational, but it can sometimes work, such as in this case. However, `Cell<T>` can incur a lot of copying overhead if the object is large, especially if it contains any heap allocations, such as trait objects. `Cell<T>` can often be more expensive than `Rc<RefCell<T>>`, ironically.
 
 
-However, `Cell<T>` can incur a lot of copying overhead if the object is large, especially if it contains any heap allocations, such as trait objects.
-
-
-# Rc&lt;RefCell&lt;T&gt;&gt;
-
-`Rc<RefCell<T>>` incurs some extra overhead. However, as we'll see below, the other approaches have at least as much overhead.
+If we want to avoid any run-time overhead, we need to turn to refactoring.
 
 
 # Intrusive Refactoring
@@ -52,13 +48,13 @@ However, `Cell<T>` can incur a lot of copying overhead if the object is large, e
 Below, we'll explore how to refactor the program to make it work.
 
 
-Keep in mind that we often cannot refactor. In the challenge, the Button struct was defined outside our crate, defined by the UI library, so we couldn't refactor it. That's why it's called "intrusive" refactoring; we'd often need to change the code of our dependencies to work with our use-cases.
+Keep in mind that these solutions will also incur some run-time overhead. If you're refactoring to avoid `Rc`, `RefCell`, `Cell` overhead, keep an eye on the overhead you're introducing instead. All of these approaches lead to additional overhead, usually more than a simple `Cell` or `RefCell`.
 
 
-For kicks, let's assume that we're lucky enough to be able to refactor our dependencies.
+Also keep in mind that we often cannot refactor. In the challenge, the Button struct was defined outside our crate, defined by the UI library, so we couldn't refactor it. That's why it's called "intrusive" refactoring; we'd often need to change the code of our dependencies to work with our use-cases. For kicks, let's assume that we're lucky enough to be able to refactor our dependencies.
 
 
-Before we dive into our refactoring options, let's see the costs.
+Lastly, before we dive into our refactoring options, let's see the costs of having to refactor to satisfy constraints like the borrow checker.
 
 
 ## The First Cost: Architectural Freedom

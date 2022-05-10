@@ -1,9 +1,9 @@
 ---
-title: New in Vale v0.2: Fearless FFI
+title: New in Vale v0.2: Separated FFI
 author: Evan Ovadia
 date: Draft
 realm: blog
-path: blog/fearless-ffi
+path: blog/separated-ffi
 layout: annotated
 namespace: c-blog m-annotated
 sponsor: us
@@ -48,7 +48,7 @@ To be more specific, our goal is just to prevent _accidental_ problems. We'll ad
 
 # Region Boundary Hardening
 
-Vale protects against these bugs with *region boundary hardening*. When it's applied to FFI, we call it *Fearless FFI.*
+Vale protects against these bugs with *region boundary hardening*. When it's applied to FFI, we call it *Separated FFI.*
 
 
 Region boundary hardening is when we:

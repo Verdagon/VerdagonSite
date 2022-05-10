@@ -1,5 +1,5 @@
 ---
-title: The Observer Challenge
+title: The Zero-Cost Observer Challenge
 author: Evan Ovadia
 date: Apr 8, 2022
 realm: blog
@@ -147,9 +147,10 @@ Your challenge: make this work, using observers, without working around the borr
 The rules of the challenge:
 
  * You must use observers; an observer that adds money to an account, and an observer that sums and prints all accounts' money.
+ * You must keep things zero-cost; avoid workarounds like `RefCell` or `Cell` that have counting or copying overhead. This is a borrow checking exercise, after all!
  * You cannot change the definition of `Button` because, [like in TypeScript, that trait is likely defined by someone else](https://www.htmlelements.com/docs/typescript/button/).
     * You can, however, change `FnMut` to `Fn` and you can add/remove lifetime annotations.
- * This is an exercise of working _within_ the borrow checker, so you cannot use `unsafe`, FFI, `RefCell`, or `Cell`. [# Many will object to not using `Cell` here. It may work for this particular example, but often does not in real life; `Cell` is too situational to be regarded as a general solution to the general challenge we're presenting here.]
+ * This is an exercise of working _within_ the borrow checker, so you cannot use `unsafe`, FFI.
  * You cannot use any framework or third-party library.
 
 

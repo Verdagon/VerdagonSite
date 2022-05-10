@@ -1,0 +1,118 @@
+
+# Region Memory Strategy
+
+In our game example above, references into `'r` were completely free. And references into `'i` were probably hot in the cache, making its reference counting very fast.
+
+How much more can we do? *Much more.* This is where things get a bit crazy.
+
+Vale's *pool and arena allocation* can eliminate the ref-counting overhead in `'i` too, and *lets eliminate its malloc and free overhead as well, while we're at it.*
+
+The default memory management strategy for a region is to use the *heap*, which uses malloc and free under the hood.
+
+We can make it so a certain region uses *pool* allocation, which is _much_ faster. Pool allocation uses a large "slab" of memory, and keeps allocating from the next part of it. [# This only applies to objects that would have been on the heap; any objects we put on the stack will still use the stack.] It also caches all "freed" structs for future allocations of the same type. When it runs out of memory in the slab, it allocates another one. [#452]
+
+Functions can also use *arena* allocation, which doesn't reuse memory, but just keeps allocating it. This can push performance even faster, though one should be careful when using this, as it could cause out-of-memory errors.
+
+Pool allocation's benefits:
+
+ * It's _extremely_ fast, because instead of an expensive call to malloc, allocation is simply incrementing the "bump pointer" in the underlying slab, or using a cached one. [# Internally, this uses a hash-map of free lists by type ID, with some interesting reuse of memory inside the slab.]
+ * It's very cache-friendly, because all of our allocated objects are right next to each other.
+ * In release mode, we can _completely_ optimize out all constraint reference counting to references inside the pool region, with no loss to safety. [#743]
+ * We pay no cost to deallocate, because we deallocate the slabs all at once at the end of the function!
+
+Pool allocation's costs:
+
+ * Since we cache these structs, our memory usage could be higher. For example, if we make 120 Spaceships and let go of 20 of them, those 20 will still be using up memory. That's why pools are good for the span of certain functions, and not the entire program.
+ * Moving objects between regions (e.g. when returning from an implicit lock function that uses a pool region) sometimes requires copying those objects. [# One could say that we're only paying the RC cost for the things we actually return from the function.]
+
+Used well, a pool allocator can drastically speed up a region.
+
+<slice>
+#452: Type-specific pools are 100% safe with no ref-counting overhead, because use-after-free doesn't actually use a freed object, it uses one that's still alive in memory, and of the correct structure.
+
+#743: This is safe because the memory is not reclaimed by anyone else, we're just accessing old data, which isn't a memory safety problem, just a logic problem (and one that would be caught in Assist Mode).
+</slice>
+
+<<<<
+For example, we could use pool allocation for this basic breadth-first-search algorithm, that checks for units at every nearby location.
+
+We use the keyword `pool` after the region declaration `'i`.
+
+*We just made ref-counting free* for our findNearbyUnits function, and completely avoided malloc and free overhead. [# The only memory overhead we paid is when we copied `findNearbyUnits`'s `'i List<'r &Unit>` result from the pool region into the caller's region.]
+
+ * References into the `'r` region are free because it's read-only.
+ * References into the `'i` region are free because it uses pool allocation.
+
+////
+```vale
+pure func findNearbyUnits<'r ro, 'i = pool>
+  (world 'r &World, origin Location)
+'i List<'r &Unit>
+'i {
+  result = List<'r &Unit>(); «1140»
+  exploredSet = HashSet<Location>();
+  unexploredQueue =
+    Queue<Location>(origin); «510»
+  unexploredSet =
+    HashSet<Location>(origin);
+  while (unexploredQueue.nonEmpty()) {
+    // Get next loc, mark it explored.
+    loc = unexploredQueue.pop();
+    unexploredSet.remove(loc);
+    exploredSet.add(loc);
+
+    // If there's a unit here, add it.
+    if [u] = world.unitsByLoc(loc) {
+      result.add(u);
+    }
+
+    // Add nearby locs not seen yet.
+    newNearbyLocs =
+      world.getAdjacentLocations(loc)
+        .filter(
+          { not exploredSet.has(_) })
+        .filter(
+          { not unexploredSet.has(_) });
+    unexploredQueue.addAll(
+      &newNearbyLocs);
+    unexploredSet.addAll(
+      &newNearbyLocs);
+  }
+  return result;
+}
+```: notest
+>>>>
+
+<slice>
+#510: Circular queue, backed by an array.
+
+#1140: In Vale, List is backed by an array. If one wants a linked list, they can use LinkedList.
+</slice>
+
+
+# Next Steps
+
+Vale's regions give the programmer incredible flexibility on where and how to optimize their code. Because Vale makes it so much easier to do this kind of optimization, Vale programs could be have performance rivaling even C++.
+
+Over the next year or two, we'll be trying these out, as well as some other ideas on cutting down the reference-counting overhead. Regions and single ownership have never been combined in this way, so we're discovering new potential every day.
+
+If you want to see this happen sooner, or just want to contribute to something cool, we invite you to [come join us!](/contribute) [#help]
+
+We'd love to hear your thoughts on regions and zero-cost references, so [leave a comment](https://www.reddit.com/r/vale/comments/i0pyo5/zero_cost_references_with_regions/)!
+
+Stay tuned for the next articles, where we talk about Vale's optimizations, pentagonal tiling, Vale's killer app, and more. If you want to learn more before then, come by the [r/Vale](http://reddit.com/r/vale) subreddit or the [Vale discord server](https://discord.gg/SNB8yGH)!
+
+<slice new-color="afterword">
+#help: All contributions are welcome! Soon, we're going to:
+
+ * Finish designing the region borrow checker!
+ * Implement the bump allocator and pooling!
+ * Write a standard library! (sets, hash maps, lists, etc)
+ * Make syntax highlighters! (VSCode, Sublime, Vim, Emacs, etc)
+ * Enable support gdb/lldb for debugging!
+ * Add better error reporting!
+ * Replace the temporary combinator-based parser with a real one!
+ * Add a "show all constraint refs" option in debug mode to our LLVM codegen stage!
+
+If any of this interests you, come join us!
+</slice>

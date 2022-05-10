@@ -23,7 +23,11 @@ if [ "$4" == "" ] ; then
 fi
 VMD_SITE_GEN="$4"
 
-echo $MODE $TARGET $VALESTROM
+if [ "$5" == "" ] ; then
+  echo "Fifth arg should be path to Snippet dir"
+  exit 1
+fi
+SNIPPET_DIR="$5"
 
 if [ $MODE == "build" ] ; then
   if [ $TARGET == "clean" ] || [ $TARGET == "all" ] ; then
@@ -51,8 +55,8 @@ fi
 
 if [ $TARGET == "seamless-fearless-structured-concurrency" ] || [ $TARGET == "all" ] ; then
   echo "Doing seamless-fearless-structured-concurrency"
-  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/seamless-fearless-structured-concurrency src/blog/seamless-fearless-structured-concurrency.vmd
-  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/seamless-fearless-structured-concurrency src/blog/seamless-fearless-structured-concurrency.vmd
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/seamless-fearless-structured-concurrency src/blog/vision/seamless-fearless-structured-concurrency.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/seamless-fearless-structured-concurrency src/blog/vision/seamless-fearless-structured-concurrency.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -61,8 +65,18 @@ fi
 
 if [ $TARGET == "comparing-hgm-traditional-reference-counting" ] || [ $TARGET == "all" ] ; then
   echo "Doing comparing-hgm-traditional-reference-counting"
-  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/comparing-hgm-traditional-reference-counting src/blog/comparing-hgm-traditional-reference-counting.vmd
-  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/comparing-hgm-traditional-reference-counting src/blog/comparing-hgm-traditional-reference-counting.vmd
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/comparing-hgm-traditional-reference-counting src/blog/thoughts/comparing-hgm-traditional-reference-counting.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/comparing-hgm-traditional-reference-counting src/blog/thoughts/comparing-hgm-traditional-reference-counting.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
+if [ $TARGET == "probabilistic-memory-safety" ] || [ $TARGET == "all" ] ; then
+  echo "Doing probabilistic-memory-safety"
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/probabilistic-memory-safety src/blog/thoughts/probabilistic-memory-safety.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/probabilistic-memory-safety src/blog/thoughts/probabilistic-memory-safety.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -71,8 +85,8 @@ fi
 
 if [ $TARGET == "raii-next-steps" ] || [ $TARGET == "all" ] ; then
   echo "Doing raii-next-steps"
-  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/raii-next-steps src/blog/raii-next-steps.vmd
-  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/raii-next-steps src/blog/raii-next-steps.vmd
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/raii-next-steps src/blog/retired/raii-next-steps.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/raii-next-steps src/blog/retired/raii-next-steps.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -81,8 +95,8 @@ fi
 
 if [ $TARGET == "cross-platform-core-vision" ] || [ $TARGET == "all" ] ; then
   echo "Doing cross-platform-core-vision"
-  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/cross-platform-core-vision src/blog/cross-platform-core-vision.vmd
-  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/cross-platform-core-vision src/blog/cross-platform-core-vision.vmd
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/cross-platform-core-vision src/blog/retired/cross-platform-core-vision.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/cross-platform-core-vision src/blog/retired/cross-platform-core-vision.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -91,8 +105,8 @@ fi
 
 if [ $TARGET == "zero-cost-refs-regions" ] || [ $TARGET == "all" ] ; then
   echo "Doing zero-cost-refs-regions"
-  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-refs-regions src/blog/zero-cost-refs-regions.vmd
-  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-refs-regions src/blog/zero-cost-refs-regions.vmd
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-refs-regions src/blog/retired/zero-cost-refs-regions.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-refs-regions src/blog/retired/zero-cost-refs-regions.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -111,8 +125,8 @@ fi
 
 if [ $TARGET == "generational-references" ] || [ $TARGET == "all" ] ; then
   echo "Doing generational-references"
-  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/generational-references src/blog/generational-references.vmd
-  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/generational-references src/blog/generational-references.vmd
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/generational-references src/blog/retired/generational-references.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/generational-references src/blog/retired/generational-references.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -121,8 +135,8 @@ fi
 
 if [ $TARGET == "hybrid-generational-memory" ] || [ $TARGET == "all" ] ; then
   echo "Doing hybrid-generational-memory"
-  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/hybrid-generational-memory src/blog/hybrid-generational-memory.vmd
-  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/hybrid-generational-memory src/blog/hybrid-generational-memory.vmd
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/hybrid-generational-memory src/blog/retired/hybrid-generational-memory.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/hybrid-generational-memory src/blog/retired/hybrid-generational-memory.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -131,8 +145,8 @@ fi
 
 if [ $TARGET == "hgm-static-analysis-part-1" ] || [ $TARGET == "all" ] ; then
   echo "Doing hgm-static-analysis-part-1"
-  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/hgm-static-analysis-part-1 src/blog/hgm-static-analysis-part-1.vmd
-  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/hgm-static-analysis-part-1 src/blog/hgm-static-analysis-part-1.vmd
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/hgm-static-analysis-part-1 src/blog/retired/hgm-static-analysis-part-1.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/hgm-static-analysis-part-1 src/blog/retired/hgm-static-analysis-part-1.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -141,8 +155,8 @@ fi
 
 if [ $TARGET == "observer-challenge" ] || [ $TARGET == "all" ] ; then
   echo "Doing observer-challenge"
-  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/observer-challenge src/blog/observer-challenge.vmd
-  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/observer-challenge src/blog/observer-challenge.vmd
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/observer-challenge src/blog/architecture/observer-challenge.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/observer-challenge src/blog/architecture/observer-challenge.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -152,28 +166,18 @@ fi
 
 if [ $TARGET == "observer-challenge-conclusions" ] || [ $TARGET == "all" ] ; then
   echo "Doing observer-challenge-conclusions"
-  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/observer-challenge-conclusions src/blog/observer-challenge-conclusions.vmd
-  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/observer-challenge-conclusions src/blog/observer-challenge-conclusions.vmd
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/observer-challenge-conclusions src/blog/architecture/observer-challenge-conclusions.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/observer-challenge-conclusions src/blog/architecture/observer-challenge-conclusions.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
   fi
 fi
 
-# if [ $TARGET == "beyond-rust-innovations" ] || [ $TARGET == "all" ] ; then
-#   echo "Doing beyond-rust-innovations"
-#   echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/beyond-rust-innovations src/blog/beyond-rust-innovations.vmd
-#   eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/beyond-rust-innovations src/blog/beyond-rust-innovations.vmd
-#   if [ $? != 0 ]; then
-#     echo "Failed!"
-#     exit 1
-#   fi
-# fi
-
 if [ $TARGET == "surprising-weak-refs" ] || [ $TARGET == "all" ] ; then
   echo "Doing surprising-weak-refs"
-  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/surprising-weak-refs src/blog/surprising-weak-refs.vmd
-  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/surprising-weak-refs src/blog/surprising-weak-refs.vmd
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/surprising-weak-refs src/blog/retired/surprising-weak-refs.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/surprising-weak-refs src/blog/retired/surprising-weak-refs.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -192,8 +196,8 @@ fi
 
 if [ $TARGET == "python-data-races" ] || [ $TARGET == "all" ] ; then
   echo "Doing python-data-races"
-  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/python-data-races src/blog/python-data-races.vmd
-  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/python-data-races src/blog/python-data-races.vmd
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/python-data-races src/blog/retired/python-data-races.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/python-data-races src/blog/retired/python-data-races.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -202,8 +206,8 @@ fi
 
 if [ $TARGET == "googler-to-traveler" ] || [ $TARGET == "all" ] ; then
   echo "Doing googler-to-traveler"
-  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/googler-to-traveler src/blog/googler-to-traveler.vmd
-  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/googler-to-traveler src/blog/googler-to-traveler.vmd
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/googler-to-traveler src/blog/thoughts/googler-to-traveler.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/googler-to-traveler src/blog/thoughts/googler-to-traveler.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -212,8 +216,8 @@ fi
 
 if [ $TARGET == "higher-raii-7drl" ] || [ $TARGET == "all" ] ; then
   echo "Doing higher-raii-7drl"
-  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/higher-raii-7drl src/blog/higher-raii-7drl.vmd
-  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/higher-raii-7drl src/blog/higher-raii-7drl.vmd
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/higher-raii-7drl src/blog/vision/higher-raii-7drl.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/higher-raii-7drl src/blog/vision/higher-raii-7drl.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -260,10 +264,10 @@ if [ $TARGET == "next-perfect-replayability" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
-if [ $TARGET == "next-fearless-ffi" ] || [ $TARGET == "all" ] ; then
-  echo "Doing next-fearless-ffi"
-  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/next-fearless-ffi src/blog/0.2/next-fearless-ffi.vmd
-  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/next-fearless-ffi src/blog/0.2/next-fearless-ffi.vmd
+if [ $TARGET == "next-separated-ffi" ] || [ $TARGET == "all" ] ; then
+  echo "Doing next-separated-ffi"
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/next-separated-ffi src/blog/0.2/next-separated-ffi.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/next-separated-ffi src/blog/0.2/next-separated-ffi.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -290,6 +294,15 @@ if [ $TARGET == "version-0.2-released" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
+if [ $TARGET == "regions-1-pure-functions" ] || [ $TARGET == "all" ] ; then
+  echo "Doing regions-1-pure-functions"
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-1-pure-functions src/blog/vision/regions-1-pure-functions.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-1-pure-functions src/blog/vision/regions-1-pure-functions.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
 
 
 
@@ -298,6 +311,7 @@ if [ $MODE == "build" ] ; then
   cp src/*.css public
   cp src/rss.xml public
   cp src/components/*.css public/components
+  cp $SNIPPET_DIR/css/*.css public/components
   cp src/EvanOvadia2022Resume812.pdf public/EvanOvadia2022Resume812.pdf
   cp src/EvanOvadiaResume2022Dev.pdf public/EvanOvadiaResume2022Dev.pdf
   cp src/components/*.js public/components

@@ -25,8 +25,30 @@
       </image-->
 
       <item>
-         <guid>https://verdagon.dev/blog/0.2/on-removing-let-let-mut</guid>
-         <link>https://verdagon.dev/blog/0.2/on-removing-let-let-mut</link>
+         <guid>https://verdagon.dev/blog/concept-functions</guid>
+         <link>https://verdagon.dev/blog/concept-functions</link>
+         <pubDate>Wed, 29 Apr 2022 11:15:00 -0400</pubDate>
+         <category>Programming Languages</category>
+         <category>Vale Programming Language</category>
+         <title>Added to Vale 0.2 Beta: Concept Functions</title>
+         <description>Like traits, but way more straightforward!</description>
+         <author>noreply@verdagon.dev (Evan Ovadia)</author>
+      </item>
+
+      <item>
+         <guid>https://verdagon.dev/blog/const-generics-spread</guid>
+         <link>https://verdagon.dev/blog/const-generics-spread</link>
+         <pubDate>Wed, 27 Apr 2022 12:15:00 -0400</pubDate>
+         <category>Programming Languages</category>
+         <category>Vale Programming Language</category>
+         <title>Const Generics and the Compile Time Spread Operator</title>
+         <description>A compile-time for-each operator!</description>
+         <author>noreply@verdagon.dev (Evan Ovadia)</author>
+      </item>
+
+      <item>
+         <guid>https://verdagon.dev/blog/on-removing-let-let-mut</guid>
+         <link>https://verdagon.dev/blog/on-removing-let-let-mut</link>
          <pubDate>Wed, 20 Apr 2022 12:15:00 -0400</pubDate>
          <category>Programming Languages</category>
          <category>Vale Programming Language</category>
@@ -65,16 +87,6 @@
          <category>Vale Programming Language</category>
          <title>Vale's Higher RAII, the pattern that saved me a vital 5 hours in the 7DRL Challenge</title>
          <description>How a language can enforce that we call an arbitrary function before destroying an object.</description>
-         <author>noreply@verdagon.dev (Evan Ovadia)</author>
-      </item>
-
-      <item>
-         <guid>https://verdagon.dev/blog/python-data-races</guid>
-         <link>https://verdagon.dev/blog/python-data-races</link>
-         <pubDate>Sun, 20 Feb 2022 12:00:00 -0400</pubDate>
-         <category>Programming Languages</category>
-         <category>Vale Programming Language</category>
-         <title>Data Races in Python, Despite the Global Interpreter Lock</title>
          <author>noreply@verdagon.dev (Evan Ovadia)</author>
       </item>
 
