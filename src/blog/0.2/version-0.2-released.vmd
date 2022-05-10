@@ -1,0 +1,443 @@
+---
+title: Vale 0.2 Released: Higher RAII, Concept Functions, Const Generics, FFI, Modules, Faster Compiles, set Keyword
+author: Evan Ovadia
+date: May 10, 2022
+realm: blog
+path: blog/version-0.2-released
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+[Version 0.2](https://vale.dev/download) is now out of beta, and officially released!
+
+
+As we all know, Vale is a programming language that aims to be *fast*, *safe*, and *easy to use.* It's a challenging goal, and version 0.2 lays solid foundations for the next step in the endeavor.
+
+
+This version has been prioritizing ease of use, making the compiler usable for larger projects. We can now comfortably create large programs (such as [this roguelike game](https://verdagon.dev/blog/higher-raii-7drl)). With this version, Vale has graduated from a prototype to early alpha status.
+
+
+You can find the [version 0.2 binaries here](https://github.com/ValeLang/Vale/releases/tag/v0.2.0.0).
+
+
+Try it out, and if you like what you see, please consider [sponsoring us on GitHub!](https://github.com/sponsors/ValeLang) This is a free project for the good of all, and with your help, we can continue working on it for longer. [#longer]
+
+
+Below are the new features in 0.2, enjoy!
+
+
+# Higher RAII
+
+This release enables [Higher RAII](http://localhost:8000/guide/structs#higher-raii), a form of linear typing that helps the compiler enforce that we "never forget to call that function".
+
+
+For a real-world use case, check out the recent article [Higher RAII, the pattern that saved me a vital 5 hours in the 7DRL Challenge](https://verdagon.dev/blog/higher-raii-7drl).
+
+
+<<<<
+To use Higher RAII, just add a `#!DeriveStructDrop` above your struct or `#!DeriveInterfaceDrop` above your interface, to prevent it from automatically defining a `drop` function.
+
+
+Instead of having an automatically-called `drop` function, this example has a `destroyShip` function that takes a boolean parameter and returns an integer.
+
+Since there is no `drop` function for the struct, Vale will never automatically destroy the object. The user _must_ call this `destroyShip` function.
+
+
+This pattern can be used to enforce that we don't forget to call a certain function (like `destroyShip`) at some point in the future.
+////
+```vale
+#!DeriveStructDrop
+struct Spaceship {
+  name str;
+  fuel int;
+}
+
+exported func main() {
+  ship = Spaceship("Serenity", 2);
+  // ship is an owning reference
+
+  println(ship.name);
+
+  fuel = (ship).destroyShip(true);
+  println("Fuel was {fuel}.")
+}
+
+func destroyShip(
+  s Spaceship,
+  print bool)
+int {
+  [name, fuel] = s; // Deallocates ship
+  if print {
+    println("Destroyed {name}!");
+  }
+  return fuel;
+}
+```stdout
+Destroyed Serenity!
+Fuel was 2.
+```
+>>>>
+
+
+
+Higher RAII can be also be used for more powerful [type-state programming](http://cliffle.com/blog/rust-typestate/) [#tsp] than any other imperative language. Try it out!
+
+
+
+<slice>
+#longer: We're particularly excited to prototype the [region borrow checker](/blog/zero-cost-refs-regions), which could help Vale approach C++'s speed by getting rid of the vast majority of our memory safety overhead, and enable concurrency features like described in [Seamless, Fearless, Structured Concurrency](/blog/seamless-fearless-structured-concurrency).
+
+We've been looking forward to this version for a long time!
+
+
+#tsp: Type-state programming is a way to use the compiler to ensure that specific functions are only callable when the object is in a certain state. This is all tracked via the type system, with zero run-time overhead.
+</slice>
+
+
+# Concept Functions
+
+Vale now supports *concept functions*, a way to specify that certain functions must exist for given generic parameters, without making them implement any traits.
+
+
+For example, List's `clone` function can require that there exists a `clone` function for its elements:
+
+```vale
+func clone<T>(self &List<T>) List<T>
+    where func clone(&T)T
+{
+  result = List<T>();
+  foreach x in self {
+    result.add(clone(x));
+  }
+  return result;
+}
+```
+
+
+
+This is often much easier than what we normally see in mainstream languages, which is to require the element to implement a certain trait.
+
+
+Read more at [Concept Functions](/blog/concept-functions)!
+
+
+# Const Generics 
+
+We're happy to announce that Vale now has "const generics", where generic parameters can contain not only types (like the `T` in `List<T>`) but also integers, booleans, and other types.
+
+
+<<<<
+Now, instead of repeating classes...
+
+```vale
+struct Vec2<T> {
+  elements [#2]T; // 2-element array of T
+}
+struct Vec3<T> {
+  elements [#3]T; // 3-element array of T
+}
+struct Vec4<T> {
+  elements [#4]T; // 4-element array of T
+}
+```
+////
+...we can have one:
+
+```vale
+struct Vec<N int, T> {
+  elements [#N]T;
+}
+```
+
+We'd use it like `Vec<2, int>`.
+>>>>
+
+
+We also now have the *compile-time spread operator* `..` for structs, which enabled us to implement tuples in the standard library, instead of in the compiler.
+
+
+We have some interesting things planned for const generics, see [Const Generics and the Compile-Time Spread Operator](/blog/const-generics-spread) for more!
+
+
+# Removing Let and Let Mut
+
+The 0.2 release removes the `let` and `let mut` keywords, making our syntax cleaner and more readable.
+
+<<<<
+Before:
+
+```vale
+func main() {
+  let a = 3;
+  let b = 3;
+  let c = 3;
+  let mut d = 3;
+  d = 7;
+  println(d);
+}
+```stdout
+7
+```
+////
+After:
+
+```vale
+func main() {
+  a = 3;
+  b = 3;
+  c = 3;
+  d = 3;
+  set d = 7;
+  println(d);
+}
+```stdout
+7
+```
+>>>>
+
+Read more at [On Removing Let and Let Mut](https://verdagon.dev/blog/on-removing-let-let-mut)!
+
+
+# Faster Compile Times
+
+This version of the compiler is 3x as fast as the previous version, after we did some optimizations:
+
+ * Memoized all of our .hashCode() calls, and used interning to speed up .equals() calls.
+ * Wrote a newly optimized generics solver, which operates on primitives instead of heap-allocated classes.
+ * Migrated from Scala parser combinators to a hand-written recursive descent parser.
+
+
+We also use LLVM 13 under the hood now.
+
+
+# Modules
+
+Vale has a new take on modules, which is as easy to use as Java's packages while providing the flexibility of Rust's crates.
+
+
+Check out the [Modules Guide](https://vale.dev/guide/modules) to see them!
+
+
+We make heavy use of our module system in our new standard library, too.
+
+
+# Downcasting
+
+We can now downcast interfaces to a specified struct, using the `as` function.
+
+<<<<
+In this example, we're downcasting a `Ship` interface reference to a `FireflyShip` struct reference.
+
+
+Downcasting will always return a `Result<T, E>` where T is the struct type, and E is the interface type. In this example, it returns a `Result<FireflyShip, Ship`>.
+
+
+It will either be an `Ok` containing a `FireflyShip`, or if the ship wasn't actually a `FireflyShip` it will contain an `Err` with the original `Ship`.
+
+
+Here, we're calling `.expect()` because we assume it is indeed a `FireflyShip`.
+////
+```vale
+interface Ship { }
+
+struct FireflyShip {
+  name str;
+}
+impl Ship for FireflyShip;
+
+exported func main() {
+  // Implicitly upcast to Ship
+  ship Ship = FireflyShip("Serenity");
+
+  // Can downcast with as:
+  fireflyShip =
+      ship.as<FireflyShip>().expect();
+
+  println(fireflyShip.name);
+}
+```stdout
+Serenity
+```
+>>>>
+
+
+# Foreach and Break
+
+
+<<<<
+Vale now supports `foreach` loops, and the `break` statement as well.
+
+
+Here's an example with both of them.
+
+
+See the [Collections Guide](https://vale.dev/guide/collections#loops) for more!
+////
+
+```vale
+exported func main() {
+  l = List<int>().add(1).add(3).add(7);
+  foreach [i, x] in l.entries() {
+    println(i + ": " + x);
+    if i == 1 {
+      break;
+    }
+  }
+}
+```stdout
+0: 1
+1: 3
+```: `import stdlib.*; import stdlib.collections.list.*;`
+>>>>
+
+
+# FFI
+
+When we use the `exported` keyword on a function, Vale will generate headers so that C can call that function. We can also call C functions by declaring an `extern` function.
+
+
+See [Externs and Exports](https://vale.dev/guide/externs) in the guide for more!
+
+
+<<<<
+Here, `main` is calling out into an external C function that reads an int from the keyboard.
+
+
+The `extern func readInt() int;` is telling Vale that the C code will declare a function named `readInt`.
+////
+```vale
+exported func main() {
+  i = readInt();
+  println("User entered: " + i);
+}
+extern func readInt() int;
+```c
+#include <stdint.h>
+#include <stdio.h>
+#include "mvtest/readInt.h"
+extern ValeInt mvtest_readInt() {
+  int64_t x = 0;
+  scanf("%ld", &x);
+  return x;
+}
+```stdin
+42
+```stdout
+User entered: 42
+```: `import stdlib.*;`
+>>>>
+
+
+
+Vale's approach to FFI is unusual. Vale regards its own objects as in a separate "region" of memory than C's objects, and doesn't directly expose Vale objects to C. [# This may be relaxed in the future, using unsafe blocks.]
+
+
+This separation enables some pretty interesting upcoming features. [Separated FFI](/blog/next-separated-ffi) will allow us to be certain we're not accidentally corrupting our Vale objects from C. [Perfect Replayability](/blog/next-perfect-replayability) will then rely on that memory-safety and determinism to allow us to easily reproduce any bug from a previous run.
+
+
+
+# What's next for 0.3
+
+
+Now that we have a usable and solid language to build on, version 0.3 will be focused on prototyping our flagship feature, the region borrow checker.
+
+
+Also keep an eye out for our next series of articles, which paint a more holistic picture of Vale will combine generational references, "life cells", and the region borrow checker to provide maximum speed, memory safety, while still remaining easy to use.
+
+
+Here's to a great year, and a great version!
+
+
+Thanks for reading, we hope you enjoyed this article! And if you're impressed with our [track record](https://vale.dev/roadmap) and believe in the direction we're heading, please consider sponsoring us on github:
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>
+
+With your support, we can work on this full-time, and bring speed and safety to more programmers than ever before!
+
+
+
+<slice new-color="afterword"/>
+
+
+# About the Vale Language Project
+
+The Vale Language Project is not just about making Vale, it's also about *exploring, discovering, and publishing* new programming language mechanisms that enable *speed*, *safety*, and *ease of use.*
+
+
+*The world needs more exploration here!* Currently, most programming language research is in:
+
+ * High-overhead languages involving reference counting and tracing garbage collection.
+ * Complex languages (Ada/Spark, Coq, Rust, Haskell, etc.) which impose a higher complexity burden on the average programmer.
+
+These are useful, but there is a *vast field of possibilities* in between, waiting to be explored!
+
+
+Our aim is to explore that space, discover what it has to offer, and make *speed and safety easier than ever before.*
+
+
+In this quest, we've discovered a lot of new techniques:
+
+ * [Region Borrow Checking](/blog/zero-cost-refs-regions), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Generational Memory](/blog/generational-references), for a language to ensure an object still exists at the time of dereferencing.
+ * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
+
+
+These techniques have also opened up some new emergent possibilities:
+
+ * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
+ * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
+ * [Separated FFI](/blog/fearless#safe-externs), which allows us to call into C without risk of accidentally corrupting Vale objects.
+ * Deterministic replayability, to record all inputs and replay execution. Goodbye races and heisenbugs!
+ * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
+
+
+We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
+
+ * We can mix an `unsafe` block with Separated FFI to make a much safer systems programming language!
+ * We can mix Erlang's isolation benefits with functional reactive programming to make much more resilient programs!
+ * We can mix region borrow checking with Pony's `iso` to support shared mutability.
+
+...plus a lot more interesting ideas to explore!
+
+
+The Vale programming language is only one combination of the features we've found. Our goal is to publish all the techniques we've found, even the ones that couldn't fit in Vale, so that other languages can make strides in this area.
+
+
+Our medium-term goals:
+
+ * Publish the Language Simplicity Manifesto, a collection of principles to keep programming languages' learning curves down.
+ * Publish the Memory Safety Grimoire, a collection of "memory safety building blocks" that languages can potentially use to make new memory models, just like Vale combined generational references and scope tethering.
+ * Prototype the Region Borrow Checker in Vale, to show the world that shared mutability can work with borrow checking!
+ * Prototype Hybrid-Generational Memory in Vale, to see how fast and easy we can make single ownership.
+
+
+We aim to publish articles biweekly on all of these topics, and inspire the next generation of fast, safe, and easy programming languages.
+
+
+If you want to support our work, please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+With enough sponsorship, we can:
+
+ * Work on this full-time.
+ * Turn the Vale Language Project into a 501(c)(3) non-profit organization.
+ * Make Vale into a production-ready language, and push it into the mainstream!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>
+
+
+
