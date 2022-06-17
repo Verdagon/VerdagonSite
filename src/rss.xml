@@ -25,6 +25,16 @@
       </image-->
 
       <item>
+         <guid>https://verdagon.dev/blog/version-0.2-released</guid>
+         <link>https://verdagon.dev/blog/version-0.2-released</link>
+         <pubDate>Thu, 12 May 2022 12:15:00 -0400</pubDate>
+         <category>Programming Languages</category>
+         <category>Vale Programming Language</category>
+         <title>Vale 0.2 Released: Higher RAII, Concept Functions, Const Generics, FFI, Modules, Faster Compiles, set Keyword</title>
+         <author>noreply@verdagon.dev (Evan Ovadia)</author>
+      </item>
+
+      <item>
          <guid>https://verdagon.dev/blog/concept-functions</guid>
          <link>https://verdagon.dev/blog/concept-functions</link>
          <pubDate>Wed, 29 Apr 2022 11:15:00 -0400</pubDate>

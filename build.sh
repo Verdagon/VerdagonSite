@@ -264,10 +264,10 @@ if [ $TARGET == "next-perfect-replayability" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
-if [ $TARGET == "next-separated-ffi" ] || [ $TARGET == "all" ] ; then
-  echo "Doing next-separated-ffi"
-  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/next-separated-ffi src/blog/0.2/next-separated-ffi.vmd
-  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/next-separated-ffi src/blog/0.2/next-separated-ffi.vmd
+if [ $TARGET == "next-fearless-ffi" ] || [ $TARGET == "all" ] ; then
+  echo "Doing next-fearless-ffi"
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/next-fearless-ffi src/blog/0.2/next-fearless-ffi.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/next-fearless-ffi src/blog/0.2/next-fearless-ffi.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1

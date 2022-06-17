@@ -1,0 +1,396 @@
+---
+title: Vale's Fearless FFI: Mitigating memory unsafety and supply chain attacks
+author: Evan Ovadia
+date: Draft
+realm: blog
+path: blog/fearless-ffi
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+[Vale 0.2](/blog/version-0.2-released) is out, and it includes the beginnings of a feature we like to call *Fearless FFI*.
+
+
+This is part of Vale's goal to be the *safest native language* [# By native, we mean not running in a VM.] Most languages compromise memory safety in some way, which can lead to difficult bugs, security vulnerabilities, and things like supply chain attacks.
+
+
+However, Vale takes a big step forward here by isolating unsafe and untrusted code, and keeping it from undermining the safe code around it.
+
+
+This page describes the proof-of-concept we have so far, plus the next steps. It involves some borderline-insane acrobatics with *inline assembly*, *bitwise xor and rotate*, and *two simultaneous stacks*. Buckle up!
+
+
+If you're impressed with our [track record so far](https://vale.dev/roadmap) and believe in the direction we're heading, please consider [sponsoring us on github](https://github.com/sponsors/ValeLang)! We can't do this without you, and we appreciate all the support you've shown.
+
+
+# The Challenge: Leaky Unsafe
+
+Normally, when a safe language's code calls functions written in an unsafe language, any bugs in the unsafe language can cause problems in the safe language. For example:
+
+ * When Python code sends a Python object into C, if the C code doesn't correctly call `Py_INCREF`, it will corrupt Python's memory and cause some mysterious behavior later on in the Python code.
+ * When Rust hands a reference into C, the C code can type-cast it at will to write arbitrary memory to the Rust object, causing confounding bugs later on in the safe Rust code.
+ * When Javascript hands the wrong kind of object to a Typescript function, it causes bugs down the line deep in the Typescript code, even though Typescript has static typing.
+
+This is called "leaky safety", and its bugs are very difficult to track down, because their symptoms manifest so far from their cause.
+
+
+This can also happen when a language has `unsafe` escape hatches. If some `unsafe` code corrupts some memory, it can cause *undefined behavior in safe code.* For example, see this [Rust snippet](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=e3614c9920c35662179633b61b98b4d2) where an unsafe block corrupts some memory that's later used by the safe code.
+
+
+In all these cases, we know that the unsafe language was involved *somewhere* in the chain of events, but since the bugs actually happen later on, in supposedly safe code, there's no easy way to identify _which_ unsafe code was the original culprit.
+
+
+Worse, some people take advantage of these intentionally, by introducing these vulnerabilities into your dependencies, in what's known as a supply chain attack. For example, the [GitHub Advisory Database](https://github.com/advisories) contains hundreds of vulnerabilities in libraries written in Rust, Go, and other languages.
+
+
+# The Goal
+
+Our goal is to be able to fearlessly call into C code, written by ourselves and even others, without risking corruption in our Vale code's data.
+
+
+This doesn't just apply to C code, but any code written in an unsafe language.
+
+
+# Region Isolation
+
+Vale protects against these bugs with *region isolation*. When it's applied to FFI, we call it *Fearless FFI.*
+
+
+Region isolation is when we:
+
+ * Separate the safe memory from the unsafe memory (such as the memory managed by C). This includes:
+    * Not allowing safe objects to contain unsafe objects.
+    * Not allowing unsafe objects to contain safe objects.
+    * Using a different stack for the unsafe code.
+ * Allowing references between the two:
+    * A safe object can contain a reference to an unsafe object.
+    * An unsafe object can contain a reference to a safe object *if it is scrambled*.
+ * Enable passing memory between the two by copying. In other words, message passing.
+ * (Optionally) Sandbox the unsafe code for extra security, using either webassembly compilation or a subprocess.
+
+
+Let's explore each of these mechanisms!
+
+
+## Message Passing
+
+As shown in [this example](https://vale.dev/guide/externs#immutable-structs), when we send immutable data between C and Vale, we're actually sending a copy.
+
+The C code can do whatever it likes with this copy, and there's no risk of corrupting Vale objects.
+
+
+
+## References Between the Two
+
+Message passing is fine, but we want to be able to hand C some pointers to our Vale data. That way, C code can call methods on our Vale objects.
+
+
+For example, this is necessary if we want to wrap a Rust HTTP server and have it call into Vale to handle requests. [# I did this recently in [RocketVale](https://github.com/verdagon/rocketvale) to implement a game server for a [roguelike game](https://verdagon.itch.io/vale-prototype).]
+
+
+However, in most languages, it's risky to make a pointer to an object and hand it to unsafe code. The unsafe code could corrupt the Vale object, like in this example:
+
+
+```vale
+exported struct Engine { fuel int; }
+exported struct Ship { engine ^Engine; }
+exported func main() {
+  s = Ship(^Engine(42));
+  halveFuel(&s);
+}
+extern func halveFuel(s &Ship) int;
+```c
+extern int myproject_halveFuel(myproject_Ship* s) {
+  // Whoops, accidentally overwrote a pointer!
+  *(int*)ship->engine = ship->engine->fuel / 2;
+
+  // Should have been:
+  // ship->engine->fuel = ship->engine->fuel / 2;
+}
+```
+
+Here, the C function `myproject_halveFuel` accidentally overwrites a pointer with an integer.
+
+
+Luckily, Vale prevents this. Vale doesn't give C a pointer that it can use to dereference our Vale objects.
+
+
+It instead gives a *wide generational reference,* which contains:
+
+ * A [generational reference](https://verdagon.dev/blog/generational-references) to the object.
+ * A [generational reference](https://verdagon.dev/blog/generational-references) to the object's region.
+ * A pointer to the object's type metadata (or vtable, if an interface reference).
+
+
+
+This is then compressed into 32 bytes [# There are quite a few unused bits in pointers, that can be repurposed for other things.] and then *scrambled*:
+
+ * We xor the entire 32 bytes by a constant factor.
+ * We rotate the entire 32 bytes by a constant factor.
+
+These constant factors are randomly generated at compile time, different for every build. [# Generations are different every run (and so are addresses, thanks to Address Space Layout Randomization), so the entire wide generational reference is random.]
+
+
+*How does C read the data then?*
+
+The C code will need to hand it back to a Vale function, like the [example here](https://vale.dev/guide/externs#mutable-structs).
+
+When a Vale function receives a scrambled reference, it will unscramble it and generation-check the region. If the C code gave an invalid reference, it will be detected right then.
+
+
+## Separating Memory
+
+One of the reasons it's risky to call into an unsafe language is because they can do buffer overruns on the stack, like this C snippet:
+
+```c
+void badCFunction() {
+  int myArray[10];
+  myArray[-5] = 7;
+  myArray[15] = 7;
+}
+```
+
+This function is particularly sinister, because it will *overwrite its caller's memory.* What if our caller was this Vale function?
+
+```vale
+struct Ship {
+  engine ^Engine; // heap-allocated Engine
+}
+func myValeFunction() {
+  ship Ship = Ship(^Engine(42));
+
+  // Call the C function
+  badCFunction();
+}
+```
+
+Here, the C function is *reaching up the stack,* into the caller's memory, and changing something there. This might make `ship.engine` point to address 0x7, because `ship` lives on the stack.
+
+
+To solve this particular problem, the Vale compiler *runs the C code on a secondary stack.* Basically, it sets the stack pointer register to a new chunk of memory, to serve as our new stack.
+
+
+This involves some inline assembly, which will set the stack pointer to some new memory, and then call a "wrapper" function using that new stack.
+
+```c
+    asm volatile(
+        // Set the stack pointer to new_stack_top.
+        "mov %[rs], %%rsp \n"
+        // Call badCFunction_wrapper function.
+        "call *%[bz] \n"
+      : [ rs ] "+r" (new_stack_top), [ bz ] "+r" (badCFunction_wrapper) ::
+    );
+```
+
+As you can see, Vale `call`s some sort of `badCFunction_wrapper` on the "new stack".
+
+This wrapper function will call `badCFunction`, and when it's done, it will jump back to our original stack.
+
+Here is the wrapper:
+
+```c
+void badCFunction_wrapper() {
+  // Extract args from thread local storage:
+  size_t original_stack_state_scrambled =
+      thread_local_current_wrapper_args->original_stack_state_scrambled;
+  // If badCFunction had any arguments, we'd read them here.
+
+  // Call the actual badCFunction.
+  badCFunction();
+
+  // Jump back to the safe stack.
+  // This will undo the stack pointer to what it was when we called setjmp.
+  // Supplying the 1 will send it into its else block.
+  longjmp(*(jmp_buf*)unscramblePtr(original_stack_state_scrambled), 1);
+}
+```
+
+
+`longjmp` is another way to switch stacks. Here, we're using it to switch back to our original stack. Our "original stack state" was stored scrambled in thread local storage.
+
+
+Remember that assembly code we saw above? Below we see it in context. This C code sets up the original stack state, puts a pointer to it in thread local storage, and then uses the assembly code to switch to the new stack.
+
+```c
+  // Set up the original_stack_state, which the other stack will use
+  // to switch back to here.
+  jmp_buf original_stack_state;
+  if (setjmp(original_stack_state) == 0) {
+
+    // Put the return destination into the thread-local "wrapper args".
+    SinisterCwrapperFunctionArgs args = {
+      scramblePtr(&original_stack_state),
+      // If badCFunction had any arguments, they would go here.
+    };
+    thread_local_current_wrapper_args = &args;
+
+    asm volatile(
+        // Set the stack pointer to new_stack_top.
+        "mov %[rs], %%rsp \n"
+        // Call badCFunction_wrapper function.
+        "call *%[bz] \n"
+      : [ rs ] "+r" (new_stack_top), [ bz ] "+r" (badCFunction_wrapper) ::
+    );
+  } else {
+    // Continue on
+  }
+```
+
+
+# Protection from Accidental Corruption
+
+
+So far, these mechanisms protect us from *accidental* corruption. With the system above, it's pretty much impossible to accidentally corrupt Vale objects. With this, projects or teams can call into their own C code, and have confidence that they aren't causing memory unsafety in their Vale objects.
+
+
+This system also protects us from accidental memory safety in our dependencies. Dependencies' unsafety is a big problem in projects nowadays. For example, the [GitHub Advisory Database](https://github.com/advisories) contains hundreds of vulnerabilities in libraries written in Rust, Go, and other languages.
+
+
+With these mechanisms, we can be confident that any problems in our dependencies won't cause memory unsafety in our code.
+
+
+*We implemented a proof-of-concept of this!* The proof of concept works for Mac OS; simply supply `--enable_side_calling true` to the `valec` invocation. The other measures (message passing, references, scrambling) already work on all platforms and are enabled by default.
+
+
+
+# Vulnerabilities and Supply Chain Attacks
+
+There are two more problems to solve here:
+
+ * A dependency *intentionally* tries to work around the above roadblocks, to read or write to Vale objects. This is known as a *supply chain attack.* 
+ * A *vulnerability* in a dependency could allow an attacker to read or write from our Vale objects.
+
+
+The above measures aren't sufficient to protect against those.
+
+
+So, the second step to this plan will be to introduce *sandboxing* for untrusted third-party code. We'll go into this more in Part 2, but TL;DR:
+
+ * We can run the C code in a *subprocess*. The C code will run at top speed, though FFI calls to it would be slow.
+ * We can run the C code in a *webassembly sandbox*. The C code must be portable, and won't run as fast, but FFI calls to it would be fast.
+ * We can compile _through_ webassembly as a build step using something called wasm2c, as described in Bobby Holley's [WebAssembly and Back Again: Fine-Grained Sandboxing in Firefox 95](https://hacks.mozilla.org/2021/12/webassembly-and-back-again-fine-grained-sandboxing-in-firefox-95/). This allows the C code to run even faster.
+
+
+Note: Message passing, stack switching, and reference scrambling are implemented in Vale, but we've only started on sandboxing. We're describing it here to let you know the direction we're heading. We're starting with the last option, using wasm2c.
+
+
+A Vale program might use different strategies per dependency:
+
+ * A team writing a lot of Vale and C code could forego sandboxing, since they wrote the C themselves.
+ * A team doing a lot of FFI calls into a library that does less calculation could use webassembly.
+ * A team doing a few FFI calls into a library that does a lot of calculation, or a library in non-portable C, could use a subprocess.
+ * If security isn't as much of a concern (such as in certain kinds of games or other client-side code) then one can turn off Fearless FFI completely.
+
+
+As we implement the rest of this, we'll be posting follow-up articles about the details and tradeoffs involved here. Stay tuned!
+
+
+# Putting it all together
+
+We've described four mechanisms to help protect our Vale data from problems in our C code:
+
+ * Message passing. (Done!)
+ * Scrambled references. (Done!)
+ * Separate stacks. (Prototyped in Mac OS!)
+ * Sandboxing, with subprocesses or wasm2c. (In progress!)
+
+
+This should give Vale programs the tools to run their native code and dependencies with much more confidence.
+
+
+Thanks for visiting, and we hope you enjoyed this article!
+
+
+In the coming weeks, we'll be writing more about our "deterministic replayability" proof-of-concept which eliminates heisenbugs and helps us reproduce race conditions, so subscribe to our [RSS feed](https://verdagon.dev/rss.xml) or the [r/Vale](https://reddit.com/r/vale) subreddit, and come hang out in the [Vale discord](https://discord.gg/SNB8yGH)!
+
+
+If you found this interesting, please consider sponsoring us:
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>
+
+With your help, we can bring more of these features into the world!
+
+
+- Evan Ovadia
+
+
+<slice new-color="afterword"/>
+
+# About the Vale Language Project
+
+The Vale Language Project is not just about making Vale, it's also about *exploring, discovering, and publishing* new programming language mechanisms that enable *speed*, *safety*, and *ease of use.*
+
+
+*The world needs more exploration here!* Currently, most programming language research is in:
+
+ * High-overhead languages involving reference counting and tracing garbage collection.
+ * Complex languages (Ada/Spark, Coq, Rust, Haskell, etc.) which impose a higher complexity burden on the average programmer.
+
+These are useful, but there is a *vast field of possibilities* in between, waiting to be explored!
+
+
+Our aim is to explore that space, discover what it has to offer, and make *speed and safety easier than ever before.*
+
+
+In this quest, we've discovered a lot of new techniques:
+
+ * [Region Borrow Checking](/blog/zero-cost-refs-regions), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Generational Memory](/blog/generational-references), for a language to ensure an object still exists at the time of dereferencing.
+ * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
+
+
+These techniques have also opened up some new emergent possibilities:
+
+ * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
+ * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
+ * [Fearless FFI](/blog/fearless#safe-externs), which allows us to call into C without risk of accidentally corrupting Vale objects.
+ * Deterministic replayability, to record all inputs and replay execution. Goodbye races and heisenbugs!
+ * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
+
+
+We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
+
+ * We can mix an `unsafe` block with Fearless FFI to make a much safer systems programming language!
+ * We can mix Erlang's isolation benefits with functional reactive programming to make much more resilient programs!
+ * We can mix region borrow checking with Pony's `iso` to support shared mutability.
+
+...plus a lot more interesting ideas to explore!
+
+
+The Vale programming language is only one combination of the features we've found. Our goal is to publish all the techniques we've found, even the ones that couldn't fit in Vale, so that other languages can make strides in this area.
+
+
+Our medium-term goals:
+
+ * Publish the Language Simplicity Manifesto, a collection of principles to keep programming languages' learning curves down.
+ * Publish the Memory Safety Grimoire, a collection of "memory safety building blocks" that languages can potentially use to make new memory models, just like Vale combined generational references and scope tethering.
+ * Prototype the Region Borrow Checker in Vale, to show the world that shared mutability can work with borrow checking!
+ * Prototype Hybrid-Generational Memory in Vale, to see how fast and easy we can make single ownership.
+
+
+We aim to publish articles biweekly on all of these topics, and inspire the next generation of fast, safe, and easy programming languages.
+
+
+If you want to support our work, please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+With enough sponsorship, we can:
+
+ * Work on this full-time.
+ * Turn the Vale Language Project into a 501(c)(3) non-profit organization.
+ * Make Vale into a production-ready language, and push it into the mainstream!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>

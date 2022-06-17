@@ -1,0 +1,28 @@
+---
+title: Why have panics?
+author: Evan Ovadia
+date: May 13, 2022
+realm: blog
+path: blog/why-have-panics
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: me
+---
+
+
+> Why have panics at all? Why not just treat all errors as Result? [# Thank you u/ItalianFurry for the question!]
+
+
+Vale's error handling strategy is to have `Result`s for expected errors, and panics for unexpected errors.
+
+
+A pure `Result`-based approach sounds good in theory, but in practice it just makes things more difficult with not much benefit; we'd often see an INTERNAL_ERROR variant of the `Result`'s error enum, and then use that whenever we hit an unexpected error. Callers usually have no idea what to do in response, they usually just retry or log an error or show an alert dialog, but we can do that with panics too.
+
+
+The drawback of the pure `Result`-based approach is that we then have a _lot_ more functions returning `Result` than we wanted. Imagine if you had to handle an error **every** time you indexed into an array, or requested a key from a map, when you already knew it had to be there. Even allocating is fallible, so we'd have to return a Result every time we allocate from the heap. [# Thanks to u/Uncaffeinated for this point!] [# Come to think of it, since stack overflow is possible, we'd also have to return a Result _every time we call a function._]
+
+
+Soon, every function in your codebase returns a `Result`, and we lose our signal in the noise.
+
+
+We'd also get a bit of [alarm fatigue](https://pubmed.ncbi.nlm.nih.gov/24153215/) and can't easily tell which calls are fallible.

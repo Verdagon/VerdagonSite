@@ -9,19 +9,19 @@ namespace: c-blog m-annotated
 ---
 
 
-[Version 0.2](https://vale.dev/download) is now out of beta, and officially released!
+Version 0.2 is now out of beta, and officially released!
 
 
-As we all know, Vale is a programming language that aims to be *fast*, *safe*, and *easy to use.* It's a challenging goal, and version 0.2 lays solid foundations for the next step in the endeavor.
+As we all know, Vale is a programming language that aims to be *fast*, *safe*, and *easy to use.* It's a challenging goal, and version 0.2 lays a solid foundation for the next steps in the endeavor.
 
 
-This version has been prioritizing ease of use, making the compiler usable for larger projects. We can now comfortably create large programs (such as [this roguelike game](https://verdagon.dev/blog/higher-raii-7drl)). With this version, Vale has graduated from a prototype to early alpha status.
+This version has been prioritizing ease of use, enabling much larger Vale projects. We can now comfortably create large programs such as [this roguelike game](/blog/higher-raii-7drl). With this version, Vale has graduated from a prototype to early alpha status.
 
 
-You can find the [version 0.2 binaries here](https://github.com/ValeLang/Vale/releases/tag/v0.2.0.0).
+You can find the [version 0.2 binaries here](https://github.com/ValeLang/Vale/releases/tag/v0.2.0).
 
 
-Try it out, and if you like what you see, please consider [sponsoring us on GitHub!](https://github.com/sponsors/ValeLang) This is a free project for the good of all, and with your help, we can continue working on it for longer. [#longer]
+Try it out, and if you like what you see, consider [sponsoring us on GitHub!](https://github.com/sponsors/ValeLang) This is a free project for the good of all, and with your help, we can continue working on it for longer. [#longer]
 
 
 Below are the new features in 0.2, enjoy!
@@ -29,19 +29,19 @@ Below are the new features in 0.2, enjoy!
 
 # Higher RAII
 
-This release enables [Higher RAII](http://localhost:8000/guide/structs#higher-raii), a form of linear typing that helps the compiler enforce that we "never forget to call that function".
+This release enables [Higher RAII](/guide/structs#higher-raii), a form of linear typing that helps the compiler enforce that we "never forget to call that function".
 
 
-For a real-world use case, check out the recent article [Higher RAII, the pattern that saved me a vital 5 hours in the 7DRL Challenge](https://verdagon.dev/blog/higher-raii-7drl).
+For a real-world use case, check out the recent article [Higher RAII, the pattern that saved me a vital 5 hours in the 7DRL Challenge](/blog/higher-raii-7drl).
 
 
 <<<<
-To use Higher RAII, just add a `#!DeriveStructDrop` above your struct or `#!DeriveInterfaceDrop` above your interface, to prevent it from automatically defining a `drop` function.
+To use Higher RAII, just add a `#!DeriveStructDrop` above your struct or `#!DeriveInterfaceDrop` above your interface, to prevent it from automatically defining a `drop` function (the `!` means "don't").
 
 
-Instead of having an automatically-called `drop` function, this example has a `destroyShip` function that takes a boolean parameter and returns an integer.
+Instead of having an implicitly-called `drop` function, this example has a `destroyShip` function that takes a boolean parameter and returns an integer.
 
-Since there is no `drop` function for the struct, Vale will never automatically destroy the object. The user _must_ call this `destroyShip` function.
+Since there is no `drop` function for the struct, Vale will never automatically destroy the object. The user _must_ explicitly call the `destroyShip` function.
 
 
 This pattern can be used to enforce that we don't forget to call a certain function (like `destroyShip`) at some point in the future.
@@ -116,7 +116,7 @@ func clone<T>(self &List<T>) List<T>
 
 
 
-This is often much easier than what we normally see in mainstream languages, which is to require the element to implement a certain trait.
+This is often much easier than what we normally see in mainstream languages, which is to require an explicit implementation for the type.
 
 
 Read more at [Concept Functions](/blog/concept-functions)!
@@ -140,6 +140,10 @@ struct Vec3<T> {
 struct Vec4<T> {
   elements [#4]T; // 4-element array of T
 }
+exported func main() {
+  v = Vec3<int>([#][3, 4, 5]);
+  ...
+}
 ```
 ////
 ...we can have one:
@@ -148,9 +152,11 @@ struct Vec4<T> {
 struct Vec<N int, T> {
   elements [#N]T;
 }
+exported func main() {
+  v = Vec<3, int>([#][3, 4, 5]);
+  ...
+}
 ```
-
-We'd use it like `Vec<2, int>`.
 >>>>
 
 
@@ -196,7 +202,7 @@ func main() {
 ```
 >>>>
 
-Read more at [On Removing Let and Let Mut](https://verdagon.dev/blog/on-removing-let-let-mut)!
+Read more at [On Removing Let and Let Mut](/blog/on-removing-let-let-mut)!
 
 
 # Faster Compile Times
@@ -208,7 +214,7 @@ This version of the compiler is 3x as fast as the previous version, after we did
  * Migrated from Scala parser combinators to a hand-written recursive descent parser.
 
 
-We also use LLVM 13 under the hood now.
+We also updated to LLVM 13 under the hood.
 
 
 # Modules
@@ -236,7 +242,7 @@ Downcasting will always return a `Result<T, E>` where T is the struct type, and 
 It will either be an `Ok` containing a `FireflyShip`, or if the ship wasn't actually a `FireflyShip` it will contain an `Err` with the original `Ship`.
 
 
-Here, we're calling `.expect()` because we assume it is indeed a `FireflyShip`.
+Here, we're calling `.expect()` because we know it is indeed a `FireflyShip`.
 ////
 ```vale
 interface Ship { }
@@ -267,9 +273,6 @@ Serenity
 
 <<<<
 Vale now supports `foreach` loops, and the `break` statement as well.
-
-
-Here's an example with both of them.
 
 
 See the [Collections Guide](https://vale.dev/guide/collections#loops) for more!
@@ -333,7 +336,7 @@ User entered: 42
 Vale's approach to FFI is unusual. Vale regards its own objects as in a separate "region" of memory than C's objects, and doesn't directly expose Vale objects to C. [# This may be relaxed in the future, using unsafe blocks.]
 
 
-This separation enables some pretty interesting upcoming features. [Separated FFI](/blog/next-separated-ffi) will allow us to be certain we're not accidentally corrupting our Vale objects from C. [Perfect Replayability](/blog/next-perfect-replayability) will then rely on that memory-safety and determinism to allow us to easily reproduce any bug from a previous run.
+This separation enables some pretty interesting upcoming features. "Fearless FFI" will allow us to be certain we're not accidentally corrupting our Vale objects from C. "Perfect Replayability" will then rely on that memory-safety and determinism to allow us to easily reproduce any bug from a previous run. [# Stay tuned for the next two articles, on Fearless FFI and Perfect Replayability. If you want early access, feel free to swing by the discord server and ask!]
 
 
 
@@ -343,7 +346,7 @@ This separation enables some pretty interesting upcoming features. [Separated FF
 Now that we have a usable and solid language to build on, version 0.3 will be focused on prototyping our flagship feature, the region borrow checker.
 
 
-Also keep an eye out for our next series of articles, which paint a more holistic picture of Vale will combine generational references, "life cells", and the region borrow checker to provide maximum speed, memory safety, while still remaining easy to use.
+Also keep an eye out for our next series of articles, which paint a more holistic picture of how Vale will combine generational references, "life cells", and the region borrow checker to provide maximum speed, memory safety, while still remaining easy to use.
 
 
 Here's to a great year, and a great version!
@@ -394,14 +397,14 @@ These techniques have also opened up some new emergent possibilities:
 
  * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
  * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
- * [Separated FFI](/blog/fearless#safe-externs), which allows us to call into C without risk of accidentally corrupting Vale objects.
+ * [Fearless FFI](/blog/fearless#safe-externs), which allows us to call into C without risk of accidentally corrupting Vale objects.
  * Deterministic replayability, to record all inputs and replay execution. Goodbye races and heisenbugs!
  * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
 
 
 We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
 
- * We can mix an `unsafe` block with Separated FFI to make a much safer systems programming language!
+ * We can mix an `unsafe` block with Fearless FFI to make a much safer systems programming language!
  * We can mix Erlang's isolation benefits with functional reactive programming to make much more resilient programs!
  * We can mix region borrow checking with Pony's `iso` to support shared mutability.
 

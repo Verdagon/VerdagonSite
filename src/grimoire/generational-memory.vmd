@@ -13,7 +13,7 @@ namespace: c-blog m-annotated
 
 This technique is the first ingredient in Vale's final [hybrid-generational memory](/blog/hybrid-generational-memory) design, which is even faster.
 
-This technique also enables Vale's [Separated FFI](vision/safety-5-externs-separated-ffi), as generational references don't need a central roster to maintain memory safety.
+This technique also enables Vale's [Fearless FFI](vision/safety-5-externs-fearless-ffi), as generational references don't need a central roster to maintain memory safety.
 
 This article explains how generational references work, how they compare to reference counting, and what makes it all so fast.
 

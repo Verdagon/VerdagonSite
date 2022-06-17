@@ -1,4 +1,5 @@
 
+
 # Region Memory Strategy
 
 In our game example above, references into `'r` were completely free. And references into `'i` were probably hot in the cache, making its reference counting very fast.

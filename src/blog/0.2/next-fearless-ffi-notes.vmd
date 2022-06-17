@@ -1,0 +1,22 @@
+
+
+
+# Unsafe Blocks
+
+We can also use region boundary hardening to support `unsafe` blocks in Vale. The one difference: instead of fully switching from the safe stack to the unsafe stack, we'd operate on both simultaneously.
+
+
+# Draft Notes and To Do
+
+ * Add a conclusion
+ * Dont call it sinister, call it accidental. we protect against bugs, not malice
+ * More details on the unsafe blocks
+ * Can we compile wasm to C again? Then it can have checks that all accesses are within a 4gb range. I think this is what https://news.ycombinator.com/item?id=29459499 is getting at.
+ * Somehow work in how people don't need unsafe to optimize.
+    * They can use the check override `!!` operator.
+    * Also, its disabled by default.
+    * We can enable those, or even automatically have them in the entire module.
+    * We can have a canary running with them on, and every one else running with them off, to detect if there's any shenanigans.
+       * Maybe the canary can also run with deterministic replayability?
+
+"This is already a huge win. The vast majority of Vale libraries don't use unsafe operations, and instead use the standard library instead. So if you haven't whitelisted any dependencies to use unsafe code, and you know that you're not intentionally working around these mechanisms yourself, you can be confident that your data won't be corrupted."

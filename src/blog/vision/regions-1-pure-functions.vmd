@@ -35,7 +35,7 @@ Let's talk about that last one!
 
 # Immutable References are Zero Cost
 
-Regions are incredibly versatile and powerful. Not only do they enable [Seamless Concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency) and [Separated FFI](https://verdagon.dev/blog/next-separated-ffi), they also allow us to *temporarily freeze* data to make it immutable.
+Regions are incredibly versatile and powerful. Not only do they enable [Seamless Concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency) and [Fearless FFI](https://verdagon.dev/blog/next-fearless-ffi), they also allow us to *temporarily freeze* data to make it immutable.
 
 
 This is good because *references to immutable data don't have any memory-safety overhead.*
@@ -358,7 +358,7 @@ We've only covered one basic example, showing how pure functions use regions to 
 Regions don't just help performance, they also enable some *novel features:*
 
  * [Seamless, Fearless, Structured Concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), a way to parallelize any loop with a single keyword, with zero risk of data races.
- * [Separated FFI](verdagon.dev/blog/next-separated-ffi) which allows a function to operate on a safe region and an unsafe region simultaneously, without risk of corrupting the safe region's data.
+ * [Fearless FFI](verdagon.dev/blog/next-fearless-ffi) which allows a function to operate on a safe region and an unsafe region simultaneously, without risk of corrupting the safe region's data.
  * The ability to "protect" data with a mutex, without a classic borrow checker.
 
 
@@ -437,14 +437,14 @@ These techniques have also opened up some new emergent possibilities:
 
  * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
  * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
- * [Separated FFI](/blog/fearless#safe-externs), which allows us to call into C without risk of accidentally corrupting Vale objects.
+ * [Fearless FFI](/blog/fearless#safe-externs), which allows us to call into C without risk of accidentally corrupting Vale objects.
  * Deterministic replayability, to record all inputs and replay execution. Goodbye races and heisenbugs!
  * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
 
 
 We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
 
- * We can mix an `unsafe` block with Separated FFI to make a much safer systems programming language!
+ * We can mix an `unsafe` block with Fearless FFI to make a much safer systems programming language!
  * We can mix Erlang's isolation benefits with functional reactive programming to make much more resilient programs!
  * We can mix region borrow checking with Pony's `iso` to support shared mutability.
 

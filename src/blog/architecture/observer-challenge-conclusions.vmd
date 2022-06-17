@@ -106,7 +106,7 @@ However, this refactoring is caused by the borrow checker's restrictions; it's c
 ([Playground link](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=0f939d376f9d9405e860a1f3178fcd4f))
 
 
-A common refactor would be to change `Button`'s `dyn FnMut() + 'a` to `dyn FnMut(&mut Vec<Account>) + 'a`, or better yet, make `Button` generic over the type:
+A common refactor would be to change `Button`'s `dyn FnMut() + 'a` to `dyn FnMut(&mut Vec<Account>) + 'a`, [# Changing `onclick` to return a closure, like `Box<dyn Fn() -> Box<dyn FnMut(T)> + 'a>`, solves some orthogonal problems (the callback is now able to remove the clicked button) but not the important one here. The problem then becomes about what parameters the closure takes in. [Playground link](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=8aa87825cf987ed9500605153840379e)] or better yet, make `Button` generic over the type:
 
 ```rs
 struct Button<'a, T> {
@@ -114,17 +114,7 @@ struct Button<'a, T> {
 }
 ```
 
-Or, instead of taking in a `T`, another approach is to instead return a closure which takes in that same `T`:
-
-```rs
-struct Button<'a, T> {
-  onclick: Box<dyn Fn() -> Box<dyn FnMut(T)> + 'a>
-}
-```
-
-([Playground link](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=8aa87825cf987ed9500605153840379e))
-
-These two approaches are mostly equivalent, though the latter callback is able to remove the button that was just clicked. The rest of the tradeoffs are the same.
+([Playground link](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=03551da08949dd2e9bc8ec395b321044))
 
 
 The tradeoffs come around the decision of what that `T` should be. It can either be:

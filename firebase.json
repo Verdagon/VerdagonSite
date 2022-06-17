@@ -13,6 +13,16 @@
         "type": 302
       },
       {
+        "regex": "/guide/(.+)",
+        "destination": "https://vale.dev/guide/:1",
+        "type": 302
+      },
+      {
+        "regex": "/vision/(.+)",
+        "destination": "https://vale.dev/vision/:1",
+        "type": 302
+      },
+      {
         "source": "/blog/0.2/on-removing-let-let-mut",
         "destination": "/blog/on-removing-let-let-mut",
         "type": 302

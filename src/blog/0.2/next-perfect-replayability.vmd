@@ -166,6 +166,11 @@ With your support, we can make this happen, and bring an end to all heisenbugs!
  * Add more to the multi-threading section, on replaying.
  * Split up the What and Why section somehow, its very long.
  * Define nondeterminism?
+ * "What about networking?" "It's done via FFI, so we record it." "What about files?" "It's done via FFI, so we record it." "What about the current time?" "It's done via FFI, so we record it." "What about threads?" "See the section below on threads."
+ * Talk about how its a way to debug vale code, not the rest.
+ * Mention how we might not see the outside world, since it runs in isolation.
+ * Talk about a whitelist mode, where we can replay only specified extern calls.
+ * Talk about how we might be able to whitelist certain files that the user knows are constant? Maybe hash them too, to detect if the user is wrong?
 
 </slice>
 
@@ -196,14 +201,14 @@ These techniques have also opened up some new emergent possibilities:
 
  * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
  * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
- * [Separated FFI](/blog/fearless#safe-externs), which allows us to call into C without risk of accidentally corrupting Vale objects.
+ * [Fearless FFI](/blog/fearless#safe-externs), which allows us to call into C without risk of accidentally corrupting Vale objects.
  * Deterministic replayability, to record all inputs and replay execution. Goodbye races and heisenbugs!
  * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
 
 
 We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
 
- * We can mix an `unsafe` block with Separated FFI to make a much safer systems programming language!
+ * We can mix an `unsafe` block with Fearless FFI to make a much safer systems programming language!
  * We can mix Erlang's isolation benefits with functional reactive programming to make much more resilient programs!
  * We can mix region borrow checking with Pony's `iso` to support shared mutability.
 
