@@ -40,7 +40,7 @@ This can also happen when a language has `unsafe` escape hatches. If some `unsaf
 In all these cases, we know that the unsafe language was involved *somewhere* in the chain of events, but since the bugs actually happen later on, in supposedly safe code, there's no easy way to identify _which_ unsafe code was the original culprit.
 
 
-Worse, some people take advantage of these intentionally, by introducing these vulnerabilities into your dependencies, in what's known as a supply chain attack. For example, the [GitHub Advisory Database](https://github.com/advisories) contains hundreds of vulnerabilities in libraries written in Rust, Go, and other languages.
+Worse, some people take advantage of these intentionally, by introducing these vulnerabilities into your dependencies, in what's known as a supply chain attack. For example, the [GitHub Advisory Database](https://github.com/advisories) describes thousands of vulnerabilities in dependencies, even ones written in normally safe languages like Go and Rust.
 
 
 # The Goal
@@ -64,7 +64,7 @@ Region isolation is when we:
     * Using a different stack for the unsafe code.
  * Allowing references between the two:
     * A safe object can contain a reference to an unsafe object.
-    * An unsafe object can contain a reference to a safe object *if it is scrambled*.
+    * An unsafe object can contain a reference to a safe object, *and it's automatically scrambled*.
  * Enable passing memory between the two by copying. In other words, message passing.
  * (Optionally) Sandbox the unsafe code for extra security, using either webassembly compilation or a subprocess.
 
@@ -74,18 +74,46 @@ Let's explore each of these mechanisms!
 
 ## Message Passing
 
-As shown in [this example](https://vale.dev/guide/externs#immutable-structs), when we send immutable data between C and Vale, we're actually sending a copy.
+
+<<<<
+We can designate an object as immutable. When we send immutable data between C and Vale, we're actually sending a copy.
 
 The C code can do whatever it likes with this copy, and there's no risk of corrupting Vale objects.
 
+Here, a Vale `main` function is sending an immutable `Vec3` struct into C.
+////
+```vale
+exported struct Vec3 imm {
+  x int; y int; z int;
+}
+exported func main() {
+  v = Vec3(10, 11, 12);
+  s = sum(v);
+  println(s);
+}
+extern func sum(v Vec3) int;
+```c
+#include <stdint.h>
+#include "mvtest/Vec3.h"
+#include "mvtest/sum.h"
+extern int mvtest_sum(mvtest_Vec3* v) {
+  int result = v->x + v->y + v->z;
+  free(v);
+  return result;
+}
+```stdout
+33
+```: `import stdlib.*;`
+>>>>
 
 
-## References Between the Two
 
-Message passing is fine, but we want to be able to hand C some pointers to our Vale data. That way, C code can call methods on our Vale objects.
+## References Between C and Vale
+
+Message passing is great for most use cases, but we also want to be able to hand C some pointers to our Vale data. That way, C code can call methods on our Vale objects.
 
 
-For example, this is necessary if we want to wrap a Rust HTTP server and have it call into Vale to handle requests. [# I did this recently in [RocketVale](https://github.com/verdagon/rocketvale) to implement a game server for a [roguelike game](https://verdagon.itch.io/vale-prototype).]
+For example, we might want to wrap a Rust HTTP server and have it call into Vale to handle requests. [# I did this recently in [RocketVale](https://github.com/verdagon/rocketvale) to implement a game server for a [roguelike game](https://verdagon.itch.io/vale-prototype).]
 
 
 However, in most languages, it's risky to make a pointer to an object and hand it to unsafe code. The unsafe code could corrupt the Vale object, like in this example:
@@ -109,6 +137,8 @@ extern int myproject_halveFuel(myproject_Ship* s) {
 }
 ```
 
+
+
 Here, the C function `myproject_halveFuel` accidentally overwrites a pointer with an integer.
 
 
@@ -128,7 +158,7 @@ This is then compressed into 32 bytes [# There are quite a few unused bits in po
  * We xor the entire 32 bytes by a constant factor.
  * We rotate the entire 32 bytes by a constant factor.
 
-These constant factors are randomly generated at compile time, different for every build. [# Generations are different every run (and so are addresses, thanks to Address Space Layout Randomization), so the entire wide generational reference is random.]
+These constant factors are randomly generated at compile time, different for every build. [# Generations are different every run (and so are addresses, thanks to Address Space Layout Randomization), so the entire wide generational reference is random. This randomness is useful further below, when giving these references to sandboxed subprocesses.]
 
 
 *How does C read the data then?*
@@ -164,7 +194,7 @@ func myValeFunction() {
 }
 ```
 
-Here, the C function is *reaching up the stack,* into the caller's memory, and changing something there. This might make `ship.engine` point to address 0x7, because `ship` lives on the stack.
+Here, the C function is *reaching backwards in the stack,* into the caller's memory, and changing something there. This might make `ship.engine` point to address 0x7, because `ship` lives on the stack.
 
 
 To solve this particular problem, the Vale compiler *runs the C code on a secondary stack.* Basically, it sets the stack pointer register to a new chunk of memory, to serve as our new stack.
@@ -184,7 +214,8 @@ This involves some inline assembly, which will set the stack pointer to some new
 
 As you can see, Vale `call`s some sort of `badCFunction_wrapper` on the "new stack".
 
-This wrapper function will call `badCFunction`, and when it's done, it will jump back to our original stack.
+
+This automatically generated wrapper function will call `badCFunction`, and when it's done, it will jump back to our original stack.
 
 Here is the wrapper:
 
@@ -206,7 +237,7 @@ void badCFunction_wrapper() {
 ```
 
 
-`longjmp` is another way to switch stacks. Here, we're using it to switch back to our original stack. Our "original stack state" was stored scrambled in thread local storage.
+Notice the `longjmp`, which is another way to switch stacks. Here we're using it to switch back to our original stack. Our "original stack state" was stored (and scrambled) in thread local storage.
 
 
 Remember that assembly code we saw above? Below we see it in context. This C code sets up the original stack state, puts a pointer to it in thread local storage, and then uses the assembly code to switch to the new stack.
@@ -237,13 +268,14 @@ Remember that assembly code we saw above? Below we see it in context. This C cod
 ```
 
 
+
 # Protection from Accidental Corruption
 
 
 So far, these mechanisms protect us from *accidental* corruption. With the system above, it's pretty much impossible to accidentally corrupt Vale objects. With this, projects or teams can call into their own C code, and have confidence that they aren't causing memory unsafety in their Vale objects.
 
 
-This system also protects us from accidental memory safety in our dependencies. Dependencies' unsafety is a big problem in projects nowadays. For example, the [GitHub Advisory Database](https://github.com/advisories) contains hundreds of vulnerabilities in libraries written in Rust, Go, and other languages.
+This system also protects us from accidental memory safety in our dependencies. Dependencies' unsafety is a big problem in projects nowadays.
 
 
 With these mechanisms, we can be confident that any problems in our dependencies won't cause memory unsafety in our code.
@@ -261,17 +293,17 @@ There are two more problems to solve here:
  * A *vulnerability* in a dependency could allow an attacker to read or write from our Vale objects.
 
 
-The above measures aren't sufficient to protect against those.
+The above measures aren't sufficient to protect against these problems.
 
 
-So, the second step to this plan will be to introduce *sandboxing* for untrusted third-party code. We'll go into this more in Part 2, but TL;DR:
+So, the second half of the plan is to introduce *sandboxing* for untrusted third-party code. Basically:
 
- * We can run the C code in a *subprocess*. The C code will run at top speed, though FFI calls to it would be slow.
- * We can run the C code in a *webassembly sandbox*. The C code must be portable, and won't run as fast, but FFI calls to it would be fast.
+ * We can run the C code in a *subprocess*. The C code will run at top speed, though FFI calls to it might be slow.
+ * We can run the C code in a *webassembly sandbox*. The C code must be portable, and might not run as fast, but FFI calls to it would be fast.
  * We can compile _through_ webassembly as a build step using something called wasm2c, as described in Bobby Holley's [WebAssembly and Back Again: Fine-Grained Sandboxing in Firefox 95](https://hacks.mozilla.org/2021/12/webassembly-and-back-again-fine-grained-sandboxing-in-firefox-95/). This allows the C code to run even faster.
 
 
-Note: Message passing, stack switching, and reference scrambling are implemented in Vale, but we've only started on sandboxing. We're describing it here to let you know the direction we're heading. We're starting with the last option, using wasm2c.
+! Note: Message passing, stack switching, and reference scrambling are implemented in Vale, but we've only started on sandboxing. We're describing it here to let you know the direction we're heading. We're starting with the last option, using wasm2c.
 
 
 A Vale program might use different strategies per dependency:
@@ -282,7 +314,7 @@ A Vale program might use different strategies per dependency:
  * If security isn't as much of a concern (such as in certain kinds of games or other client-side code) then one can turn off Fearless FFI completely.
 
 
-As we implement the rest of this, we'll be posting follow-up articles about the details and tradeoffs involved here. Stay tuned!
+As we implement the sandboxing portion, we'll be posting follow-up articles about the details and tradeoffs involved here. Stay tuned!
 
 
 # Putting it all together
