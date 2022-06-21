@@ -380,7 +380,7 @@ By offering these all in the standard library, we can make it easy to have fast 
 # Conclusion
 
 
-Thanks for reading! In the coming weeks, I'll be writing about how we can augment generational references with an "automatic borrow checker," so subscribe to our [RSS feed](https://verdagon.dev/rss.xml) or the [r/Vale](https://reddit.com/r/vale) subreddit, or come hang out in the [Vale discord](https://discord.gg/SNB8yGH).
+Thanks for reading! In the coming weeks, I'll be writing about how we can augment generational references with an "automatic borrow checker," so subscribe to our [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), or the [r/Vale](https://reddit.com/r/vale) subreddit, or come hang out in the [Vale discord](https://discord.gg/SNB8yGH).
 
 
 
