@@ -1,1 +1,12 @@
 next-decade-languages-rc
+
+maybe call it "new approaches to memory safety"
+
+talk about type stability
+
+talk about how RC might get faster, both from uni inline data, and from the region borrow checker
+
+talk about generational references
+
+talk about basil's weird stack thing
+

@@ -363,7 +363,7 @@ This should give Vale programs the tools to run their native code and dependenci
 Thanks for visiting, and we hope you enjoyed this article!
 
 
-In the coming weeks, we'll be writing more about our "deterministic replayability" proof-of-concept which eliminates heisenbugs and helps us reproduce race conditions, so subscribe to our [RSS feed](https://verdagon.dev/rss.xml) or the [r/Vale](https://reddit.com/r/vale) subreddit, and come hang out in the [Vale discord](https://discord.gg/SNB8yGH)!
+In the coming weeks, we'll be writing more about our "deterministic replayability" proof-of-concept which eliminates heisenbugs and helps us reproduce race conditions, so subscribe to our [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), or the [r/Vale](https://reddit.com/r/vale) subreddit, and come hang out in the [Vale discord](https://discord.gg/SNB8yGH)!
 
 
 If you found this interesting, please consider sponsoring us:

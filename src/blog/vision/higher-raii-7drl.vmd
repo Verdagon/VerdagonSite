@@ -228,7 +228,7 @@ In general, when we want to make sure that we do something in the future, we sho
 It was exciting to finally use it! I come from a heavy C++ and Rust background, and I've always known that RAII has a lot of untapped potential. Finally, Vale is powerful enough to use, and it feels really good to finally use Higher RAII in a real-life program. It's an incredibly versatile and valuable pattern, one that I hope Vale will bring into the mainstream!
 
 
-Thanks for reading! In the coming weeks, I'll be writing more about the Vale 7DRL experience, so subscribe to our [RSS feed](https://verdagon.dev/rss.xml) or the [r/Vale](https://reddit.com/r/vale) subreddit, and come hang out in the [Vale discord](https://discord.gg/SNB8yGH).
+Thanks for reading! In the coming weeks, I'll be writing more about the Vale 7DRL experience, so subscribe to our [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), or the [r/Vale](https://reddit.com/r/vale) subreddit, and come hang out in the [Vale discord](https://discord.gg/SNB8yGH).
 
 
 If you want to support our work, please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
