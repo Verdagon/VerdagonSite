@@ -65,7 +65,7 @@ The Khronos Group created something called [SPIR](https://www.khronos.org/spir/)
 
 Common protocols often spark firestorms of innovation.
 
-My favorite example of a common protocol is [LLVM](https://llvm.org/), an easy assembly-like language that comes with many "backends" that can translate to any architecture under the sun, such as x86 or ARM. Languages only need to compile to the LLVM language, [# More specifically, they call the LLVM API to construct an Abstract Syntax Tree in memory, and then LLVM will translate that.] and then let the LLVM backends do the rest. Without LLVM, we might not have languages like Cone, Zig, Nim, Rust, Lobster, Odin, or our favorite, [Vale](https://vale.dev/). [# Though I'm probably a bit biased. Just a bit.]
+My favorite example of a common protocol is [LLVM](https://llvm.org/), an easy assembly-like language that comes with many "backends" that can translate to any architecture under the sun, such as x86 or ARM. Languages only need to compile to the LLVM language, [# More specifically, they call the LLVM API to construct an Abstract Syntax Tree in memory, and then LLVM will translate that.] and then let the LLVM backends do the rest. Without LLVM, we might not have languages like [Cone](https://cone.jondgoodwin.com/), [Zig](https://ziglang.org/), [Nim](https://nim-lang.org/), [Rust](https://www.rust-lang.org/), [Lobster](https://duckduckgo.com/?t=ffab&q=lobster+language&ia=images), [Odin](http://odin-lang.org/), or our favorite, [Vale](https://vale.dev/). [# Though I'm probably a bit biased. Just a bit.]
 
 Speaking of LLVM, if you look really closely, there's a "SPIR-V LLVM IR Translator" box in the above image. It makes you wonder: could general purpose languages take advantage of that?
 
@@ -149,7 +149,7 @@ If we need more calculations on less data, the GPU becomes much more viable. A u
 
 However, there might be some interesting tricks to pull here.
 
- * We might be able to eagerly ship some data to the GPU before it's needed.
+ * We might be able to eagerly ship some data to the GPU before it's needed, like how video streaming loads data ahead of time.
  * After shipping that data to the GPU, we can send updates as they happen. [# This is often done with Vertex Buffer Objects, so we know it's possible.]
  * Futhark allows us to chain different functions together into a pipeline with [Fusion](https://futhark.readthedocs.io/en/stable/performance.html).
     * This means we dont have to ship data back to the CPU and then to the GPU again for the next phase; the GPU can directly hand one function's output to another function's input.
@@ -236,7 +236,7 @@ Or, perhaps a language could make it easy to flip back and forth between layouts
 Recursion is [possible on GPUs](https://stackoverflow.com/questions/3644809/does-cuda-support-recursion), but it isn't advisable. Same goes for virtual calls, such as through traits, interfaces, or base classes.
 
 
-Luckily, there are some languages that give the user very precise control over what code is allows to use recursion or indirect calls. For example, [Zig](https://github.com/ziglang/zig/issues/1006) tracks recursion. Perhaps a language could use a mechanism like that to keep recursion and indirect calls at bay, to better run code on the GPU.
+Luckily, there are some languages that give the user very precise control over what code is allows to use recursion or indirect calls. For example, [Zig](https://github.com/ziglang/zig/issues/1006) tracks recursion. Perhaps a language could use a mechanism like that to keep recursion and indirect calls at bay, to better run code on the GPU. [# It would be interesting as well if a compile could also find a way to convert recursive functions into non-recursive. There's probably an algorithm that can do something like that by using stacks.]
 
 
 
