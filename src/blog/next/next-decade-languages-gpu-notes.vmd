@@ -1,0 +1,87 @@
+
+talk about languages.
+
+# Futhark
+
+
+# MPL
+
+One language is already leading the charge.
+
+read up more on MPL, integrate a lot more.
+
+# Zig
+
+https://devlog.hexops.com/2021/mach-engine-the-future-of-graphics-with-zig
+
+
+# Rust
+
+rust is probably suited to this?
+
+can help with data races. vale too.
+
+  • low level languages, likely. zig, odin, C. rust, c++, and vale have a hidden challenge of the occasional implicit virtual dispatch
+
+# Julia
+
+https://cancandan.github.io/julia/graphics/cuda/2022/05/07/triangles.html
+
+
+# Vale
+
+- the necessity of unsafe, so we have precise control. only certain languages are equipped for this
+
+generation checks are a no-go, so we need `unsafe` in vale
+
+cuMemMap to expose an entire region or allocator to the GPU
+
+
+# braid, pacxx, skepu, julia
+
+
+Scratch
+
+
+openmp is doing some cool things, allowing us to easily specify the memory to send over: https://stackoverflow.com/questions/28962655/can-openmp-be-used-for-gpus 
+
+vale could allow us to specify specific allocators?
+
+how does futhark specify what memory goes to the GPU?
+
+falling back to CPU.
+
+
+
+
+
+it's also hidden because a lot of our benchmarks are measuring problems that are more suited for CPU parallelism. but in things like [surprising use case], GPU's absolutely destroy CPUs.
+
+
+
+there are a lot of promising ways to parallelize code:
+  • running a thread (show a C# example)
+  • async/await (low overhead, saves memory)
+  • goroutines (saves memory)
+  • actors (saves memory, actors barely have any state)
+  • cone is thinking of blending actors and async/await
+  • vale may have found a way to blend async/await and goroutines (or maybe dont mention this yet)
+
+a section on data locality for warps?
+
+This means that parallel(gpu) cannot be a magic wand to speed up our code. The user (or a very smart compiler?) needs to know when to use parallel(gpu), and when regular CPU parallelism might be better.
+
+For peak efficiency, we'll always need to know the low level details, and break into implementation-defined behavior. This is why languages like Zig exist; there's no such thing as a zero-cost abstraction, because no abstraction is perfect.
+
+
+
+
+
+
+talk about a possible `pure unsafe gpu parallel` loop that could use cuMemMap under the hood
+
+
+ask andrewrk, ginger bill, athas
+
+whats "heterogenous compute"?
+

@@ -11,7 +11,7 @@ namespace: c-blog m-annotated
 [Vale 0.2](/blog/version-0.2-released) is out, and it includes the beginnings of a feature we like to call *Fearless FFI*.
 
 
-This is part of Vale's goal to be the *safest native language.* [# By native, we mean not running in a VM.] Most languages compromise memory safety in some way which can lead to difficult bugs and security vulnerabilities, such as supply-chain attacks.
+This is part of Vale's goal to be the *safest native language.* [# By native, we mean not running in a VM.] Most languages compromise memory safety in some way which can lead to difficult bugs and security vulnerabilities.
 
 
 However, Vale takes a big step forward here by isolating unsafe and untrusted code, and keeping it from undermining the safe code around it.
@@ -42,7 +42,7 @@ This can also happen when a language has `unsafe` escape hatches. If some `unsaf
 In all these cases, we know that the unsafe language was involved *somewhere* in the chain of events, but since the bugs actually happen later on, in supposedly safe code, there's no easy way to identify _which_ unsafe code was the original culprit.
 
 
-Worse, some people take advantage of these intentionally, by introducing these vulnerabilities into your dependencies, in what's known as a supply-chain attack. For example, the [GitHub Advisory Database](https://github.com/advisories) describes thousands of vulnerabilities in dependencies, even ones written in normally safe languages like Go and Rust.
+Worse, some people take advantage of these intentionally, by introducing these vulnerabilities into your dependencies. For example, the [GitHub Advisory Database](https://github.com/advisories) describes thousands of vulnerabilities in dependencies, even ones written in normally safe languages like Go and Rust.
 
 
 # The Goal
@@ -289,7 +289,7 @@ With these mechanisms, we can be confident that any problems in our dependencies
 
 There are two more problems to solve here:
 
- * A dependency *intentionally* reads or writes our safe objects, such as with a [Return-Oriented Programming](https://en.wikipedia.org/wiki/Return-oriented_programming), a kind of *supply-chain attack*. [Supply chain attacks on open source software grew 650% in 2021](https://techmonitor.ai/technology/cybersecurity/supply-chain-attacks-open-source-software-grew-650-percent-2021) and [Backdooring Rust Crates for Fun and Profit](https://kerkour.com/rust-crate-backdoor) have some great explanations of this kind of attack.
+ * A dependency *intentionally* reads or writes our safe data. This is known as a kind of *supply-chain attack*.
  * An accidental *vulnerability* in a dependency could allow an attacker to read or write from our Vale objects.
 
 
@@ -319,7 +319,7 @@ As we implement the sandboxing portion, we'll be posting follow-up articles abou
 
 # Security, Whitelisting, Permissions
 
-Of course, memory unsafety isn't the only form of supply-chain attack. For example, a dependency could read and write files maliciously.
+Of course, memory unsafety isn't the only source of vulnerabilities. For example, a dependency could read and write files maliciously.
 
 
 For this reason, we plan to have *whitelisting.* Specifically, every project must explicitly allow every dependency on a library which uses FFI.
@@ -337,6 +337,12 @@ This will also be required for standard library modules, such as `stdlib.Subproc
 
 
 This will, in effect, give Vale compile-time per-module *capability-based security*, which should help mitigate problems from dependencies.
+
+
+Of course, that only applies to Vale code. For native code, we can sandbox the subprocesses, or use [WebAssembly System Interface](https://wasi.dev/) (WASI), which gives us capability-based security for the dependencies that we run in webassembly.
+
+
+This could be a great boon to the software world. Capability-based security could help mitigate a lot of supply-chain attacks, like the ones explained in [Supply chain attacks on open source software grew 650% in 2021](https://techmonitor.ai/technology/cybersecurity/supply-chain-attacks-open-source-software-grew-650-percent-2021) and [Backdooring Rust Crates for Fun and Profit](https://kerkour.com/rust-crate-backdoor).
 
 
 

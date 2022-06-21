@@ -1,0 +1,66 @@
+
+
+
+# Unsafe Blocks
+
+We can also use region boundary hardening to support `unsafe` blocks in Vale. The one difference: instead of fully switching from the safe stack to the unsafe stack, we'd operate on both simultaneously.
+
+
+# Draft Notes and To Do
+
+ * Add a conclusion
+ * Dont call it sinister, call it accidental. we protect against bugs, not malice
+ * More details on the unsafe blocks
+ * Can we compile wasm to C again? Then it can have checks that all accesses are within a 4gb range. I think this is what https://news.ycombinator.com/item?id=29459499 is getting at.
+ * Somehow work in how people don't need unsafe to optimize.
+    * They can use the check override `!!` operator.
+    * Also, its disabled by default.
+    * We can enable those, or even automatically have them in the entire module.
+    * We can have a canary running with them on, and every one else running with them off, to detect if there's any shenanigans.
+       * Maybe the canary can also run with deterministic replayability?
+
+"This is already a huge win. The vast majority of Vale libraries don't use unsafe operations, and instead use the standard library instead. So if you haven't whitelisted any dependencies to use unsafe code, and you know that you're not intentionally working around these mechanisms yourself, you can be confident that your data won't be corrupted."
+
+
+
+ For that reason, we introduce *sandboxing*, we don't have to scramble when issues in our dependencies are found.
+
+
+# Sandboxing
+
+There are two ways we can prevent supply chain attacks: subprocesses or compiling through webassembly.
+
+
+! Note: While the above mechanisms are prototyped in Vale, the below mechanisms are not in Vale yet.
+
+
+## WebAssembly and wasm2c
+
+Normally, people use WebAssembly to run C code in a sandboxed environment. This is the technology that allows C code to run in the browser.
+
+
+However, that's not the only way to use webassembly. Instead of interpreting it by running it in a VM, we can also compile _through_ webassembly code, back into native machine code. This is even faster than interpreting it.
+
+
+Recently, Bobby Holley published an article [WebAssembly and Back Again: Fine-Grained Sandboxing in Firefox 95](https://hacks.mozilla.org/2021/12/webassembly-and-back-again-fine-grained-sandboxing-in-firefox-95/) which uses wasm2c to translate the resulting .wasm output _back into C_. This brings the overhead down to 42% while maintaining portability, and even as low as 14% using some platform-specific techniques.
+
+
+This has some limitations:
+
+ * We must have the C source.
+ * It's slower than native code (14% or 42%, depending on portability).
+ * WebAssembly has some [code portability limitations](https://emscripten.org/docs/porting/guidelines/index.html).
+
+If any of these are problems, then there's another option: subprocesses.
+
+
+## Subprocesses
+
+One process cannot access memory from another process.
+
+
+So, we'll launch a subprocess that can run our C code for us. When we want to call a C function, we'll send a message (either via socket or pipe) to the subprocess, which will run its code, and send a message back to us with the result.
+
+
+The drawback to this approach is that it takes extra time to send and receive messages between processes.
+
