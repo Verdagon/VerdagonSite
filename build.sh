@@ -264,10 +264,10 @@ if [ $TARGET == "next-perfect-replayability" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
-if [ $TARGET == "next-fearless-ffi" ] || [ $TARGET == "all" ] ; then
-  echo "Doing next-fearless-ffi"
-  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/next-fearless-ffi src/blog/0.2/next-fearless-ffi.vmd
-  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/next-fearless-ffi src/blog/0.2/next-fearless-ffi.vmd
+if [ $TARGET == "fearless-ffi" ] || [ $TARGET == "all" ] ; then
+  echo "Doing fearless-ffi"
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/fearless-ffi src/blog/0.2/fearless-ffi.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/fearless-ffi src/blog/0.2/fearless-ffi.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -298,6 +298,16 @@ if [ $TARGET == "regions-1-pure-functions" ] || [ $TARGET == "all" ] ; then
   echo "Doing regions-1-pure-functions"
   echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-1-pure-functions src/blog/vision/regions-1-pure-functions.vmd
   eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-1-pure-functions src/blog/vision/regions-1-pure-functions.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
+if [ $TARGET == "next-decade-languages-gpu" ] || [ $TARGET == "all" ] ; then
+  echo "Doing regions-1-pure-functions"
+  echo $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/next-decade-languages-gpu src/blog/next/next-decade-languages-gpu.vmd
+  eval $VMD_SITE_GEN/build/vmdsitegen $MODE --compiler_dir $VALESTROM --out public/blog/next-decade-languages-gpu src/blog/next/next-decade-languages-gpu.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1

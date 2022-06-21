@@ -16,6 +16,7 @@ I use this site to blog about my endeavors. Enjoy!
 
 # Recent posts:
 
+ * [Vale's Fearless FFI, for Safer Dependencies and Supply-Chain Attack Mitigation](/blog/fearless-ffi)
  * [Vale 0.2 Released](/blog/version-0.2-released)
  * [Added to Vale 0.2 Beta: Concept Functions](/blog/concept-functions)
  * [Const Generics and the Compile Time Spread Operator](/blog/const-generics-spread)
