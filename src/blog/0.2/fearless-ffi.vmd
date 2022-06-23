@@ -1,5 +1,5 @@
 ---
-title: Vale's Fearless FFI, for Safer Dependencies and Supply-Chain Attack Mitigation
+title: "Fearless FFI" for Memory Safety, Safer Dependencies, and Supply-Chain Attack Mitigation
 author: Evan Ovadia
 date: Jun 21, 2022
 realm: blog
@@ -14,7 +14,7 @@ namespace: c-blog m-annotated
 This is part of Vale's goal to be the *safest native language.* [# By native, we mean not running in a VM.] Most languages compromise memory safety in some way which can lead to difficult bugs and security vulnerabilities.
 
 
-However, Vale takes a big step forward here by isolating unsafe and untrusted code, and keeping it from undermining the safe code around it.
+Vale takes a big step forward here, by isolating unsafe and untrusted code and keeping it from undermining the safe code around it.
 
 
 This page describes the proof-of-concept we have so far, plus the next steps. It involves some borderline-insane acrobatics with *inline assembly*, *bitwise xor and rotate*, and *two simultaneous stacks*. Buckle up!
@@ -45,12 +45,21 @@ In all these cases, we know that the unsafe language was involved *somewhere* in
 Worse, some people take advantage of these intentionally, by introducing these vulnerabilities into your dependencies. For example, the [GitHub Advisory Database](https://github.com/advisories) describes thousands of vulnerabilities in dependencies, even ones written in normally safe languages like Go and Rust.
 
 
-# The Goal
+<slice/>
 
-Our goal is to be able to fearlessly call into C code, written by ourselves and even others, without risking corruption in our Vale code's data.
+
+# The Goals
+
+We have two goals here:
+
+ * Fearlessly call into *our own* C code without risking *accidental* corruption in our Vale code's data, by separating the Vale memory from C.
+ * Fearlessly call into *others'* C code without risking *malicious* corruption in our Vale code's data, by using sandboxing.
 
 
 This doesn't just apply to C code, but any code written in an unsafe language.
+
+
+<slice/>
 
 
 # Fearless FFI
@@ -72,6 +81,9 @@ Vale protects against these bugs with a handful of different mechanisms, which c
 Let's explore each of these mechanisms!
 
 
+<slice/>
+
+
 # Copying Data Between Vale and C
 
 
@@ -83,7 +95,7 @@ The C code can do whatever it likes with this copy, and there's no risk of corru
 Here, a Vale `main` function is sending an immutable `Vec3` struct into C.
 ////
 ```vale
-exported struct Vec3 imm {
+exported struct Vec3 imm { «exp»
   x int; y int; z int;
 }
 exported func main() {
@@ -106,6 +118,10 @@ extern int mvtest_sum(mvtest_Vec3* v) {
 ```: `import stdlib.*;`
 >>>>
 
+
+<slice>
+#exp: We use the `exported` keyword to make it visible to the C code, and automatically generate the headers (like `mvtest/Vec3.h`).
+</slice>
 
 
 # References Between C and Vale
@@ -152,13 +168,15 @@ It instead gives a *wide generational reference,* which contains:
  * A pointer to the object's type metadata (or vtable, if an interface reference).
 
 
+For those unfamiliar, a *generational reference* is a reference containing a pointer to an object, and a "remembered generation" which is an integer that matched the "actual generation" integer from the object itself. When we free the object, the object's actual generation is incremented. Before dereferencing a generational reference, Vale asserts that the generations matched, to ensure we haven't deallocated the object since then. By our last measurements, generational references are [over twice as fast as reference counting](https://verdagon.dev/blog/generational-references), and could get even faster when we add our planned [region borrow checker](https://verdagon.dev/blog/zero-cost-refs-regions) and [hybrid-generational memory](https://verdagon.dev/blog/hybrid-generational-memory) features.
 
-This is then compressed into 32 bytes [# There are quite a few unused bits in pointers, that can be repurposed for other things.] and then *scrambled*:
+
+The "wide" generational reference is then compressed into 32 bytes [# There are quite a few unused bits in pointers, that can be repurposed for other things.] and then *scrambled*:
 
  * We xor the entire 32 bytes by a constant factor.
  * We rotate the entire 32 bytes by a constant factor.
 
-These constant factors are randomly generated at compile time, different for every build. [# Generations are different every run (and so are addresses, thanks to Address Space Layout Randomization), so the entire wide generational reference is random. This randomness is useful further below, when giving these references to sandboxed subprocesses.]
+These constant factors are randomly generated at compile time, different for every build. [# Generations are different every run (and so are addresses, thanks to Address Space Layout Randomization), so the entire wide generational reference is random. This randomness is useful further below, when giving these references to sandboxed subprocesses.] This is mainly to prevent C from accidentally dereferencing the contained pointers. [# This "pointer obfuscation" isn't for security, it's just to prevent accidental memory corruption from C. We'll talk about additional measures for security below.]
 
 
 *How does C read the data then?*
@@ -166,6 +184,9 @@ These constant factors are randomly generated at compile time, different for eve
 The C code will need to hand it back to a Vale function, like the [example here](https://vale.dev/guide/externs#mutable-structs).
 
 When a Vale function receives a scrambled reference, it will unscramble it and generation-check the region. If the C code gave an invalid reference, it will be detected right then.
+
+
+<slice/>
 
 
 # Separating Memory
@@ -269,6 +290,12 @@ Remember that assembly code we saw above? Below we see it in context. This C cod
 
 
 
+We also make sure that Vale will never reuse memory previously freed by the C code. This can happen if C calls `free` and then Vale calls `malloc`. Instead, we plan to use a separate address range for all Vale allocations, using [mimalloc](https://github.com/microsoft/mimalloc) (note that this is not implemented yet, only planned).
+
+
+<slice/>
+
+
 # Protection from Accidental Corruption
 
 
@@ -283,6 +310,8 @@ With these mechanisms, we can be confident that any problems in our dependencies
 
 *We implemented a proof-of-concept of this!* The proof of concept works for macOS by simply supply `--enable_side_calling true` to the `valec` invocation. The other measures (copying data, references, scrambling) already work on all platforms and are enabled by default.
 
+
+<slice/>
 
 
 # Vulnerabilities and Supply-Chain Attacks
@@ -317,6 +346,9 @@ A Vale program might use different strategies per dependency:
 As we implement the sandboxing portion, we'll be posting follow-up articles about the details and tradeoffs involved here. Stay tuned!
 
 
+<slice/>
+
+
 # Security, Whitelisting, Permissions
 
 Of course, memory unsafety isn't the only source of vulnerabilities. For example, a dependency could read and write files maliciously.
@@ -344,6 +376,8 @@ Of course, that only applies to Vale code. For native code, we can sandbox the s
 
 This could be a great boon to the software world. Capability-based security could help mitigate a lot of supply-chain attacks, like the ones explained in [Supply chain attacks on open source software grew 650% in 2021](https://techmonitor.ai/technology/cybersecurity/supply-chain-attacks-open-source-software-grew-650-percent-2021) and [Backdooring Rust Crates for Fun and Profit](https://kerkour.com/rust-crate-backdoor).
 
+
+<slice/>
 
 
 # Putting It All Together
