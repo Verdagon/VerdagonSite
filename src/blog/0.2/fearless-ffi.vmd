@@ -1,5 +1,5 @@
 ---
-title: "Fearless FFI" for Memory Safety, Safer Dependencies, and Supply-Chain Attack Mitigation
+title: Fearless FFI: Memory Safety, Safer Dependencies, and Supply-Chain Attack Mitigation
 author: Evan Ovadia
 date: Jun 21, 2022
 realm: blog
@@ -26,6 +26,7 @@ If you're impressed with our [track record so far](https://vale.dev/roadmap) and
 # The Challenge: Leaky Unsafe
 
 Most languages have a Foreign Function Interface (FFI) to enable calling into another language's code.
+
 
 Normally, when a safe language's code calls functions written in an unsafe language, any bugs in the unsafe language can cause problems in the safe language. For example:
 

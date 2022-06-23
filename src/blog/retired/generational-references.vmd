@@ -158,7 +158,7 @@ For this experiment, we benchmarked [#program] [#rustandc] three flavors of Vale
 
 
 <slice>
-#program: We used the [BenchmarkRL](https://github.com/ValeLang/Vale/tree/master/benchmarks/BenchmarkRL/vale) terrain generator to gather these numbers, with different values for the `--region-override` flag: `unsafe-fast`, `naive-rc`, and `resilient-v3` respectively.
+#program: We used the [BenchmarkRL](https://github.com/Verdagon/BenchmarkRL/tree/master/vale) terrain generator to gather these numbers, with different values for the `--region-override` flag: `unsafe-fast`, `naive-rc`, and `resilient-v3` respectively.
 
 
 #rustandc: Here, we benchmarked against other flavors of Vale, to isolate the differences between unsafe, reference-counting, and generational references.
