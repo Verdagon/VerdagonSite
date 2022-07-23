@@ -274,7 +274,8 @@ With our `Mutexes` and region annotations, the compiler can give us free, zero-c
 ////
 ```vale
 func templar(
-    inAstMutex &Mutex<InAst>) {
+    inAstMutex &Mutex<InAst>)
+Mutex<OutAst> {
   inAstLock = inAstMutex.openro();
   inAst = inAstLock.contents;
 
