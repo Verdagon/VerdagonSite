@@ -1,23 +1,22 @@
 ---
-title: Next Decade in Languages: User Code on the GPU
+title: Next-Gen Language Features: User Code on the GPU
 subtitle: 10,000 Norwegian horseman traveling to Alaska to solve 10,000 addition problems.
 author: Evan Ovadia
-date: Jun 27, 2022
+date: Jun 25, 2022
 realm: blog
-path: blog/next-decade-languages-gpu
+path: blog/next-gen-languages-gpu
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: us
 ---
 
 
 Some of you might remember our [Seamless Concurrency](/blog/seamless-fearless-structured-concurrency) article, about how a region-aware language could safely add multi-threading with just one simple `parallel` keyword.
 
 
-*That was just scratching the surface of what's possible!*
+That was just scratching the surface of what's possible!
 
 
-There's so much incredible potential in this realm of parallelism:
+There's *so much incredible potential* in the realm of parallelism:
 
  * Threading models that have the benefits of both goroutines and async/await. [# I'm referring not only to [Zig's colorless async/await](https://kristoff.it/blog/zig-colorblind-async-await/), but also what lies beyond it!]
  * Concurrency models that are so reliable that it's literally impossible to crash them them, which enable [nine nines](https://stackoverflow.com/questions/8426897/erlangs-99-9999999-nine-nines-reliability): uptime of 99.9999999%. [# Lookin' at you, Pony actors!]
@@ -25,22 +24,29 @@ There's so much incredible potential in this realm of parallelism:
 
 Today, we're going to talk about that last one!
 
-It's sometimes tempting to think that we've reached the end of programming languages, and that today's languages are perfect. I'm here to tell you that we ain't seen nothin' yet!
 
-Welcome to the *Next Decade in Languages* series, where we talk about surprising language aspects that have a lot potential, and could soon change the way we program. I hope you enjoy it, and if you'd like us to continue, please consider [sponsoring us](https://github.com/sponsors/ValeLang)!
+It's sometimes tempting to think that we've reached the end of programming languages, and that today's languages are as good as it gets. I'm here to tell you that we ain't seen nothin' yet! [# If you want a real taste of what's coming from the languages realm, check out [r/programminglanguages](https://www.reddit.com/r/programminglanguages), [r/vale](https://www.reddit.com/r/vale), and my [RSS feed](https://verdagon.dev/rss.xml) where I post articles like this pretty often.]
+
+Welcome to the *Next Gen Language Features* series, where we talk about surprising language features that are on the horizon, and could soon change the way we program.
+
+I hope you enjoy it, and if you'd like us to continue, please consider [sponsoring us](https://github.com/sponsors/ValeLang)!
+
+
+<slice/>
 
 
 # GPUs' Hidden Powers
 
 If you have a late 2019 Macbook Pro, you have 6 x 2.6ghz cores, totaling to 15.6 ghz.
 
+
 However, there are 1,536 other cores hidden on your machine, each running at around 1.3 ghz. These are in your GPU, and they're usually used to play your movies and make your games look good.
 
-That totals to 1996.8 ghz! That's 128x the power of your CPU. Imagine if you could harness that power for more than graphics!
+
+That's a lot of untapped computational power. Imagine if you could harness that power for more than graphics! [# Machine learning is a popular use case, and some people have even used it for climate, weather, and ocean modeling.]
 
 
 A couple decades ago, folks at Nvidia thought the same thing, and created [CUDA](https://en.wikipedia.org/wiki/CUDA), giving us unprecedented control over that raw power.
-
 
 With CUDA, one can write C++ code that runs on the GPU. I'm not talking about shaders, which only do very specialized things, I mean general purpose, real C++ code. One can even use it to write a [ray tracing](https://developer.nvidia.com/discover/ray-tracing) program that produces this image: [# I made this in 2012!]
 
@@ -48,12 +54,20 @@ With CUDA, one can write C++ code that runs on the GPU. I'm not talking about sh
 <div style="text-align: center"><img src="/images/raytraced.png" width="390" height="266"></div>
 
 
-Since then, while the rest of us weren't looking, they've made incredible strides. While we were struggling to get 10x speedups on our mere 6 CPU cores, people have been using GPUs to get 100-1000x speedups.
+The GPU isn't a silver bullet, but it can be used for many kinds of code [# This kind of code is often often referred to as "[embarassingly parallel](https://en.wikipedia.org/wiki/Embarrassingly_parallel)".] where we can do a lot of calculations in parallel because there are no dependencies between them. This kind of calculation is very common in some fields (like games and simulations), though not very common in others (like GUI apps and CRUD servers).
 
 
-However, it was always very tricky to get it working. One had to have exactly the right hardware, exactly the right drivers, it only supported C and C++, and it only seemed to work on odd days of the month, when Venus was aligned with our ninth planet, Pluto.
+While the rest of us weren't looking, GPU programming has made incredible strides. While we were struggling to get 10x speedups on our mere 6 CPU cores, people have been using GPUs to get 100-1000x speedups.
+
+
+However, it was always very tricky to get it working. One had to have exactly the right hardware, exactly the right drivers, it only supported C and C++, and it only worked on odd days of the month, when Venus was aligned with our ninth planet, Pluto.
+
 
 Alas, kind of a mess.
+
+
+<slice/>
+
 
 # A Mess, Perhaps
 
@@ -63,15 +77,23 @@ The Khronos Group created something called [SPIR](https://www.khronos.org/spir/)
 
 <img src="/images/spir.jpg" width="100%"/>
 
+
 Common protocols often spark firestorms of innovation.
+
 
 My favorite example of a common protocol is [LLVM](https://llvm.org/), an easy assembly-like language that comes with many "backends" that can translate to any architecture under the sun, such as x86 or ARM. Languages only need to compile to the LLVM language, [# More specifically, they call the LLVM API to construct an Abstract Syntax Tree in memory, and then LLVM will translate that.] and then let the LLVM backends do the rest. Without LLVM, we might not have languages like [Cone](https://cone.jondgoodwin.com/), [Zig](https://ziglang.org/), [Nim](https://nim-lang.org/), [Rust](https://www.rust-lang.org/), [Lobster](https://duckduckgo.com/?t=ffab&q=lobster+language&ia=images), [Odin](http://odin-lang.org/), or our favorite, [Vale](https://vale.dev/). [# Though I'm probably a bit biased. Just a bit.]
 
+
 Speaking of LLVM, if you look really closely, there's a "SPIR-V LLVM IR Translator" box in the above image. It makes you wonder: could general purpose languages take advantage of that?
+
+
+<slice/>
+
 
 # Parallelism for the User
 
 The underlying technology is only half of the story. For something to take off, it needs to be intuitive.
+
 
 Luckily, parallelism is becoming more and more intuitive.
 
@@ -81,7 +103,11 @@ Luckily, parallelism is becoming more and more intuitive.
 
 Truly, parallelism is getting more and more within reach.
 
+
 On top of that, it might be possible to get the best of all worlds, like described in [Seamless, Structured, Fearless Concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency).
+
+
+<slice/>
 
 
 # How they might Meet
@@ -103,18 +129,22 @@ exported func main() {
 ```
 
 
-We would love to implement this in Vale at some point, after [our plans](https://vale.dev/roadmap) for implementing the [region borrow checker](https://verdagon.dev/blog/zero-cost-refs-regions) and [hybrid-generational memory](https://verdagon.dev/blog/hybrid-generational-memory). But, this article isn't about Vale specifically, it's about the field in general, and where it might go naturally.
-
-
 I think languages could make some big strides here.
 
 
 However, there are some open questions and challenges between here and there.
 
 
+<slice/>
+
+
 # Challenges
 
 That all sounds great, but how can we make it happen? There are a lot of challenges between here and there.
+
+
+<slice/>
+
 
 ## Shipping Data to the GPU
 
@@ -122,11 +152,11 @@ There's a cost to send data to and from the GPU.
 
 Let's pretend we have 10 GPU cores, and we have this data:
 
-1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+> 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
 
 and we want to double each number, to get:
 
-2, 4, 6, 8, 10, 12, 14, 16, 18, 20
+> 2, 4, 6, 8, 10, 12, 14, 16, 18, 20
 
 we might use this code:
 
@@ -137,53 +167,73 @@ results =
     };
 ```
 
+
+
 If we have 2 CPU cores, and 10 GPU cores, the GPU could run this 5x faster, right?
+
 
 Unfortunately, it's not that simple: we need to send that `data` array to the GPU first. And then afterwards, we'll need to send that `results` array all the way back to the CPU!
 
-Sending that data could take a long time, so it might be faster to just use our 2 CPU cores!
 
-Imagine ten thousand Norwegian horseman traveling for two weeks to Alaska, each with a simple addition problem, like 5 + 7. Ten thousand Alaskan kindergarteners receive the problems, spend three seconds solving them in parallel, and the ten thousand horseman spend another two weeks returning. It would have been faster to have one Norwegian kindergartener do the ten thousand additions!
+Sending data between the CPU and GPU can take a long time, so it might be faster to just use our 2 CPU cores.
+
+
+Imagine ten thousand Norwegian horseman traveling for two weeks to Alaska, each with a simple addition problem, like 5 + 7. Ten thousand Alaskan kindergarteners receive the problems, spend three seconds solving them in parallel, and the ten thousand horseman spend another two weeks returning.
+
+
+It would have been faster to have one Norwegian kindergartener do the ten thousand additions!
+
 
 If we need more calculations on less data, the GPU becomes much more viable. A user needs to balance it.
+
 
 However, there might be some interesting tricks to pull here.
 
  * We might be able to eagerly ship some data to the GPU before it's needed, like how video streaming loads data ahead of time.
  * After shipping that data to the GPU, we can send updates as they happen. [# This is often done with Vertex Buffer Objects, so we know it's possible.]
- * Futhark allows us to chain different functions together into a pipeline with [Fusion](https://futhark.readthedocs.io/en/stable/performance.html).
+ * We might chain different functions together into a pipeline, such as with Futhark's [Fusion](https://futhark.readthedocs.io/en/stable/performance.html).
     * This means we dont have to ship data back to the CPU and then to the GPU again for the next phase; the GPU can directly hand one function's output to another function's input.
-    * This is similar to how some shader frameworks allow us to piece subshaders together.
+    * This is similar to how some shader frameworks allow us to piece [subshaders](https://docs.unity3d.com/Manual/shader-objects.html) together.
 
 
 Futhark is also helping with this, by giving us building blocks that are naturally more parallelizable and have less branching, second-order array combinators (SOACs) such as map, reduce, scan, filter, reduce_by_index.
 
+
 I suspect languages will become smarter about eagerly streaming data to the GPU. We're starting to see the early signs of this in [CUDA 11.3](https://developer.nvidia.com/blog/exploring-the-new-features-of-cuda-11-3/), which adds some features for streaming memory to the GPU at the right time.
+
+
+<slice/>
 
 
 ## Warps
 
 The second big challenge is that CPU parallelism is very different from GPU parallelism. The user will need to know when their parallelism isn't suited for the GPU.
 
+
 In CPUs, core A runs code X, while core B runs code Y. You can have twelve different cores running twelve different functions. They're completely separate
+
 
 Nvidia GPUs have hundreds or thousands of cores, divided into groups of 32 cores, called "warps". [# In keeping with the 3D graphics tradition of clear and consistent naming, the SIMD concept is called SIMD groups on Metal, warps on Nvidia, wavefronts on AMD, and subgroups on Vulkan.] All cores in a warp will all be executing the same code, similar to how SIMD runs the *s*ame *i*nstructions on *m*ultiple *d*ata.
 
+
 This system has benefits, but also drawbacks, explained below.
+
+
+<slice/>
 
 
 ### Branching in Warps
 
 Let's pretend our GPU has 4 cores per warp, and we want to do some operations on this data:
 
-80, 82, 1, 3
+> 80, 82, 1, 3
 
 We'll be doing all these operations will happen in one warp, because there are 4 cores per warp, and theres 4 pieces of data here. So far so good.
 
 
 But let's say we want to *halve the even numbers* and *triple the odd numbers*:
 
-45, 46, 3, 9
+> 45, 46, 3, 9
 
 We might use this code:
 
@@ -215,11 +265,11 @@ In practice, the user can restructure their program so that all cores in a warp 
 
 This might have two warps doing a lot of waiting:
 
-80, 82, 1, 3, 84, 86, 5, 7
+> 80, 82, 1, 3, 84, 86, 5, 7
 
 But this input will have two warps doing zero waiting:
 
-80, 82, 84, 86, 1, 3, 5, 7
+> 80, 82, 84, 86, 1, 3, 5, 7
 
 
 The user needs to be aware of this, and use techniques like that to organize their data.
@@ -231,6 +281,9 @@ Maybe languages could help with this. Perhaps a language could make it easier to
 Or, perhaps a language could make it easy to flip back and forth between layouts, so we can experiment and profile to see what's fastest on the GPU. For example, Jai is adding a feature to [change the layouts of structs and arrays for better optimization](https://www.youtube.com/watch?v=ZHqFrNyLlpA&ab_channel=JonathanBlow). [# Specifically, it allows changing an array-of-structs into a struct-of-arrays.]
 
 
+<slice/>
+
+
 ## Recursion and Indirect Calls
 
 Recursion is [possible on GPUs](https://stackoverflow.com/questions/3644809/does-cuda-support-recursion), but it isn't advisable. Same goes for virtual calls, such as through traits, interfaces, or base classes.
@@ -238,6 +291,8 @@ Recursion is [possible on GPUs](https://stackoverflow.com/questions/3644809/does
 
 Luckily, there are some languages that give the user very precise control over what code is allows to use recursion or indirect calls. For example, [Zig](https://github.com/ziglang/zig/issues/1006) tracks recursion. Perhaps a language could use a mechanism like that to keep recursion and indirect calls at bay, to better run code on the GPU. [# It would be interesting as well if a compile could also find a way to convert recursive functions into non-recursive. There's probably an algorithm that can do something like that by using stacks.]
 
+
+<slice/>
 
 
 ## Registers
@@ -248,6 +303,9 @@ GPUs have a finite number of registers. Using less registers will often make GPU
 Any low-level language would do well here, as they give very fine-grained control. However, I think C and Zig have a powerful advantage here, by *embracing undefined and implementation-defined behavior.* This allows these languages to harness platform-specific behaviors for maximum speed.
 
 
+<slice/>
+
+
 ## Other Challenges
 
 That seems like a lot of challenges! And there are even some more past that. One might think that there's just too many challenges, and it will remain difficult to use the GPU forever.
@@ -256,24 +314,36 @@ That seems like a lot of challenges! And there are even some more past that. One
 But the same thing was true of hard drives, CPUs, peripherals, you name it. Abstractions will emerge, patterns will arise, protocols will be standardized, and we will find ways to more effectively harness more GPUs. The question is just how fast we get there.
 
 
+<slice/>
+
+
 # Promising Languages
 
 There are some really promising languages that could bring GPU programming to the mainstream one day.
 
-[Zig](https://ziglang.org/)'s low-level precision makes it perfect for writing code on the GPU, where every single register matters. Plus, its lack of interfaces/traits and restrictions on recursion could be invaluable for running code on the GPU where stack space is limited.
-
-[Vale](https://vale.dev/)'s plans for [Seamless Concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency) could easily lead to GPU execution, and its plans for first-class allocators could help with eagerly shipping data to the GPU.
-
-[Rust](https://www.rust-lang.org/) adds memory safety with very little run-time overhead, [# In practice, Rust's memory safety primarily comes from the borrow checker which has no overhead, and when an object needs to be reachable from multiple places, we fall back to arrays and hash maps which each have little performance cost, relative to RC or GC.] which could be a nice benefit for code on the GPU, where memory unsafety can be tricky to debug.
 
 [Cone](https://cone.jondgoodwin.com) offers a borrow checker on top of not only single ownership but also RC, GC, and [user-defined memory management models](https://cone.jondgoodwin.com/memory.html). This could allow us to more easily control what memory is on the GPU and when.
 
+
+[Vale](https://vale.dev/)'s plans for [Seamless Concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency) could easily lead to GPU execution, and its plans for first-class allocators could help with eagerly shipping data to the GPU.
+
+
+[Zig](https://ziglang.org/)'s low-level precision makes it perfect for writing code on the GPU, where every single register matters. Plus, its lack of interfaces/traits and restrictions on recursion could be invaluable for running code on the GPU where stack space is limited.
+
+
+[Rust](https://www.rust-lang.org/) adds memory safety with very little run-time overhead, [# In practice, Rust's memory safety primarily comes from the borrow checker which has no overhead, and when an object needs to be reachable from multiple places, we fall back to arrays and hash maps which each have little performance cost, relative to RC or GC.] which could be a nice benefit for code on the GPU, where memory unsafety can be tricky to debug.
+
+
 [Futhark](https://futhark-lang.org/) excels at running user code on the GPU already! I could imagine Futhark getting some nice integrations with mainstream languages, to bring GPU programming to the masses.
+
 
 [MaPLe](https://github.com/MPLLang/mpl) is extending SML to add fork-join parallelism, for much easier multi-threading. It already gives the user the right building blocks, and if it adds support for the GPU, I think it could work really well.
 
 
 But any language could make strides here! I hope that we don't all just sit back and wait for existing languages to innovate here. If you have an idea on how we can more effectively harness a GPU, make a language and show it to the world! Or maybe fork an existing language, like Vale, Zig, or D. And if you need any pointers on language design, come to the [Vale discord server](https://discord.gg/SNB8yGH) and we'd be happy to help however we can, and share our code and designs for implementing some of the ideas described here.
+
+
+<slice/>
 
 
 # Conclusion
@@ -309,15 +379,15 @@ I'd love to keep writing articles like this for a long time. Big thanks to our s
 
 <slice new-color="afterword"/>
 
-# About the Vale Language Project
+# Vale's Vision
 
-The Vale Language Project is not just about making Vale, it's also about *exploring, discovering, and publishing* new programming language mechanisms that enable *speed*, *safety*, and *ease of use.*
+Vale aims to bring a new way of programming into the world that offers *speed*, *safety*, and *ease of use.*
 
 
-*The world needs more exploration here!* Currently, most programming language research is in:
+*The world needs something like this!* Currently, most programming language work is in:
 
  * High-overhead languages involving reference counting and tracing garbage collection.
- * Complex languages (Ada/Spark, Coq, Rust, Haskell, etc.) which impose a higher complexity burden on the average programmer.
+ * Complex languages (Ada/Spark, Coq, Rust, Haskell, etc.) which impose higher complexity burden and mental overhead on the programmer.
 
 These are useful, but there is a *vast field of possibilities* in between, waiting to be explored!
 
@@ -325,20 +395,20 @@ These are useful, but there is a *vast field of possibilities* in between, waiti
 Our aim is to explore that space, discover what it has to offer, and make *speed and safety easier than ever before.*
 
 
-In this quest, we've discovered a lot of new techniques:
+In this quest, we've discovered and implemented a lot of new techniques:
+
+ * [Generational Memory](/blog/generational-references), for a language to ensure an object still exists at the time of dereferencing.
+ * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
+ * [Fearless FFI](/blog/fearless-ffi), which allows us to call into C without risk of accidentally corrupting Vale objects.
+ * [Perfect Replayability](/blog/perfect-replayability-prototyped), to record all inputs and replay execution, and completely solve heisenbugs and race bugs.
+
+
+These techniques have also opened up some new emergent possibilities, which we hope to implement:
 
  * [Region Borrow Checking](/blog/zero-cost-refs-regions), which adds mutable aliasing support to a Rust-like borrow checker.
- * [Generational Memory](/blog/generational-references), for a language to ensure an object still exists at the time of dereferencing.
  * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
-
-
-These techniques have also opened up some new emergent possibilities:
-
  * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
  * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
- * [Fearless FFI](/blog/fearless#safe-externs), which allows us to call into C without risk of accidentally corrupting Vale objects.
- * Deterministic replayability, to record all inputs and replay execution. Goodbye races and heisenbugs!
- * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
 
 
 We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
@@ -350,18 +420,18 @@ We also gain a lot of inspiration from other languages, and are finding new ways
 ...plus a lot more interesting ideas to explore!
 
 
-The Vale programming language is only one combination of the features we've found. Our goal is to publish all the techniques we've found, even the ones that couldn't fit in Vale, so that other languages can make strides in this area.
+The Vale programming language is a novel combination of ideas from the research world and original innovations. Our goal is to publish our techniques, even the ones that couldn't fit in Vale, so that the world as a whole can benefit from our work here, not just those who use Vale.
 
 
 Our medium-term goals:
 
+ * Finish the Region Borrow Checker, to show the world that shared mutability can work with borrow checking!
+ * Prototype Hybrid-Generational Memory in Vale, to see how fast and easy we can make single ownership.
  * Publish the Language Simplicity Manifesto, a collection of principles to keep programming languages' learning curves down.
  * Publish the Memory Safety Grimoire, a collection of "memory safety building blocks" that languages can potentially use to make new memory models, just like Vale combined generational references and scope tethering.
- * Prototype the Region Borrow Checker in Vale, to show the world that shared mutability can work with borrow checking!
- * Prototype Hybrid-Generational Memory in Vale, to see how fast and easy we can make single ownership.
 
 
-We aim to publish articles biweekly on all of these topics, and inspire the next generation of fast, safe, and easy programming languages.
+We aim to publish articles biweekly on all of these topics, and create and inspire the next generation of fast, safe, and easy programming languages.
 
 
 If you want to support our work, please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
@@ -380,5 +450,4 @@ With enough sponsorship, we can:
      Sponsor us on GitHub!
   </a>
 </center>
-
 

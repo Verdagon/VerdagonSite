@@ -1,23 +1,23 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
    <channel>
-      <title>Languages and Architecture</title>
-      <link>https://verdagon.dev/</link>
-      <description>A blog on programming languages, software architecture, and Evan Ovadia's other shenanigans!</description>
-      <lastBuildDate>Mon, 21 Mar 2022 16:15:00 -0400</lastBuildDate>
+      <title>Vale Articles (Sponsors' Early Access)</title>
+      <link>https://vale.dev/</link>
+      <description>The fast, fearless, and flexible programming language!</description>
+      <lastBuildDate>Mon, 21 Mar 2022 16:15:00 -0500</lastBuildDate>
       <category>Software/</category>
       <category>Software Architecture</category>
       <category>Programming Languages</category>
       <category>Vale Programming Language</category>
       <copyright>Copyright 2022 Evan Ovadia</copyright>
-      <atom:link href="http://verdagon.dev/rss.xml" rel="self" type="application/rss+xml" />
+      <atom:link href="http://verdagon.dev/sponsors.xml" rel="self" type="application/rss+xml" />
 
       <!--docs>http://blogs.law.harvard.edu/tech/rss</docs-->
       <language>en-us</language>
-      <pubDate>Mon, 22 Mar 2022 16:15:00 -0400</pubDate>
+      <pubDate>Mon, 21 Mar 2022 16:15:00 -0500</pubDate>
       <webMaster>noreply@verdagon.dev (Evan Ovadia)</webMaster>
       <!--image>
          <url>http://www.feedforall.com/ffalogo48x48.gif</url>
-         <title>FeedForAll Sample Feed</title>
+         <title>FeedForAll Sample Feed (Sponsors' Early Access)</title>
          <link>http://www.feedforall.com/industry-solutions.htm</link>
          <description>FeedForAll Sample Feed</description>
          <width>48</width>
@@ -25,12 +25,42 @@
       </image-->
 
       <item>
+         <guid>https://verdagon.dev/blog/first-100k-lines</guid>
+         <link>https://verdagon.dev/blog/first-100k-lines</link>
+         <pubDate>Sat, 23 July 2022 10:15:00 -0400</pubDate>
+         <category>Programming Languages</category>
+         <category>Vale Programming Language</category>
+         <title>How to Survive Your First 100,000 Lines (Sponsors' Early Access)</title>
+         <author>noreply@verdagon.dev (Evan Ovadia)</author>
+      </item>
+
+      <item>
+         <guid>https://vale.dev/memory-safe</guid>
+         <link>https://vale.dev/memory-safe</link>
+         <pubDate>Sat, 23 July 2022 10:15:00 -0400</pubDate>
+         <category>Programming Languages</category>
+         <category>Vale Programming Language</category>
+         <title>The Most Memory Safe Native Programming Language (Sponsors' Early Access)</title>
+         <author>noreply@verdagon.dev (Evan Ovadia)</author>
+      </item>
+
+      <item>
+         <guid>https://verdagon.dev/blog/zero-cost-memory-safety-regions-part-1-pure-functions</guid>
+         <link>https://verdagon.dev/blog/zero-cost-memory-safety-regions-part-1-pure-functions</link>
+         <pubDate>Sat, 23 July 2022 10:15:00 -0400</pubDate>
+         <category>Programming Languages</category>
+         <category>Vale Programming Language</category>
+         <title>Zero-Cost Memory Safety with Vale Regions, Part 1 (Sponsors' Early Access)</title>
+         <author>noreply@verdagon.dev (Evan Ovadia)</author>
+      </item>
+
+      <item>
          <guid>https://verdagon.dev/blog/perfect-replayability-prototyped</guid>
          <link>https://verdagon.dev/blog/perfect-replayability-prototyped</link>
          <pubDate>Thu, 28 June 2022 10:15:00 -0400</pubDate>
          <category>Programming Languages</category>
          <category>Vale Programming Language</category>
-         <title>Perfect Replayability</title>
+         <title>Perfect Replayability (Sponsors' Early Access)</title>
          <author>noreply@verdagon.dev (Evan Ovadia)</author>
       </item>
 
@@ -40,7 +70,7 @@
          <pubDate>Thu, 21 June 2022 10:15:00 -0400</pubDate>
          <category>Programming Languages</category>
          <category>Vale Programming Language</category>
-         <title>Vale's Fearless FFI, for Safer Dependencies and Supply-Chain Attack Mitigation</title>
+         <title>Vale's Fearless FFI, for Safer Dependencies and Supply-Chain Attack Mitigation (Sponsors' Early Access)</title>
          <author>noreply@verdagon.dev (Evan Ovadia)</author>
       </item>
 
@@ -50,7 +80,7 @@
          <pubDate>Thu, 12 May 2022 12:15:00 -0400</pubDate>
          <category>Programming Languages</category>
          <category>Vale Programming Language</category>
-         <title>Vale 0.2 Released: Higher RAII, Concept Functions, Const Generics, FFI, Modules, Faster Compiles, set Keyword</title>
+         <title>Vale 0.2 Released: Higher RAII, Concept Functions, Const Generics, FFI, Modules, Faster Compiles, set Keyword (Sponsors' Early Access)</title>
          <author>noreply@verdagon.dev (Evan Ovadia)</author>
       </item>
 
@@ -60,7 +90,7 @@
          <pubDate>Wed, 29 Apr 2022 11:15:00 -0400</pubDate>
          <category>Programming Languages</category>
          <category>Vale Programming Language</category>
-         <title>Added to Vale 0.2 Beta: Concept Functions</title>
+         <title>Added to Vale 0.2 Beta: Concept Functions (Sponsors' Early Access)</title>
          <description>Like traits, but way more straightforward!</description>
          <author>noreply@verdagon.dev (Evan Ovadia)</author>
       </item>
@@ -71,7 +101,7 @@
          <pubDate>Wed, 27 Apr 2022 12:15:00 -0400</pubDate>
          <category>Programming Languages</category>
          <category>Vale Programming Language</category>
-         <title>Const Generics and the Compile Time Spread Operator</title>
+         <title>Const Generics and the Compile Time Spread Operator (Sponsors' Early Access)</title>
          <description>A compile-time for-each operator!</description>
          <author>noreply@verdagon.dev (Evan Ovadia)</author>
       </item>
@@ -82,7 +112,7 @@
          <pubDate>Wed, 20 Apr 2022 12:15:00 -0400</pubDate>
          <category>Programming Languages</category>
          <category>Vale Programming Language</category>
-         <title>On Removing Let and Let Mut</title>
+         <title>On Removing Let and Let Mut (Sponsors' Early Access)</title>
          <description>So small a thing, yet such an improvement!</description>
          <author>noreply@verdagon.dev (Evan Ovadia)</author>
       </item>
@@ -93,7 +123,7 @@
          <pubDate>Thu, 4 Apr 2022 12:15:00 -0400</pubDate>
          <category>Programming Languages</category>
          <category>Vale Programming Language</category>
-         <title>A Tale of Yak Shaving: Accidentally Making a Language, for an Engine, for a Game</title>
+         <title>A Tale of Yak Shaving: Accidentally Making a Language, for an Engine, for a Game (Sponsors' Early Access)</title>
          <description>The longest yak-shave in history!</description>
          <author>noreply@verdagon.dev (Evan Ovadia)</author>
       </item>
@@ -104,7 +134,7 @@
          <pubDate>Thu, 31 Mar 2022 16:15:00 -0400</pubDate>
          <category>Programming Languages</category>
          <category>Vale Programming Language</category>
-         <title>Surprising Weak-Ref Implementations: Swift, Obj-C, C++, Rust, and Vale</title>
+         <title>Surprising Weak-Ref Implementations: Swift, Obj-C, C++, Rust, and Vale (Sponsors' Early Access)</title>
          <description>Such shenanigans, right under our noses!</description>
          <author>noreply@verdagon.dev (Evan Ovadia)</author>
       </item>
@@ -115,7 +145,7 @@
          <pubDate>Mon, 22 Mar 2022 16:15:00 -0400</pubDate>
          <category>Programming Languages</category>
          <category>Vale Programming Language</category>
-         <title>Vale's Higher RAII, the pattern that saved me a vital 5 hours in the 7DRL Challenge</title>
+         <title>Vale's Higher RAII, the pattern that saved me a vital 5 hours in the 7DRL Challenge (Sponsors' Early Access)</title>
          <description>How a language can enforce that we call an arbitrary function before destroying an object.</description>
          <author>noreply@verdagon.dev (Evan Ovadia)</author>
       </item>
@@ -126,7 +156,7 @@
          <pubDate>Mon, 21 Mar 2022 16:15:00 -0400</pubDate>
          <category>Programming Languages</category>
          <category>Vale Programming Language</category>
-         <title>Seamless, Fearless, and Structured Concurrency</title>
+         <title>Seamless, Fearless, and Structured Concurrency (Sponsors' Early Access)</title>
          <description>We can combine the best parts of different structured concurrency approaches!</description>
          <author>noreply@verdagon.dev (Evan Ovadia)</author>
       </item>
@@ -138,7 +168,7 @@
          <pubDate>Tue, 5 Jan 2021 12:00:00 -0400</pubDate>
          <category>Programming Languages</category>
          <category>Vale Programming Language</category>
-         <title>Generational References</title>
+         <title>Generational References (Sponsors' Early Access)</title>
          <description>2.3x faster than reference counting, unoptimized!</description>
          <author>noreply@verdagon.dev (Evan Ovadia)</author>
       </item>
@@ -150,7 +180,7 @@
          <pubDate>Sat, 2 Jan 2021 12:00:00 -0400</pubDate>
          <category>Programming Languages</category>
          <category>Vale Programming Language</category>
-         <title>Vale's Hybrid-Generational Memory</title>
+         <title>Vale's Hybrid-Generational Memory (Sponsors' Early Access)</title>
          <description>For speed and simplicity!</description>
          <author>noreply@verdagon.dev (Evan Ovadia)</author>
       </item>
@@ -162,7 +192,7 @@
          <pubDate>Wed, 29 Jul 2020 12:00:00 -0400</pubDate>
          <category>Programming Languages</category>
          <category>Vale Programming Language</category>
-         <title>Zero-Cost References with Regions in Vale</title>
+         <title>Zero-Cost References with Regions in Vale (Sponsors' Early Access)</title>
          <description>Watch regions eliminate reference-counting overhead!</description>
          <author>noreply@verdagon.dev (Evan Ovadia)</author>
       </item>
@@ -173,7 +203,7 @@
          <pubDate>Wed, 15 Jul 2020 12:00:00 -0400</pubDate>
          <category>Programming Languages</category>
          <category>Vale Programming Language</category>
-         <title>The Next Steps for Single Ownership and RAII</title>
+         <title>The Next Steps for Single Ownership and RAII (Sponsors' Early Access)</title>
          <description>How constraint references enable easy safety, speed, and much more powerful RAII!</description>
          <author>noreply@verdagon.dev (Evan Ovadia)</author>
       </item>

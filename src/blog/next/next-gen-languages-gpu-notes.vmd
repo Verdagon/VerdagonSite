@@ -85,3 +85,9 @@ ask andrewrk, ginger bill, athas
 
 whats "heterogenous compute"?
 
+
+
+Take a look at present Chapel language, designed from day one for massive HPC parallelism.
+Generating GPU Kernels from Chapel's Features for Parallelism and Locality
+This talk describes Chapel's recently added support for GPU programming, detailing the programming model and code generation strategy.
+https://chapel-lang.org/presentations/Engin-SIAM-PP22-GPU-static.pdf

@@ -1,0 +1,326 @@
+---
+title: Heisenbugs: The most elusive kind of bug, and how to capture them with Perfect Replayability
+subtitle: Eliminate heisenbugs and endless debugging sessions!
+author: Evan Ovadia
+date: Jun 29, 2022
+realm: blog
+path: blog/perfect-replayability-prototyped
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: us
+---
+
+
+The [Vale 0.2 release](https://vale.dev/) is out, and it includes a prototype for one of Vale's most productive features: perfect replayability.
+
+
+*Perfect replayability* is a language feature where we can execute a program twice, and guarantee that the second run will behave exactly as the first, even in the presence of multithreading. [#mostlangs] [#mtproto]
+
+
+With this feature, we *eliminate all heisenbugs*, so nobody ever has to spend hours trying to reproduce a tricky bug ever again.
+
+
+It also makes our programs *completely deterministic*, which is invaluable for many kinds of networked applications, especially multiplayer games.
+
+
+By using this technique, we were able to finish making [Incendian Falls](https://verdagon.itch.io/incendian-falls) in time and successfully complete the [7DRL challenge](https://7drl.com/).
+
+
+<img src="/images/incendian.png" width="100%"/>
+
+
+*The prototype was just merged in, you can play with this feature today.* [# If you're impressed with our track record and believe in the direction we're heading, please consider [sponsoring us on github](https://github.com/sponsors/ValeLang)! We can't do this without you, and we appreciate all the support you've shown.]
+
+
+# What and Why
+
+One of the biggest challenges in any debugging session is *reproducing the problem.* There are so many uncontrollable factors that affect whether a bug happens:
+
+ * Network latency
+ * Thread scheduling
+ * Time of day
+ * Random number generators
+ * User input
+ * Animation delays
+
+It can be nigh impossible to reproduce certain bugs. These are called "heisenbugs," because they always seem to appear when you aren't looking for them, and then disappear when you try to study them. [# This isn't actually how software bugs work, but it seems like it!]
+
+
+Often, we spend hours (a "hunting trip", as we say in the biz) trying to reproduce it in a debugger, hoping that we hit a certain breakpoint.
+
+
+Then, when it hits, we celebrate! And then we sober up and put our detective hats on. We must *step gingerly* to make sure we don't hit "continue" in the debugger, thus losing our current state.
+
+
+We also can't re-run the program, because it took hours to reproduce the bug even this once.
+
+
+And since we can't re-run the program, we can't add any more printouts! We're stuck, unable to move.
+
+
+At this point, all we can do is inspect the current state of the program, _hoping_ that there's enough information there, _hoping_ that there are enough printouts, _hoping_ that we can identify the root cause.
+
+
+And once we have a fix, we need another hunting trip to reproduce the problem again, to see if our fix worked. However, we never quite know if a successful run was successful because of our fix, or because the heisenbug is hiding again.
+
+
+It would be amazing if instead, we could *perfectly reproduce* these problems, and then add printouts and even refactor our code, without additional hunting trips.
+
+
+Sounds like a fantasy, right? How can this be possible?
+
+
+<slice>
+#mostlangs: This is pretty difficult to achieve in most languages, because they have undefined behavior, `unsafe` operations, and so on. Some languages even expose nondeterminism in their standard library (C#'s string.GetHashCode(), Java's WeakReference) with no way to make them deterministic.
+
+#mtproto: This is just a prototype, and doesn't support multithreading yet. Read below for how we'll make it possible.
+</slice>
+
+
+# Overview
+
+In short, we *eliminate* all undefined behavior, *remove* as many sources of nondeterminism [# Nondeterminism is like unpredictability, it's a source of data that's different every run. For example, a function that returns the current time will be different every run.] as possible, and *record* the rest.
+
+
+Let's start with how we can record inputs!
+
+
+## Recording Inputs
+
+We can start up our program in "recording mode", where Vale records all data that comes in via FFI, for example:
+
+ * Any data coming in from the network.
+ * Any data coming in from a file.
+ * Any timestamps such as from `GetTime`.
+ * Any data coming from standard in.
+
+Any other FFI inputs are also recorded.
+
+
+Then, when we start the program in "replaying mode", whenever the program attempts to call that FFI function, it will instead read from that recording file.
+
+
+## Undefined Behavior
+
+For a language to have perfect replayability, it can't have any undefined behavior.
+
+
+Most languages can't guarantee zero undefined behavior, but we achieved it in Vale. This is because of Vale's complete memory safety [# Because of Vale's [generational references](https://verdagon.dev/blog/generational-references), it can offer memory safety without unsafe escape hatches and without garbage collection.] and its Fearless FFI, which isolates all safe data from unsafe data using the FFI boundary.
+
+
+See [Fearless FFI: Memory Safety, Safer Dependencies, and Supply-Chain Attack Mitigation](https://verdagon.dev/blog/fearless-ffi) for more! [# We might even have a way to offer `unsafe` blocks and still maintain perfect replayability, see our [internal notes](https://github.com/Verdagon/Vale/blob/master/docs/PerfectReplayability.md) if you'd like to know more on this.]
+
+
+## Remove Nondeterminism
+
+There are some sources of nondeterminism we had to carefully avoid, when designing Vale.
+
+
+For example, *casting a pointer to an integer* is nondeterministic in any language, because memory addresses are randomly determined at run-time, because of [Address Space Layout Randomization](https://www.howtogeek.com/278056/what-is-aslr-and-how-does-it-keep-your-computer-secure/). For now, we've removed that kind of casting in Vale. We may add it back sometime in the future, with a promising "deterministic mapping allocator" which compensates for ASLR.
+
+
+Another source of nondeterminism is *uninitialized memory*. For example, when we allocate an array and read it out-of-bounds, it's impossible to know what data it will read. Luckily, Vale's [generational references](https://verdagon.dev/blog/generational-references) guarantee we can't read uninitialized memory.
+
+
+## Handle Multi-threading
+
+Making a program deterministic when there's multi-threading is actually simpler than one might assume. Basically, we:
+
+ * Make a recording file for each OS thread (not each virtual thread, which are already deterministically scheduled).
+ * Record the "message ID" of every message it receives through a channel.
+ * Record the "mutex lock count" of every mutex it opens.
+
+
+If you'd like more details on how that works, see our [internal notes](https://github.com/Verdagon/Vale/blob/master/docs/PerfectReplayability.md), and feel free to swing by the [discord server](https://discord.gg/SNB8yGH) if you have any questions!
+
+
+Note that multi-threading is not fully implemented yet, we mention it to show the direction we're heading.
+
+
+# Resilience
+
+With the above measures, we find an amazing capability emerges: *resilience*.
+
+
+We have "pure resilience", the ability to add pure function calls and printouts to our program, and be able to use the same recording. After all, it calls the same FFI functions in the same order, so why not?
+
+
+We also have some "impure resilience", the ability to be able to refactor our program to a surprising extent, and still be able to use the same recording. If it calls the same FFI functions in the same order, then we can refactor quite a bit!
+
+
+In fact, this resilience is what would separate Vale's perfect replayability from existing technologies like `rr` which just record a single execution, and dont allow modifying the source code.
+
+
+# Perfect Replayability + Random Testing
+
+When making [Incendian Falls](https://verdagon.itch.io/incendian-falls) for the [7DRL challenge](https://7drl.com/), we had to move fast; we had to implement an entire game in only one week.
+
+
+<img src="/images/incendian.png" width="100%"/>
+
+
+We used deterministic replayability [# At the time, we actually used a subset of C#. Since C# doesn't have perfect replayability, it was tricky to figure out what libraries let nondeterminism creep in.] to help us find *five bugs we wouldn't have found otherwise.*
+
+
+To do this, we:
+
+ * Made a primitive invincible AI that would make the player take random actions each turn.
+ * Ran the game thousands of times, overnight.
+
+
+In the morning, we found that a lot of games had crashed. We replayed each one in the debugger, and reproduced the crash instantly.
+
+
+We did this for each run, and root-caused the problems to five bugs.
+
+
+If not for this technique, we might not have finished in time.
+
+
+
+# Perfect Replayability + Lock-Step Simulation
+
+
+A lot of games already require perfect replayability. For example, most real-time strategy games require [deterministic lock-step simulation](https://www.gafferongames.com/post/deterministic_lockstep/) which means:
+
+
+ * Triggering zero undefined behavior.
+ * Recording all inputs (and sharing them with other machines).
+ * Removing all sources of non-determinism.
+
+
+Vale has determinism built into the language itself, so Vale could be an amazing choice for multiplayer games.
+
+
+# Try it out!
+
+You can use replayability today, by passing `--enable_replaying true` to the `valec` invocation.
+
+
+Then, run your program with `--vale_record recording.bin` to record an execution to `recording.bin`.
+
+
+After that, you can run your program again with `--vale_replay recording.bin` to make it run the exact same way. (We recommend running this in a debugger if you want to break on an error.)
+
+
+Note that this is just a prototype. Some things don't work yet, such as passing mutable references over the FFI boundary. Feel free to report any bugs to the GitHub repo!
+
+
+# Limitations
+
+There are a few limitations to this approach.
+
+ * This can only replay Vale code. Because a replay doesn't actually call the FFI functions (it intercepts them and reads from a file instead) we won't reproduce a crash that happens in C code, for example.
+ * Because we don't actually call the FFI functions during a replay, that means we likely won't see some output on the screen. For this, we plan to enable whitelisting:
+    * The user could whitelist functions like `println` so they can see printouts.
+    * The user could whitelist certain libraries that play will with replayability.
+ * There is a slight slowdown, as we serialize all inputs from FFI. For some programs, this is negligible. For programs that communicate a lot with C, the overhead could be significant.
+
+
+Still, for many cases, this is a small price to pay to completely eliminate heisenbugs and weeks-long investigative debugging sessions.
+
+
+# Conclusion
+
+With perfect replayability, we made it so the language itself is not a source of nondeterminism, which allows us to be a lot more productive and spend a lot less time debugging.
+
+
+We described this feature in pretty broad strokes! Those who want to read more on the implementation details are welcome to look at our [internal designs](https://github.com/Verdagon/Vale/blob/master/docs/PerfectReplayability.md) for some more details.
+
+
+In the coming weeks, we'll be writing more about "immutable calling" which helps eliminate memory safety overhead, so subscribe to our [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), or the [r/Vale](https://reddit.com/r/vale) subreddit, and come hang out in the [Vale discord](https://discord.gg/SNB8yGH)!
+
+
+We hope you enjoyed this! And if you believe in the direction we're heading, please consider sponsoring us on github!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>
+
+With your support, we can bring an end to all heisenbugs!
+
+
+- Evan Ovadia
+
+
+<slice new-color="afterword"/>
+
+
+# Vale's Vision
+
+Vale aims to bring a new way of programming into the world that offers *speed*, *safety*, and *ease of use.*
+
+
+*The world needs something like this!* Currently, most programming language work is in:
+
+ * High-overhead languages involving reference counting and tracing garbage collection.
+ * Complex languages (Ada/Spark, Coq, Rust, Haskell, etc.) which impose a higher complexity burden on the average programmer.
+
+These are useful, but there is a *vast field of possibilities* in between, waiting to be explored!
+
+
+Our aim is to explore that space, discover what it has to offer, and make *speed and safety easier than ever before.*
+
+
+In this quest, we've discovered and implemented a lot of new techniques:
+
+ * [Generational Memory](/blog/generational-references), for a language to ensure an object still exists at the time of dereferencing.
+ * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
+ * [Fearless FFI](/blog/fearless-ffi), which allows us to call into C without risk of accidentally corrupting Vale objects.
+ * [Perfect Replayability](/blog/perfect-replayability-prototyped), to record all inputs and replay execution, and completely solve heisenbugs and race bugs.
+
+
+These techniques have also opened up some new emergent possibilities, which we hope to implement:
+
+ * [Region Borrow Checking](/blog/zero-cost-refs-regions), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
+ * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
+ * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
+
+
+We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
+
+ * We can mix an `unsafe` block with Fearless FFI to make a much safer systems programming language!
+ * We can mix Erlang's isolation benefits with functional reactive programming to make much more resilient programs!
+ * We can mix region borrow checking with Pony's `iso` to support shared mutability.
+
+...plus a lot more interesting ideas to explore!
+
+
+The Vale programming language is a novel combination of new innovations and ideas from the research world. Our goal is to publish our techniques, even the ones that couldn't fit in Vale, so that the world as a whole can benefit from our work here, not just those who use Vale.
+
+
+Our medium-term goals:
+
+ * Prototype the Region Borrow Checker in Vale, to show the world that shared mutability can work with borrow checking!
+ * Prototype Hybrid-Generational Memory in Vale, to see how fast and easy we can make single ownership.
+ * Publish the Language Simplicity Manifesto, a collection of principles to keep programming languages' learning curves down.
+ * Publish the Memory Safety Grimoire, a collection of "memory safety building blocks" that languages can potentially use to make new memory models, just like Vale combined generational references and scope tethering.
+
+
+We aim to publish articles biweekly on all of these topics, and create and inspire the next generation of fast, safe, and easy programming languages.
+
+
+If you want to support our work, please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+With enough sponsorship, we can:
+
+ * Work on this full-time.
+ * Turn the Vale Language Project into a 501(c)(3) non-profit organization.
+ * Make Vale into a production-ready language, and push it into the mainstream!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>
+
+

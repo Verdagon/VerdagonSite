@@ -1,0 +1,662 @@
+
+
+
+
+
+
+
+
+
+
+
+
+# Development Velocity
+
+
+Development velocity is, arguably, the _most_ important aspect to optimize for, when choosing a language.
+
+
+This is because often, *development time is the highest cost we pay.*
+
+
+Some napkin math to illustrate:
+
+ * Google used [15.5 terawatt hours](https://www.cnbc.com/2022/04/13/google-data-center-goal-100percent-green-energy-by-2030.html) in 2020, most which went to data centers. We'll conservatively assume rather expensive electricity ([$0.199/kwh for CA](https://www.electricchoice.com/electricity-prices-by-state/)). That [comes out to](https://www.wolframalpha.com/input?i=15.5+twh+*+%240.199+%2F+kwh) $3.085 billion. 
+ * Google has [27,169](https://increditools.com/how-many-software-engineers-does-google-have/) software engineers. Some are higher, but the lowest level's average yearly salary is [$189,721](https://www.levels.fyi/?compare=Google&track=Software%20Engineer). That comes out to $5.154 billion.
+
+In other words, software development is more expensive than power usage.
+
+
+Development velocity is a nebulous concept, but I would say it's *how fast we can expand, modify, and maintain our codebase, while still accomplishing our goals and not causing too much collateral damage.*
+
+
+The "accomplishing our goals" is very important here. Without a clear goal, we can get caught up in making our features perfect. But as anyone who has launched a product can tell you, it's better to have two solid, tested, flexible features instead of one perfect one.
+
+
+The "too much" is also important. There is often a tradeoff between moving fast and keeping things absolutely correct. We must weigh the value of new features against the damage caused by any bugs that might slip into production for a while.
+
+
+With that in mind, let's see how the various approaches do!
+
+
+## GC and Developer Velocity
+
+Garbage collection reigns supreme in developer velocity.
+
+
+One reason for this is that it's *simple.* Garbage collection will decouple your entire program from (often unnecessary) constraints like single ownership, aliasability, or mutability.
+
+
+Generally, *as you add more constraints to a problem, code becomes more complex* as it has to do contortions to work around them. Garbage collection helps keeps those constraints to a minimum, so that you can focus on only your original problem.
+
+
+
+## Reference Counting
+
+RC does have an extra bit of risk: if you're not careful, you can form *reference cycles* and cause some memory to never be reclaimed. Eventually, this could lead to a program running out of memory and crashing.
+
+This isn't a problem for short-lived programs or apps that can trivially be restarted, but longer running programs or servers will need to take care. Luckily, there are patterns to follow to avoid this, tools to prevent it (such as weak references) and tools to detect it.
+
+
+## Borrow Checking
+
+97% of your program is not performance critical. Don't prematurely optimize.
+
+
+### Prototyping and Iterating
+
+The borrow checker can be [slower](https://news.ycombinator.com/item?id=31063493 .anecdote) to [prototype](https://news.ycombinator.com/item?id=32579944) [with](https://news.ycombinator.com/item?id=26419670 .anecdote) when we just want to [solve](https://news.ycombinator.com/item?id=28804477 .anecdote) [the problem](https://news.ycombinator.com/item?id=23744577 .anecdote) rather than being [distracted by the language](https://blogs.dust3d.org/2019/03/13/why-i-rewrote-the-mesh-generator-of-dust3d-from-rust-to-cplusplus/ .anecdote), even for [more](https://lobste.rs/s/veinkw/comparison_rust_zig#c_nmf8jz .anecdote) [experienced](https://news.ycombinator.com/item?id=31568497 .anecdote) [rustaceans](https://www.reddit.com/r/rust/comments/iwij5i/blog_post_why_not_rust/g627nwx/ .anecdote).
+
+
+[One user says,](https://www.reddit.com/r/rust/comments/iwij5i/comment/g62ytxa/?utm_source=share&utm_medium=web2x&context=3 .anecdote) "Rust’s complexity regularly slows things down when you’re working on system design/architecture, and regularly makes things faster when you’re implementing pieces within a solid design (but if it’s not solid, it may just grind you to a total halt)."
+
+
+Once you're done prototyping, it can be [difficult to change your program](https://www.reddit.com/r/rust/comments/iwij5i/blog_post_why_not_rust/g62ytxa/?utm_source=share&utm_medium=web2x&context=3 .anecdote), like [moving through molasses](https://news.ycombinator.com/item?id=16663159 .anecdote). Refactoring can be a [massive pain](https://lobste.rs/s/jgcvev/why_not_rust .anecdote), especially if you [change the way you store some data](https://lobste.rs/s/x22ulj/why_developers_who_use_rust_love_it_so_much#c_yd7dmv .anecdote).
+
+
+[One user says,](https://kevinhoffman.medium.com/to-box-or-not-to-box-my-first-real-rust-refactor-db467119c4c7 .anecdote) "In general I find refactoring to be a far more excruciating process in Rust than in other languages." [# The user continues on to say "It is also far more satisfying." There's nothing quite like the feeling of being done with a refactor, especially when it improves one's code.]
+
+
+[Another user says,](https://news.ycombinator.com/item?id=27458058 .anecdote) "In theory ... it's possible to avoid the escape hatches if you are careful to structure access to your data juuuuust right. That works out fine if you're the only person working on an infrequently-changing program with a small model that you understand very well. If everyone needs to hook into the first two or three function call levels of the main loop, and if your model is anything but small, that doesn't work out anymore. Six weeks into the whole thing and people spend more time un-breaking builds than writing code."
+
+
+<slice />
+
+
+### Leaky Abstractions and API Stability
+
+The borrow checker can slow development velocity in two ways: leaky abstractions and api stability.
+
+
+A *composable* feature is one that can be used seamlessly with other features.
+
+Rust usually does very well in this aspect, like with its `Result` type.
+
+
+However, sometimes the borrow checker conflicts in confusing ways with other features:
+
+ * It causes us to have to know the [gritty details of the async/await compiler transforms](https://news.ycombinator.com/item?id=32121035). Async/await isn't as hard without borrow checking.
+ * ['static lifetimes can be infectious](http://aturon.github.io/tech/2018/04/24/async-borrowing/).
+ * Side effects often require changing the signatures of many indirect callers, by adding a `&mut` or returning a new value.
+ * Sync/Send's infectious nature [can be difficult](https://news.ycombinator.com/item?id=31857710).
+
+
+Some of these mean that the borrow checker can cause *infectious or leaky abstractions:* to use a feature, we sometimes need to refactor our function and many of those who indirectly call us. This can be in conflict with decoupling and encapsulation, principles that are important no matter what paradigm you're using.
+
+
+If we're called by a public API, changing it to accommodate a leaky abstraction can *break API compatibility*. Sometimes, we don't even have that option because we're implementing a third-party trait method. For example, [Future and Stream have fixed interfaces and there is no way to pass extra data through them](https://blog.polybdenum.com/2022/06/25/an-unfortunate-experience-with-rust.html).
+
+
+When this occurs, [one user says](https://discord.com/channels/273534239310479360/818964227783262209/917808318184054784) you can do "one of three things: 1) Refactor into an unrecognizable mess. 2) Add a lot of RwLock or RefCell. 3) Abandon the project. The issue is that to maintain the same interface, it gets to be so hacky that maintence becomes borderline impossible."
+
+
+Sometimes, the constraints we add for memory safety are in conflict with the constraint of API stability, and there's a limit to how many constraints you can add to a problem. [# From [Harry Potter and the Methods of Rationality](https://www.hpmor.com/chapter/56)!]
+
+
+<slice />
+
+
+## Manual Memory Management
+
+not as great on developer velocity, though asan can help.
+
+there are some cool features coming out of there though:
+
+ * An [implicit context system](http://odin-lang.org/docs/overview/#implicit-context-system) where you can use any allocator with any existing function, even if the function wasn't specifically wiring for it, which completely decouples the code from the allocator choice.
+ * [Colorblind async/await](https://kristoff.it/blog/zig-colorblind-async-await/), a concurrency mechanism that doesn't require infectious function coloring.
+ * [Comptime](https://kristoff.it/blog/what-is-zig-comptime/), which does what generics does for other languages with much less complexity. 
+
+
+
+
+
+
+
+
+# Speed
+
+
+incorporate below:
+
+ * Garbage collection is [slower](https://www.codetd.com/en/article/12048271) and has occasional pauses which can be jarring for the user. It also needs much more memory to be as fast as other approaches.
+ * Reference counting generally doesn't have pauses [# Sometimes we can get a pause if we let go of the last reference that's keeping a large hierarchy of objects alive, but that's usually pretty trivial to fix.] but can be even [slower than garbage collection](https://www.codetd.com/en/article/12048271).
+
+
+However, if we absolutely need maximum speed, or don't have enough memory, we have two options: [# Note that low-level languages aren't always faster. GUI apps, CRUD servers, certain kinds of games, and many other use cases will likely run equally slow with any language, because they don't lend themselves well to [cache prefetching](https://en.wikipedia.org/wiki/Cache_prefetching).]
+
+ * Borrow checking, like in Rust.
+ * Manual memory management, like in C, C++, [Zig](https://ziglang.org/), [Odin](http://odin-lang.org/), [C3](http://www.c3-lang.org/), [Beef](https://www.beeflang.org/), etc.
+
+
+
+
+
+
+
+
+# GC might be good enough for some situations [# need better title]
+
+
+GC is slow.
+
+
+The main reason to not use GC is that it's slow _in certain ways_ which might be bad for the given situation.
+
+
+There are actually two ways to measure speed. Let's say that we're running a web server:
+
+ * *Latency*: After receiving the request, how long does the server take to respond?
+ * *Throughput*: How many requests per second can a server respond to?
+
+
+## Poor Latency
+
+
+Occasionally the *garbage collector* must freeze your calculations (for a millisecond, or more, or less) to figure out which memory is still in use, so it can reuse any other memory. This hapepns rarely, but it does mean that a few of your requests can have *poor latency.*
+
+
+Sometimes, a millisecond pause now and then doesn't matter. If you're writing a mobile or web app, your program is generally idle. Then the user clicks something, you'll do a little computation, and then your program is idle again. The GC runs during the idle time, and the user doesn't notice.
+
+
+However, that millisecond pause can be a deal-breaker for other situations:
+
+ * An [HFT](https://en.wikipedia.org/wiki/High-frequency_trading) server might be racing a competing HFT server, and a millisecond pause could make all the difference.
+ * For a 60fps AAA game, a 1 millisecond pause could take an entire 6% of a frame, which could cause a visible stutter.
+
+
+If your situation can handle that pause, GC is likely the best choice.
+
+
+## GC's throughput can be competitive
+
+
+GC might have poor latency, but its throughput isn't too bad, compared to an average C or C++ program that uses [malloc and free](https://en.cppreference.com/w/c/memory/malloc) under the hood.
+
+ * From [this](http://www.cs.umass.edu/~emery/pubs/04-17.pdf): "When space is plentiful, the runtime performance of garbage collection can be competitive with explicit memory management, and can even outperform it by up to 4%."
+ * From [this](http://www.cs.ucsb.edu/~grze/papers/gc/appel87garbage.pdf), When you have enough memory, copying GC becomes faster than explicit free() [# todo: get actual quote]
+
+
+## ...until you start optimizing
+
+However, as soon as you start optimizing (such as replacing that malloc/free usage with [arena allocation](https://en.wikipedia.org/wiki/Region-based_memory_management)), C will likely catch up to and surpass the GC'd program. [# Though sometimes, the JVM optimizer is _incredible_. [This tiny benchmark](https://stackoverflow.com/questions/67211077/java-vs-rust-performance) shows Java performing 1.52-2.36x _faster_ than Rust, somehow. (Rust avg 0.77; Java 0.506 (1.52x), post-warmup .326 (2.36x))]
+
+
+It also varies depending on your use case, and what optimizations you can perform in a given situation.
+
+
+For example, physics engines, graphics engines, and simulations do a lot of simple operations on very large arrays. Our CPUs are specifically engineered to notice when we're iterating over large arrays, and they're able to use [cache pre-fetching](https://en.wikipedia.org/wiki/Cache_prefetching) to bring later elements into the CPU eagerly before they're needed, for a [>2x performance boost](https://www.youtube.com/watch?t=687&v=WnJV6J-taIM). This is easier to achieve with Zig and Rust than it is for garbage collection.
+
+
+However, many use cases aren't easily able to take advantage of cache prefetching. Web servers, apps, [many kinds of games](https://www.reddit.com/r/roguelikedev/comments/i3xekn/ec_vs_ecs_for_roguelikes/), etc. are generally doing more complex operations on less data, and it's difficult to shape their memory access patterns to be more efficient.
+
+
+Key takeaway: If you're just making a mobile or web app, you likely don't need high performance, and don't mind the occasional small pause. GC is perfect for that situation! Otherwise, keep reading!
+
+
+
+## RC
+
+
+As stated above, garbage collection can have poor latency guarantees, but pretty good throughput.
+
+Reference counting is generally the opposite: good latency guarantees, but poor throughput.
+
+
+This is because reference counting doesn't need to periodically stop the world and scan through all live objects, to know which memory can be reused. Instead, it cleans up every object as soon as the last reference is let go. [# Sometimes, you might let go of the last reference that's keeping an entire object hierarchy alive and you can experience a pause, but that's generally an easy problem to fix.]
+
+
+Recently, there's been some pretty amazing strides in reference counting. Lobster uses some pretty amazing [static analysis](https://aardappel.github.io/lobster/memory_management.html) under the hood to eliminate the vast majority of reference count updates, to make it ridiculously fast.
+
+
+
+
+## Cache Stuff
+
+
+
+
+## Cache Locality
+
+
+Let's say we have this Ship and Engine class:
+
+```
+class Ship {
+  int hp;
+  Engine engine; // pointer
+}
+class Engine {
+  int fuel;
+  int temperature;
+}
+```
+
+And we want to print the hp and fuel:
+
+```
+System.out.println(ship.hp);
+System.out.println(ship.engine.fuel);
+```
+
+This can actually be made much faster.
+
+
+When our code reads some data, the CPU will actually ready itself to read any nearby memory in case you ask for it.
+
+
+It does this by bringing that nearby memory (typically 64 bytes) into the *cache.* Reading data that happens to be in the cache is extremely fast, often 10-100x faster than reading all the way from RAM.
+
+
+CPU caching is incredibly complex and powerful, anyone interested should definitely check out [What every programmer should know about memory: Part 2, CPU caches](https://lwn.net/Articles/252125/).
+
+
+In the above snippet, when we said `ship.engine.fuel`, we had to read that `fuel` _all the way from RAM_, because it's not in the cache.
+
+
+Instead, we can *inline* our data:
+
+```
+class MyShip {
+  int hp;
+  int fuel;
+  int temperature;
+}
+```
+
+Now, when we read the `hp`, the CPU will probably also bring `fuel` and `temperature` into the cache, and reading them will be much quicker than reading all the way from the `Engine`.
+
+
+This code is now twice as fast as the original.
+
+
+There are a few languages that make this really easy.
+
+In Go, we can use \[explain here\].
+
+In C#, we can make Engine a struct. \[Explain more\].
+
+In manually managed memory languages, objects do this by default.
+
+
+
+## Borrow checking is Fast
+
+
+## MMM is Faster
+
+Memory safety is never free:
+
+ * Garbage collection has tracing costs.
+ * Reference counting has increment/decrement costs.
+ * Borrow checking forces us into workarounds that involve bounds checking and hashing costs.
+
+
+And a lot of the fastest patterns can only be done in non-memory-safe ways.
+
+
+Some examples:
+
+ * In TigerBeetleDB, PUT STUFF HERE
+ * In the Cone compiler, it's faster for each Call AST node to have a direct pointer to the callee function, instead of doing a potentially expensive hash lookup.
+ * In an AVL tree, each node needs a pointer to its parent.
+
+
+
+
+# Simplicity
+
+simplicity: how much inherent complexity does it solve, how much does it surface, and how much artificial complexity does it introduce.
+
+## GC
+
+GC is simple.
+
+## RC
+
+RC is simple.
+
+## BC
+
+
+
+## Unsupported Simple, Useful, Safe Patterns
+
+
+The borrow checker is a very effective static analysis mechanism, but it still tends to be incompatible with a lot of simple, useful, and safe patterns:
+
+ * [Graphs](https://news.ycombinator.com/item?id=24996001); it generally only thrives with a strict tree hierarchy of data.
+ * It has a lot of trouble with [observers](https://www.reddit.com/r/rust/comments/pwqju6/is_there_an_underlying_reason_that_idiomatic_rust/) and any [callback-based](https://news.ycombinator.com/item?id=12029238) code.
+ * [Back-references](https://users.rust-lang.org/t/back-reference-to-the-parent-struct/7413/2); [you cannot get from a child to a parent](https://news.ycombinator.com/item?id=29470640).
+ * [Dependency references](https://en.wikipedia.org/wiki/Dependency_injection), such as to a retrying network requester.
+ * [Intrusive data structures](https://lwn.net/Articles/907876/).
+ * Many forms of RAII [# RAII is about automatically affecting the world outside our object. To do that, the borrow checker often requires us to take a `&mut` parameter or return a value, but we can't change `drop`'s signature. To see this in action, try to make a handle that automatically removes something from a central collection.] plus [higher RAII](https://verdagon.dev/blog/higher-raii-7drl).
+ * Delegates, like in iOS GUI widgets.
+
+...and so on. All of these are generally impossible within the rules of borrow checker.
+
+
+If the best architecture for the situation calls for any of these patterns, you'll need to consider other options because the borrow checker can't guarantee that these are memory safe. [# look at this more: wishy washy, too long, too much to fit in head]
+
+
+Fortunately, there are useful workarounds like `Rc`, `RefCell`, etc. to accommodate the limitations of the borrow checker in a safe way.
+
+
+However, the community largely says that these are a [last](https://www.reddit.com/r/rust/comments/pyrz1u/comment/hewbadj/?utm_source=reddit&utm_medium=web2x&context=3 .anecdote) [resort](https://www.reddit.com/r/rust/comments/rjjmir/comment/hpax7hu/?utm_source=reddit&utm_medium=web2x&context=3 .anecdote), [avoided](https://news.ycombinator.com/item?id=32411275 .anecdote), and should be [refactored out whenever possible](https://news.ycombinator.com/item?id=27274055 .anecdote). `Rc` also requires a heap, which your use case might not have. For now, we'll talk about working within the borrow checker as much as possible, and further below we'll talk about the benefits and costs of these other tools.
+
+
+<slice />
+
+## Architectures and Artificial Complexity
+
+
+The borrow checker can [come at a complexity cost](https://www.reddit.com/r/rust/comments/rs86g9/comment/hqlg71b/?utm_source=reddit&utm_medium=web2x&context=3). [# See [betamos' comment](https://www.reddit.com/r/rust/comments/rs86g9/comment/hqlg71b/?utm_source=reddit&utm_medium=web2x&context=3) specifically.]
+
+
+Sometimes, the borrow checker is just surfacing a situation's inherent complexity so we can deal with it at compile-time. However, sometimes it causes artificial complexity when there's no way to express to a borrow checker that something is indeed safe. Keep an eye out for when [really simple situations in other languages become these intensely painful situations](https://news.ycombinator.com/item?id=16660188 .anecdote) with the borrow checker.
+
+
+The borrow checker will often naturally guide you towards a separation between data and code, akin to a relational database or an ECS pattern. Sometimes that's good; ECS games fit the borrow checker well. However, if your program is [better served by other architectures](https://www.reddit.com/r/roguelikedev/comments/i3xekn/ec_vs_ecs_for_roguelikes/) [and not ECS](https://www.reddit.com/comments/ene9mm/comment/fe0t9ij?context=3), then following the borrow checker *might be incurring artificial complexity.*
+
+
+<slice />
+
+## Feels like a Puzzle
+
+
+Working with the borrow checker can feel like [solving puzzles](https://news.ycombinator.com/item?id=26938245), which can be good or bad.
+
+
+[One user says](https://news.ycombinator.com/item?id=29470640), "You can paint yourself into a corner with data structures. ... Make a mistake and rework is difficult. Data structure design is a puzzle-solving problem."
+
+
+[Another user says](https://www.reddit.com/comments/qzbd05/comment/hlloxad?context=3), "One of the hurdles is the intellectual burden and fatigue I get from Rust. It's ironically one of the reasons I love Rust, yet I do find it to impact my stamina and drive to do personal work in Rust."
+
+
+For some people, [this puzzle solving can be fun and exciting](https://zserge.com/posts/better-c-benchmark/), and has a feeling of satisfaction like [intellectual heroin](https://news.ycombinator.com/item?id=25799704).
+
+
+I've personally felt this; when I have the energy and I'm not on a deadline, it's quite a rush to get the borrow checker to like a design, but when I'm on a deadline the puzzle can be stressful.
+
+
+<slice />
+
+## Learning Curve
+
+
+Rust is [hard to learn](https://news.ycombinator.com/item?id=26794281), and I have personally witnessed experienced, smart, and talented people struggle with Rust. Its core concepts are simple, but [learning how to use them is difficult](https://news.ycombinator.com/item?id=27959122). Rust throws [all its complexity at you at once](https://www.reddit.com/r/rust/comments/i9sor7/frustrated_its_not_you_its_rust/g1ilbv0/), and [you have to wrap your head around all of them to some degree to be able to progress](https://news.ycombinator.com/item?id=26794916). [#progressive]
+
+
+It's tempting to dismiss the learning curve as unimportant. However, there's a reason people don't use formal proof systems for everything to improve their programs' correctness: we don't want to have to learn [Hoare Logic and Separation Logic just to write a basic data structure](https://coq.discourse.group/t/verify-a-intrusive-linked-list-is-memory-safe-with-coq/1585).
+
+
+Obviously, *there is a balance,* and it's not unreasonable for some people to say that the borrow checker's difficult learning curve isn't worth its benefits for their situation.
+
+
+<slice>
+#progressive: Newer languages are learning from this and applying the principle of [progressive disclosure](https://www.nngroup.com/articles/progressive-disclosure/), which enables a user to accomplish their goals without having to become a master and learn the more arcane and obscure parts of a language.
+</slice>
+
+
+## Using RefCell, Rc, etc.
+
+Some of these problems can be worked around with `Rc` or `Arc`.
+
+
+However, the prevailing advice is that `Rc<RefCell<T>>` is a [last](https://www.reddit.com/r/rust/comments/pyrz1u/comment/hewbadj/?utm_source=reddit&utm_medium=web2x&context=3 .anecdote) [resort](https://www.reddit.com/r/rust/comments/rjjmir/comment/hpax7hu/?utm_source=reddit&utm_medium=web2x&context=3 .anecdote), [avoided](https://news.ycombinator.com/item?id=32411275), and should be [refactored out whenever possible](https://news.ycombinator.com/item?id=27274055 .anecdote).
+
+
+This is because Rc has some pretty major downsides, depending on the situation.
+
+ * A lot of systems programming situations don't even have a heap, so they can't use Rc.
+ * It makes it harder to estimate how much memory we're using, because `Rc` can sometimes keep memory alive longer than we originally intend.
+ * `RefCell` can cause a panic or run-time error if not used with discipline.
+ * We lose the benefit of having a single owner (more on this below).
+ * It forces allocations onto the heap. Heap usage, even when just a plain `Box` or `malloc`/`free` can increase a program's run time by [as much as 25%](https://www.researchgate.net/profile/Benjamin-Zorn/publication/2626581_Improving_the_Cache_Locality_of_Memory_Allocation/links/56bbd28c08ae3f9793155449/Improving-the-Cache-Locality-of-Memory-Allocation.pdf?origin=publication_detail).
+ * Since these allocations are on the heap, we no longer get cache locality benefits, which can slow our program down even further.
+ * My test program (a terrain generator) [showed](https://verdagon.dev/blog/generational-references) that even single-threaded reference counting can add an additional 25.29% overhead compared to regular `malloc`/`free` usage.
+ * `Arc` is even more expensive. Atomic reference counted languages (such as Swift) can run [4.2x slower](https://thenewstack.io/which-programming-languages-use-the-least-electricity/) (in other words, they add 320% run time). Sometimes, a [heap allocation is actually faster](https://morestina.net/blog/784/exploring-lock-free-rust-3-crossbeam#Results).
+
+
+So `Rc<RefCell<T>>` might not be a great solution to one's problems. There are pretty hefty tradeoffs involved.
+
+
+Of course, the performance overhead is only if we use them all over the place. [One user says](https://news.ycombinator.com/item?id=27268301) that it's "something I've seen a lot with people coming from GC languages getting into Rust: they just write the code the way they're used to and work around the borrow checker by slapping Arc/Mutex all over the place. Then that leads to frustration and wondering why you even got rid of the GC in the first place if you end up with a crappier non-transparent reference-counted garbage collection with all these Arc/Rc."
+
+
+[It can be difficult finding the right idiom for the problem at hand](https://www.reddit.com/r/rust/comments/lg0a7b/comment/gmpnjwh/?utm_source=reddit&utm_medium=web2x&context=3), but with enough discipline and practice, *one can learn a balance* between `Rc<RefCell<T>>` and pure borrow checking that works for them. One can also learn when just `Rc<T>` or just `RefCell<T>` will suffice.
+
+
+The biggest remaining downside using Rc with an object is that it *loses it's single owner.* Having a single owner is a major boon in a lot of cases:
+
+ * It lets us detect when we're accessing something after its "logical" life has ended.
+ * It enables RAII, which automatically calls something at the end of the parent object's life or at the end of the current block.
+ * It enables [Higher RAII](https://verdagon.dev/blog/higher-raii-7drl), which generally enforces we never forget to call a function we need to call.
+
+
+The big takeaway here is that one can't always just reach for `Rc` when the borrow checker gets difficult, and it's not accurate to think that `Rc` is a catch-all solution for the borrow checker's problems. There are a lot of downsides that one has to be aware of.
+
+
+## Using Unsafe
+
+One can use `unsafe` to get around some of the above problems.
+
+
+In fact, sometimes it's unavoidable: embedded programs will _need_ unsafe to interface with other parts of the system. It's not uncommon to have a large swath of the program be `unsafe`.
+
+
+However, just because unsafe code is labeled by `unsafe` doesn't make the rest of the program safe. Often, `unsafe` code can cause crashes and undefined behavior to occur in safe code.
+
+
+It's sometimes said that Rust allows us to build safe APIs around unsafe code. This doesn't necessarily mean that the code is inherently safer though; bugs in safe code can often trigger mysterious behavior in the underlying `unsafe` code.
+
+
+In other words, `unsafe` is invisible and pervasive, similar to `null` in other languages. When one uses `unsafe`, or any libraries that use `unsafe`, they have to acknowledge that they're undermining the safety of the rest of the system.
+
+
+Because of this and other reasons, the community generally [discourages](https://news.ycombinator.com/item?id=32906707) and frowns upon [using unsafe in any library](https://news.ycombinator.com/item?id=32961573). It makes sense; if `unsafe` was allowed everywhere, it would undermine Rust's reputation for safety.
+
+
+In reality, memory unsafety can be totally fine, such as for single-player games or if we have good sandboxing (we'll cover this more below).
+
+However, it might not be wise when writing anything that handles sensitive data or is safety-critical, unless one can properly measure the risk and potential damage for any instance of undefined behavior.
+
+
+
+## MMM
+
+MMM has zero artificial complexity. but it doesnt solve or surface any inherent complexity.
+
+
+
+
+
+# Correctness
+
+ackn how its weird that this has anything to do with memory management. however, the borrow checker helps with it, so its worth talking about.
+
+
+
+## MMM
+
+MMM offers the least assistance in guaranteeing correctness.
+
+However, you can still write correct programs with MMM. you just need to approach it the right way.
+
+
+There is something to be said for correctness in manually managed languages, because they build on less complexity.
+
+If you allocate all your memory up-front, use an arena allocator for all temporary calculations, and treat all unions as value types, you don't have to worry about all of the complexities that come with heap allocation (architectural complexities like borrow checking, or the performance complexities from garbage collection)
+
+
+(mention odins implicit context, zigs allocator support, zigs lack of a built in allocator)
+
+
+
+
+
+
+
+
+ * The borrow checker can increase the *risk of errors*. Often, instead of having a reference like in a GC'd language, the borrow checker will force us to use an index or an ID instead. If we try to "dereference" the ID of an object that doesn't exist, we often get a run-time error (whether that be an Err or a panic) that we have to handle somehow. [# Compare this to a language like [Pony](https://www.ponylang.io/) which is specifically designed to minimize run-time errors.]
+
+
+## Protection from Data Races
+
+
+A [data race](https://en.wikipedia.org/wiki/Race_condition#Data_race) is a particular kind of [race condition](https://en.wikipedia.org/wiki/Race_condition) where one thread is accessing a piece of data at the same time another thread is writing to it.
+
+
+Nobody can predict what happens in that case. The behavior could change every time you run your program. It's one of the most frustrating bugs to track down and fix.
+
+
+garbage collected languages help with this. check out [Clojure, Pony, Erlang, or Dart](https://sites.google.com/a/athaydes.com/renato-athaydes/posts/fearlessconcurrencyhowclojurerustponyerlanganddartletyouachievethat), which all have different methods of preventing data races. [# And perhaps even [Ada](https://news.ycombinator.com/item?id=23601022)!] Go almost eliminates this as well with [message passing](https://minacoder.com/index.php/2022/02/20/channel-in-golang-message-passing-technique/), though it doesn't guarantee it like the other languages.
+
+The borrow checker protects against this by making sure that only one thread has access to a particular piece of data at any given time.
+
+
+
+MMM doesn't help with this, though there are certain architectures and ways of doing things that can reduce the odds.
+
+
+
+<slice />
+
+
+## More Functional Patterns
+
+If someone else might have a reference to a piece of data, you can't modify it. Instead, you often find yourself producing some new data instead, that you can use in your future calculations.
+
+
+This is a tendency common to [functional programming](https://en.wikipedia.org/wiki/Functional_programming) languages like Haskell and OCaml.
+
+
+This can be quite beneficial: you'll never be surprised by some data changing when you have a reference to it, or as [Manish put it](https://manishearth.github.io/blog/2015/05/17/the-problem-with-shared-mutability/), single-threaded race conditions.
+
+
+! If you'd like to obtain this benefit without using a borrow checker, then follow the principle of [unidirectional data flow](https://www.droidcon.com/2022/05/04/rethinking-user-actions-to-shape-a-better-unidirectional-data-flow/) when designing your program.
+
+
+
+## Top-Down Architectures
+
+This is my favorite benefit of the borrow checker: it influences us into a *top-down architecture*, which can help us maintain assumptions in our programs.
+
+
+In short, a top-down architecture is where you can organize your program's functions into a tree (or a directed acyclic graph), such that a parent can call a child, but a child cannot call a parent.
+
+
+This is a very subtle but powerful effect for your program. Explaining it would take an entire three articles on its own, but check out this [video by Brian Will](https://www.youtube.com/watch?v=QM1iUe6IofM) where he talks about the benefits of procedural code and some of the dangers of misusing object-oriented patterns.
+
+
+! If you'd like this benefit without using a borrow checker, try functional reactive programming frameworks like React, or functional programming languages like Haskell or OCaml. Or, if in an object oriented situation, look for any function that bubbles an event upward and make sure it does _nothing else._
+
+
+## "It Just Works"
+
+
+It is sometimes said that when using the borrow checker, your program will "just work" and there will be a lot less logic errors at run-time. 
+
+
+~~I think this is largely true. I think it's because of the above three factors, plus strong static typing, and a lack of null.~~
+
+
+talk about how this is true of pony, FP, and rust.
+
+
+! If you'd like this benefit without using a borrow checker, try a language like Pony [# Pony basically [cannot crash](https://tutorial.ponylang.io/expressions/errors.html) because every error is tracked by the type system and there is no such thing as panicking.] or any language with [linear types](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/linear_types.html) or [higher RAII](https://verdagon.dev/blog/higher-raii-7drl).
+
+
+
+
+
+
+
+
+
+
+# Conclusion
+
+As we saw, memory safety has some benefits:
+
+ * Helps with security, if handling untrusted input and not sandboxed.
+ * Helps with privacy, if handling multiple users' data.
+ * Protects users, if writing a safety-critical program.
+ * Helps detect some errors at compile-time rather than run-time.
+
+However, garbage collection has its drawbacks:
+
+ * Tracing can be cache-unfriendly and slow in some situations.
+ * Reference counting can be cache-unfriendly and even slower.
+ * It can cause pauses at unpredictable times.
+
+Even borrow checking can have some costs in certain situations:
+
+ * Many simple, useful, and safe patterns are impossible or difficult.
+ * It can cause unstable APIs or widespread refactors.
+ * It can make iterating and prototyping much slower.
+ * It can influence us to architectures that don't fit our use case.
+ * It can feel like a puzzle, which can be fun or frustrating.
+ * The learning curve can be prohibitively high.
+
+But borrow checking has some pretty interesting benefits:
+
+ * Top-down architectures
+ * More functional patterns
+ * Data race freedom
+ * "It just works!"
+
+There are ways to make non-memory-safe languages safe enough for plenty of situations:
+
+ * More resilient patterns
+ * Tooling like address sanitizer, valgrind, etc.
+ * Sandboxing
+
+And non-memory-safe languages have some interesting benefits too:
+
+ * An [implicit context system](http://odin-lang.org/docs/overview/#implicit-context-system).
+ * [Colorblind async/await](https://kristoff.it/blog/zig-colorblind-async-await/).
+ * [Comptime](https://kristoff.it/blog/what-is-zig-comptime/) for simpler generics.
+
+
+It really depends on the situation. For example:
+
+ * If you're writing pacemaker software, *use a memory safe language.* [# In fact, you should probably go further and use model checkers and TLA+ to be truly certain that the program is correct.]
+ * If you're writing something like a single-player game, *other languages can work well too.* If another language has other benefits more suited to your situation, then go for it, it's not hurting anyone.
+
+
+When deciding which language to use, here's what I recommend:
+
+ * Ask those languages' communities about what benefits they bring to your situation.
+ * If someone speaks in generalities, see if their advice applies to your situation.
+ * If someone thinks their language is perfect, try asking someone with more experience.
+
+
+If you're ever unsure, come by our [discord server](https://discord.gg/SNB8yGH)! [# Don't worry, we won't just recommend using Vale for everything!]
+
+
+Thank you for reading! I hope that this post has given you a broader perspective on the tradeoffs involved in using memory safety.
+
+
+
+. [# need a sentence saying that if you can afford these, go with them, your life will be a lot easier]
+

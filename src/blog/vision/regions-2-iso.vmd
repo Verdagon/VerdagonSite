@@ -2,7 +2,7 @@
 title: Zero-Cost Memory Safety with Vale Regions, Part 2
 subtitle: Watch how we split our memory into regions, for more performance!
 author: Evan Ovadia
-date: Apr 29, 2022
+date: Draft
 realm: blog
 path: blog/zero-cost-memory-safety-regions-part-1-pure-functions
 layout: annotated

@@ -1,5 +1,5 @@
 ---
-title: Language Simplicity Manifesto
+title: Language Complexity: What it is, When it's Good, and How to Do it Right
 author: Evan Ovadia
 date: Feb 15, 2022
 realm: blog
@@ -8,6 +8,223 @@ layout: annotated
 namespace: c-blog m-annotated
 sponsor: me
 ---
+
+
+
+Tomorrow's languages need to be simpler than the ones we have today. That might sound obvious.
+
+
+It's actually harder than you'd think because *the way we think about complexity in today's languages is mostly wrong.*
+
+
+Most people think that: [#riddles]
+
+ * Python is as simple as a language can be.
+ * C++ keeps getting more and more complex as time goes on.
+ * Rust is complex because it has to be.
+
+
+All of these statements are mostly incorrect. By the end of this article, you'll see why.
+
+
+This article aims to answer the fundamental questions of complexity: what even _is_ complexity, when is it good or bad, and what makes a language "too complex"? 
+
+
+<slice>
+#riddles: Notes to self:
+
+"Python is simple as a language can be": wrong because it doesnt surface the inherent complexity of types, and so doesnt reduce that complexity for the user
+
+"C++ keeps getting more and more complex as time goes on": wrong because foreach loops actually reduce complexity even though the language gets more complex.
+
+"Rust is complex because it has to be": wrong because it's situational complexity. it's way more complex in web servers.
+</slice>
+
+
+# Complexity Is Relative
+
+In 2014, our team centralized our app's state into a central StateManager V2 which worked similarly to today's Redux.
+
+"The old solution is too complex! The new solution is simple." we said. We replaced it, bugs decreased, and life was better.
+
+
+In 2017, new members joined the team, and proposed a new StateManager V3.
+
+"The old solution is too complex! This proposal is simple." they said. So they replaced it, and bugs decreased even further, and life was even better.
+
+
+Of course, V2 was not "too complex". It only became too complex once we had a simpler alternative.
+
+
+The same is true with languages. *When we say something is simple or too complex, it is relative.*
+
+
+
+# Complexity Is Situational
+
+Some language's complexities seem to arise in certain situations and not others. Functional programming is stellar when transforming data, but in cases with a lot of state, we need to bring in more complex concepts such as monads. We might call this **situational complexity.**
+
+
+Everything below here should be taken in context. If it's a general purpose language, then measure it against general purposes. If it's a domain specific language, measure it against the specific domain.
+
+
+
+
+
+# Inherent Complexity
+
+Python is often regarded as a simple language, because it doesn't have static typing.
+
+
+However, even though the compiler doesn't track types, we often still need do that in our heads. The types exist conceptually, even if the compiler doesn't know about them at compile-time. We humans still need to track types manually. This seems to be **inherent complexity**, complexity that is there even if the language does not track it.
+
+
+need example
+
+mention it's situational
+
+
+# Artificial Complexity
+
+
+need another example
+
+mention its situational again
+
+
+
+# Complexity is irrelevant, minimize burden
+
+The only thing that matters is how much the user has to think about.
+
+Typescript adds a complex feature, static typing, to help manage the inherent complexity of types.
+
+It's a more complex situation all around!
+
+However, it makes programming easier for the user, and that's what's important.
+
+
+*We shouldn't minimize complexity, we should minimize burden.*
+
+
+Other examples:
+
+ * Vale's regions, Pony's `iso`, and Rust's borrow checker were all added to help protect the user from the inherent complexity in multithreading. We need to think less because of it.
+ * In some domains, Rust's borrow checker adds complexity, but reduces the programmer's burden of optimizing their code.
+
+
+
+The challenge is that they often come hand in hand. For example:
+
+ * some examples of complexity that pisses me off
+
+
+So what kinds of complexity help burden, and what kinds of complexity reduce burden? Read on!
+
+
+
+# Opt-in Complexity
+
+In C#, one can write an entire program without knowing about the `struct` keyword. But if one wants more performance, they can opt-into more complexity. Perhaps this **opt-in complexity** is a good thing?
+
+
+Other examples:
+
+ * 
+
+
+# Ignorable Complexity
+
+
+In Vale's design, one can write an entire program with just the base building blocks: owning references and non-owning references. If one wants to go the extra mile for more performance, they can use inline objects, regions, allocators, and override gen-checks with an operator. However, these don't change the semantics of the program, just the performance characteristics. A new user can successfully ignore these details and know what the program is doing. This **ignorable complexity** seems pretty good. (Note: These features aren't all done, but useful for discussion.)
+
+
+Counterexample: C++?
+
+
+# Remediable Complexity
+
+
+In Java, a foreach loop uses an iterator under the hood.
+
+
+# Emergent Complexity
+
+
+In Rust, the borrow checker is based around one central principle, aliasability-xor-mutability (we can have one mutable reference xor many shared references to an object). This simple rule creates a lot of complexity for real-world programming, and makes us use patterns we might not naturally have opted for. Is the borrow checker simple or complex? Or perhaps both: fundamentally simple, but with high **emergent complexity**.
+
+
+# Up-Front Complexity
+
+Also in Rust, the borrow checker's complexity hits the programmer all at once when learning the language. This is **up-front complexity**, compared to the more gradual complexity of e.g. C#.
+
+
+# Compounding Complexity
+
+Also in Rust, the borrow checker can clash with other aspects of the language, such as async/await. Two simple features can cause **compounding complexity.**
+
+
+The opposite of this is "composable" complexity.
+
+
+# Composable Complexity
+
+Most languages have complex sub-languages to express generics (e.g. `<T extends IShip>` etc). However, Zig was able to combine one feature (comptime) with another feature (static typing) to be able to add generics with no complex sub-language. Their features **aligned to reduce complexity** compared to other languages, assuming they would have added generics anyway (which is uncertain but beside the point).
+
+
+# A Proper Abstraction
+
+Proper abstraction will surface inherent complexity, 
+
+
+# How to handle complexity
+
+
+To make a language great, one should help with the situation's inherent complexity, and not cause artificial complexity. If it's complexity inherent to programming itself, make a general purpose language. If it's inherent to a specific domain, make a domain-specific language.
+
+Now, let's add some complexity to help with inherent complexity.
+
+Firstly, check if it's up-front complexity. Make it ignorable complexity if possible, or opt-in complexity.
+
+Now, ensure it fits with the rest of the language. Avoid compounding complexity. Prefer composable complexity, try to find a way to make it fit better with the rest of the language.
+
+
+
+# Conclusion
+
+Of course, these are lofty ideals, but in real language design we need to add complexity to offer the power our users want. Language design is an art in balancing complexities and the powers they enable in the best way possible.
+
+I'd love to hear your opinions! What do you think complexity is? What are some great examples of languages handling complexity well?
+
+
+
+
+
+# NOTES
+
+Incorporate feedback and comments from https://www.reddit.com/r/ProgrammingLanguages/comments/vtph4p/what_is_language_complexity_when_is_it_good_and/
+
+
+
+Adding complexity help manage inherent complexity to reduce burden.
+This would be better if we didnt use "complexity" for both the added complexity and the stuff already inherent.
+
+
+
+If you don't consider undefined behavior, C is a big step forward. By adding more features (becoming more complex) it makes software simpler. By taking away irrelevant redundant details, we can focus on what makes one piece of code actually different from another.
+
+By adding some language complexity, we've reduced the user's complexity.
+
+C is a good abstraction.
+
+And fundamentally, that's what a programming language is all about: offering the proper abstractions.
+
+Language design is about balancing abstractions and restrictions to give the user the most power with the least complexity.
+
+
+
+
+
 
 
 ## Abstract

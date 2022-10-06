@@ -1,0 +1,162 @@
+---
+title: Language Simplicity: C++, Rust, Go, and Vale
+author: Evan Ovadia
+date: Jun 28, 2022
+realm: blog
+path: blog/thoughts-language-complexity
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: me
+---
+
+
+The biggest tradeoffs in language design are around *complexity.*
+
+
+This article will talk about the complexity in five languages: C++, Rust, C#, and Vale.
+
+
+By looking at these, an underlying pattern emerges, which we'll talk about at the end.
+
+
+# C++: Features != Complexity
+
+C++ is well known as one of the most complex languages. Its learning curve is steep, and seemingly never ends.
+
+However, with a lot of the features they're adding, they're actually making the language simpler in practice.
+
+For example, before C++11 introduced foreach loops, we had to write for-loops like this:
+
+```c++
+for (std::vector<Spaceship>::iterator i = ships.begin(), end = ships.end(); i != end; i++) {
+   auto& ship = *i;
+   ...
+}
+```
+
+Since C++, this is how we write foreach loops:
+
+```c++
+for (auto& ship : ships) {
+   ...
+}
+```
+
+Key takeaway: *Adding a feature can make a language simpler to use.*
+
+
+# Rust: Inherent vs Artificial Complexity
+
+The borrow checker is notoriously difficult, and has a high learning curve. Despite being based on a simple rule (aliasability xor mutability), using the borrow checker can be very complex.
+
+
+Some of Rust's complexity is because it makes sure one thread can't read memory while another thread might write to it, a principle called "aliasability xor mutability".
+
+
+This complexity is *inherent complexity* in a multi-threaded programs, because it would need to deal with this complexity anyway in any language. The borrow checker just helps surface it, and give us some rules for more sane designs.
+
+
+Rust enforces this rule even in single-threaded programs, because it happens to also be a nice method for ensuring memory safety. However, it's much more complex than garbage collection. One can say that, compared to garbage collection, Rust causes *artificial complexity* in single threaded programs.
+
+
+! There's some extra tradeoffs and nuance here. [# The borrow checker can also prevent some bugs (similar to functional programming) such as iterator invalidation. On the other hand, the borrow checker prevents many useful safe patterns such as observers, delegates, many kinds of RAII, graphs, backreferences, dependency injection, etc. The workarounds can sometimes introduce even more complexity, ironically.] Rust can be a great choice for a lot of use cases. The point here is that we should know whether some complexity is inherent or artificial.
+
+
+A language *should* surface inherent complexity. This can save time, because it forces the programmer to deal with it, and often gives the programmer tools to help with it.
+
+
+However, a language *shouldn't* cause artificial complexity. This will waste a programmer's time.
+
+
+Another example is static typing: it feels more complex, but it's surfacing a lot of inherent complexity, which is often a good thing.
+
+
+Key takeaways:
+
+ * Inherent complexity is complexity that's fundamental to the problem.
+ * Artificial complexity is when we're forced to care about details that don't matter.
+ * A language should strive to surface inherent complexity, and not cause artificial complexity.
+
+
+# C#: Zero-cost Complexity
+
+In C#, you can make an entire program without ever using the `struct` keyword. The `struct` keyword can make a program faster, when used well. However, using it can be complex; one must be more careful when using them, and obey certain rules.
+
+
+Most people don't need `struct`. These people don't pay the complexity cost.
+
+
+Some people do need that extra performance. They can choose to use it, and pay the complexity cost.
+
+
+`struct` is an example of *zero-cost complexity,* in that you don't pay for it if you don't use it.
+
+
+The opposite is *pervasive complexity,* complexity that's forced on you even if you don't benefit from its tradeoff.
+
+
+Zero-cost complexity is much better than pervasive complexity.
+
+
+# Async/Await vs Goroutines
+
+Async/await 
+
+
+Artificial complexity 
+
+
+Key takeaway: 
+
+
+# C#: Opt-in Complexity
+
+
+
+
+
+
+When we don't keep an eye on complexity, we end up with steep learning curves.
+
+
+
+
+Two kinds of complexity: inherent complexity and artificial complexity.
+
+
+> Can you explain the advantage of tethering over traditional reference counting? It would seem like RC counts can be elided in similar circumstances, if you can track the lifetime/identity of the referring object - I guess the primary difference is that tethering forces you to bind the object to a statically-known (stack-based) lifetime
+
+
+There are some similarities:
+
+ * When we make a new local pointing to an object:
+    * RC will increment the target's RC
+    * HGM will:
+       * Compare the generations.
+       * If generations don't match, panic (or produce NULL).
+       * Save the object's old isScopeTethered bit (in a hidden local var on stack).
+       * Write 1 to the object's isScopeTethered bit.
+ * When that local goes out of scope:
+    * RC will:
+       * Decrement the target's RC
+       * Compare target's RC to zero.
+       * If RC is zero, call the object's destructor.
+    * HGM will restore the object's old isScopeTethered bit.
+
+
+But there are several big advantages to HGM, all which come from this one fact: in HGM (and regular generational memory too), the compiler *determines exactly where we deallocate an object, so we can reuse its memory when we want.*
+
+
+This benefit manifests in various ways:
+
+ * We can put objects on the stack, because we can destroy them when the function call ends.
+ * We can embed objects in other objects, because we can destroy them when we need to swap them out for other contents there.
+ * We can embed objects in an array (rather than the Java-style array-of-references).
+ * We can embed objects into slabs of memory for custom allocators, because we know we can destroy them when we destroy the allocator.
+
+
+All of this is good because we can make our programs cache-friendly by controlling our objects' memory layout, which is often the bottleneck for modern programs.
+
+
+There's another benefit regarding arrays: we decided that when an array is tethered, we cannot add or remove elements (`.push()` and `.pop()` will assert there's no scope tether). This means that, while we have a scope tether to an array, our static analysis can know that its elements will remain alive, which means we can eliminate more generation checks.
+

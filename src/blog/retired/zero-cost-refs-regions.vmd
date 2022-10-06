@@ -75,7 +75,7 @@ Now let's look at the overhead of the remaining 5%. Reference counting has what 
 
 ## Cycles
 
-The first weakness of RC is that it can form cycles, causing memory leaks. Vale doesn't have this problem because every object has one owning reference, which controls when the object is deallocated.
+The first weakness of RC is that it can form cycles, causing memory leaks. In practice, Vale doesn't have this problem because every object has one owning reference, which controls when the object is deallocated. [# One can make an ownership cycle in theory, but it never actually happens in practice. As any C++ programmer can attest, it's almost impossible to accidentally get a `unique_ptr` cycle.]
 
 For the difference between owning, constraint, and weak references, see [The Next Steps for Single Ownership and RAII](/blog/raii-next-steps).
 

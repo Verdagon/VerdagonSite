@@ -1,0 +1,34 @@
+
+
+
+If this sounds unusual, it can help to imagine a basic zero-overhead memory-safe language that:
+
+ * Statically pre-allocates all memory up-front.
+ * Only ever reuses memory for the same type.
+ * Only uses arena allocation for temporary calculations.
+ * Uses value semantics (like [C# structs](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/struct)), pointers to static memory, and iso data for return values
+
+shared mutability isn't actually inherently memory unsafe. vec and index show us that.
+
+why i dont like rust
+you spend too much time working around arbitrary restrictions
+theyre useful, no doubt, but they dont line up with reality at all.
+
+ill explain. what is memory unsafety?
+its aliasability xor mutability
+its use after free
+its use after reuse of a different type
+its use after reuse of a different shape. there are only two types: pointer and non pointer.
+its really just reinterpreting a non pointer as a pointer
+
+you can imagine a completely mem safe language with no speed overhead and no borrow checker, watch this.
+lets say your program has four structs: ship, missile, engine, radar. heres what you do.
+make an array of ship
+make an array of engine
+make an array of radar
+make an array of missile.
+each slot in this array starts out empty. whenever you want a new ship, find an empty slot, mark it as in use, and use it.
+suddenly, youre memory safe. if you use a pointer after you "free" it, you still get something of the right shape.
+what about enums/variants inside it? make them value types, like structs in C# or Copy in rust
+if you add a region checker on top of that, you can even save a lot of space.
+

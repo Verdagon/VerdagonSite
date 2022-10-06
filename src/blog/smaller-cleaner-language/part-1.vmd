@@ -1,0 +1,74 @@
+
+
+
+"Within Rust, there is a much smaller and cleaner language struggling to get out", Part 1
+
+in this series, youll see:
+- the borrow checker is actually a collection of 5 different features.
+- the borrow checker is not how rust gets most of its memory safety.
+- the borrow checker can be deconstructed, reassembled, and blended with other techniques
+
+there is an entire class of languages that will be explored, created, and theorized in the next several years
+
+part 1: talk about how the borrow checker has a few favored workarounds: cloning and arrays. these are a hint, that the borrow checker, or the universe, or something, is trying to tell us something.
+
+half of our references become indices, and half stay references. this tells us something. _the borrow checker is not a universally useful construct._
+
+the borrow checker does not directly give us memory safety... the story is more nuanced than that.
+
+part 2: look at the insight that if we dereference a dangling index, we're fine. UAF is not the enemy. honestly, we already kind of knew that. its really use after reuse thats the enemy. this tells us its really use after reuse of a different type. [# actually, different ptr vs nonptr.]
+
+part 3: a lot of our programs end up as something similar to a relational database or an ECS system. then if we just access everything by index, we are borrow checker compliant, and no RC costs.
+
+part 4: IN FACT we can forget the bounds checking and just use pointers. also, its faster than just a heap, just use a free list. this is Va. in coming articles, we'll talk about how to reduce its space overhead, enable inline data, use a stack, and add fearless concurrency.
+
+
+
+
+
+
+
+
+Every language chasing both memory safety and speed will need to become more complex as time goes on, because there are always specialized tricks that one can use to get safety and speed in certain specific situations. We invent them all the time. This is why we see such an explosion of techniques in Rust like slotmap and generational indices, GhostCell+QCell, static RC, and so on.
+
+Complexity is inevitable, when one is pursuing memory safety and speed. The real trick in that space is knowing how to do it without sacrificing simplicity. I think the main way to do that is via something I call opt-in complexity, or progressive disclosure. There are three tenets of this:
+- Keep the core language simple. You should be able to learn the core tools, and be able to express any program with just those.
+- You can opt-in to any of the more complex features. C# does this well with its struct keyword.
+- As a bonus: make it so that you can read a program, ignore those syntactical adjustments, and still know what's going on in the program. For example, the register keyword in C from decades ago: if you ignore it, you can still understand what the function does.
+
+
+
+
+
+
+
+
+va is a language that is mainly based on type stability. heap alloc and dealloc is insanely fast, just a load, load, store.
+
+its actually a lot faster than rust because it needs no artificial bounds checking like rust does.
+
+then it uses arena allocation for its temporary data, either reusing the calling frames arena or more often just making its own. add in some values types, maybe sprinkle some mutable value semantics like in val, and youre gold.
+
+you can even do compaction on it, using an algorithm that finds two pages that have no overlap, merges them, and makes both virtual pages point to them.
+
+what about leaks? add single ownership.
+
+what does rust really get you? well, it lets you have a mutable pointer to enums. it also has some concurrency advantages i guess? but you need a lot of cloning and bounds checking and heap allocation.
+
+someone can make a language that does this. compared to this, you look at rust and youre like  what is this? this is a huge fractal of complexity for such little benefit. and you save some memory
+
+the funniest thing about all this is that even rust is trying to tell us this. anyone who's used rust a lot can tell you, the borrow checker influences you toward a bunch of arrays at the top level of your program, and youll use a lot of indices or IDs into them.
+
+add something like pony's iso if you want to move things between threads
+
+its like this is the simpler, easier language inside rust thats struggling to come out.
+
+game developers have been doing something like this for decades, too.
+
+rust blew its entire complexity budget and more on something thats just... not that much better.
+
+(fun fact, if you make each of these arrays a slotmap, then you get generational memory, and vale)
+
+the borrow checker is this huge obstacle we put in our own way to selectively freeze parts of our program to enforce that nobody changes it. sometimes that's great but its ridiculous in a lot of situations and not the best tool. its a way to make a local piece of code impose a decree on the rest of the program that spreads
+
+

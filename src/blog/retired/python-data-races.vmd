@@ -9,6 +9,9 @@ namespace: c-blog m-annotated
 sponsor: me
 ---
 
+! Note: I wrote this article with an unusual (and partially incorrect) definition of data race. To get the most out of this article, one could interpret "data race" as "race condition". The greater theme of this article is unchanged: that a language (such as Javascript or most flavors of Python) cannot avoid concurrency problems by making everything single-threaded under the hood. Happy reading!
+
+
 I recently wrote an article on [how a language can improve on Rust's and Pony's concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), and one of my readers asked:
 
 

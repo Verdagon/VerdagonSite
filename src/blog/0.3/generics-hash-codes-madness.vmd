@@ -1,0 +1,158 @@
+---
+title: Hash Codes, Non-Determinism, and Krakens
+author: Evan Ovadia
+date: Sep 25, 2022
+realm: blog
+path: blog/generics-hash-codes-madness
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+Until recent events, I've firmly believed the most terrifying thing known to mankind is the kraken.
+
+
+The kraken is a colossal eldritch sea horror which resembles a giant squid. It's known to crush entire ships.
+
+
+<<<<
+If someone says they aren't scared of krakens, they've obviously never met one. They say that 60% of all ships lost at sea fell victim to krakens, probably. [# I probably didn't make this up. I uh, saw it on reddit somewhere, yeah.]
+////
+<img src="/images/kraken.jpg" width="100%"/>
+>>>>
+
+
+However, something else has started appearing in my kraken nightmares: hash codes. Not all hash codes, but a specific kind of hash code that's more insidious than colossal eldritch sea horrors.
+
+
+After hours of debugging, I've discovered a terrifying underlying truth of our world, and the reason why krakens and hash codes would appear in the same nightmare.
+
+
+This is my tale.
+
+
+# A Worthy Goal
+
+
+For the last several months, I've been working on Vale's support for [regions](https://verdagon.dev/blog/zero-cost-refs-regions), which involves adding a sort of "opt-in borrow checker" to the language. Since it's opt-in and not [upwardly infectious](https://www.reddit.com/r/ProgrammingLanguages/comments/vofiyv/thoughts_on_infectious_systems_asyncawait_and_pure/), it should pair well with our [generational references](https://verdagon.dev/blog/generational-references) to give us speed and safety while still keeping the language easy to use. As someone who grew up with C++ and Rust, this makes me _very_ excited.
+
+
+This meant adding more functionality to our type system and function resolution, and transitioning from [templates](https://www.tutorialspoint.com/cplusplus/cpp_templates.htm) to full [generics](https://learn.microsoft.com/en-us/dotnet/csharp/programming-guide/generics/differences-between-cpp-templates-and-csharp-generics). [# This is because part of regions involves monomorphizing any read-only region into both an immutable and mutable region.]
+
+
+A couple weeks before finishing the generics transition, I encountered something unusual. After fixing one of our tests (code-named "delirious blue" for obscure reasons), and then fixing another test, delirious blue started failing again.
+
+
+I ran it again, with the debugger running, and it passed.
+
+
+_Oh no. No no no no no no._
+
+
+I ran it again, and it failed. Then passed. Then passed. Failed. Passed, failed, failed, passed, failed, failed.
+
+
+_No!_
+
+
+I knew, in that moment, that *non-determinism* had crept into the compiler somehow.
+
+
+# Non-Determinism
+
+
+Every time you run a program, it's supposed to do the same thing. Programs are predictable.  If you run `echo hello` five times in a row, it's supposed to be *deterministic*; it's supposed to show the same thing every time. 
+
+
+```
+$ echo hello
+hello
+$ echo hello
+hello
+$ echo hello
+hello
+$ echo hello
+hello
+$ echo hello
+olleh [# One time it actually printed "is he gone yet oh shoot uh hello", it was legitimately the scariest thing I'd ever seen, next to that time I saw a 2 in a binary file.]
+```
+
+
+When a program isn't predictable, the very underpinnings of our world fall apart. Debugging becomes difficult, birds fall from the sky, and our most precious illusions fade away and leave us in an uncertain, lovecraftian world filled with terrors.
+
+
+This is *non-determinism*. It's when a function or program gives unexpectedly different results even when we give it the same inputs.
+
+
+# The Investigation
+
+
+Every time I ran the compiler, I got a different result. It's like it would randomly decide which functions to compile first, so I couldn't reliably reproduce the problem I was trying to solve. I spent _hours_ on this, with no luck.
+
+
+"Something's non-deterministic! It's driving me insane!" I said to the server.
+
+
+"But how? Isn't the frontend written in Scala? The JVM is deterministic." someone said.
+
+
+"It should be deterministic," I said, "it's garbage collected after all..."
+
+
+Then I remembered the winter of '19. It was the [7 Day Roguelike Challenge](https://7drl.com/), when developers worldwide spend 7 days each making a roguelike game. It was day five, we'd already lost half of our comrades to bugs, and everyone was in their final days.
+
+
+I had fired up my program for the fifteenth time that day, but things were suddenly acting weird: when I ran the same program with the same inputs, I got different behavior every time. This was a problem, because it was a game where the user could save, reload, and [travel back in time](https://verdagon.itch.io/incendian-falls), expecting things to behave the same way as they did last time. Mastering these techniques was very important for defeating the final boss, a Kraken.
+
+
+After spending most of the day diving and debugging, I'd figured out that it was because I was using strings in a new place, and C#'s `string.GetHashCode()` returns [something different every run](https://andrewlock.net/why-is-string-gethashcode-different-each-time-i-run-my-program-in-net-core/).
+
+
+Needless to say, non-determinism and I have _a history._
+
+
+"But that can't happen in Scala..." I mused to myself, "it always provides a pretty sane default hashCode implementation."
+
+
+"I think there's a couple classes that just return the object's address." someone said.
+
+
+"That's impossible!" I said. "The JVM can't return an address because it literally _moves_ objects around during compaction!"
+
+
+# The Culprit
+
+
+It turns out, they were right. Whereas Scala's `Vector`, `List`, etc. will all calculate their hash codes based on their elements, Scala's `Array` doesn't. It inherits the `hashCode` function from `java.util.Object` which **just returns the address of the object.**
+
+
+And then, to make sure it returns the same hash code for the entire duration of the program, the JVM literally [remembers the object's original address](https://stackoverflow.com/questions/16445094/is-javas-hashcode-deterministic). How crazy is that?
+
+
+So I had four options, in order of preference:
+
+ 1. Make sure to never observe the ordering of a hash map's elements, such as by calling `HashMap.head` or `HashMap.iterator`.
+ 2. Stop using `Array` altogether, and use Scala's `Vector` instead.
+
+
+I have some religious objections to the first option, so I went with the second for now.
+
+
+Suddenly, the compiler was deterministic again. I breathed a sigh of relief. Bullet dodged!
+
+
+# Retrospect
+
+
+I firmly believe that non-determinism is the *bane of humanity.* It's nearly impossible to determine where a program's non-determinism comes from.
+
+
+I was extremely lucky that I'd faced this problem before, and that someone in my server knew that you could actually observe an object's address in the JVM.
+
+
+Luckily, there's hope on the horizon. At some point, we'll be able to rewrite the Vale compiler in Vale itself, and Vale's [perfect replayability](https://verdagon.dev/blog/perfect-replayability-prototyped) feature guarantees that we can perfectly reproduce any bug we find.
+
+
+Until then, looks like we shouldn't use Scala's `Array` class!
+
+

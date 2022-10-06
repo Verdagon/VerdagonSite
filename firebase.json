@@ -13,6 +13,16 @@
         "type": 302
       },
       {
+        "source": "/blog/next-decade-languages-gpu",
+        "destination": "/blog/next-gen-languages-gpu",
+        "type": 302
+      },
+      {
+        "source": "/blog/next-fearless-ffi",
+        "destination": "/blog/next-gen-languages-gpu",
+        "type": 302
+      },
+      {
         "regex": "/guide/(.+)",
         "destination": "https://vale.dev/guide/:1",
         "type": 302

@@ -9,7 +9,7 @@ namespace: c-blog m-annotated
 sponsor: us
 ---
 
-We're going to commit a cardinal sin today and talk about *syntax design!* [# It's such a travesty to be talking about something as mundane as _syntax_ during the week we're prototyping [deterministic replayability](https://github.com/ValeLang/Vale/blob/master/docs/DeterministicReplayability.md)!]
+We're going to commit a cardinal sin today and talk about *syntax design!* [# It's such a travesty to be talking about something as mundane as _syntax_ during the week we're prototyping [deterministic replayability](https://github.com/ValeLang/Vale/blob/master/docs/PerfectReplayability.md)!]
 
 
 <div><img src="/images/bikeshed.jpg" width="100%" style="opacity: .8"/><center><span style="opacity: .8"><a href="https://en.wikipedia.org/wiki/Law_of_triviality">(Also, while we have you here, what color should we paint this shed?)</a></span></center></div>
@@ -21,14 +21,15 @@ There are three main alternatives for variable declaration:
     * Javascript's `let x = 4` vs. `const x = 4`
     * Rust's `let x = 4` vs. `let mut x = 4`
     * Java's `int x = 4` vs. `final int x = 4`
+    * Swift's `let x = 4` vs. `var x = 4`
  * Not specifying whether the variable can change, such as:
-    * Swift's `let x = 4`
+    * Old Javascript's `var x = 4`
     * Go's `x := 4` (though it's not really a keyword per se)
- * Leaving it off completely, such as:
+ * Leaving off keywords completely, such as:
     * Python's `x = 4`
 
 
-The previous version of [Vale](https://vale.dev/) used the second option, `let` and `let mut`. [# Vale is a language that aims to be fast and memory-safe, while still being easy to learn. This syntax change helps with that!]
+The previous version of [Vale](https://vale.dev/) used the first option, `let` and `let mut`. [# Vale is a language that aims to be fast and memory-safe, while still being easy to learn. This syntax change helps with that!]
 
 However, it recently changed to a fourth option, which was so nice that it became the default behavior in version 0.2.
 
@@ -257,15 +258,15 @@ With your help, we can write nonsense like this more often!
 
 <slice new-color="afterword"/>
 
-# About the Vale Language Project
+# Vale's Vision
 
-The Vale Language Project is not just about making Vale, it's also about *exploring, discovering, and publishing* new programming language mechanisms that enable *speed*, *safety*, and *ease of use.*
+Vale aims to bring a new way of programming into the world that offers *speed*, *safety*, and *ease of use.*
 
 
-*The world needs more exploration here!* Currently, most programming language research is in:
+*The world needs something like this!* Currently, most programming language work is in:
 
  * High-overhead languages involving reference counting and tracing garbage collection.
- * Complex languages (Ada/Spark, Coq, Rust, Haskell, etc.) which impose a higher complexity burden on the average programmer.
+ * Complex languages (Ada/Spark, Coq, Rust, Haskell, etc.) which impose higher complexity burden and mental overhead on the programmer.
 
 These are useful, but there is a *vast field of possibilities* in between, waiting to be explored!
 
@@ -273,20 +274,20 @@ These are useful, but there is a *vast field of possibilities* in between, waiti
 Our aim is to explore that space, discover what it has to offer, and make *speed and safety easier than ever before.*
 
 
-In this quest, we've discovered a lot of new techniques:
+In this quest, we've discovered and implemented a lot of new techniques:
+
+ * [Generational Memory](/blog/generational-references), for a language to ensure an object still exists at the time of dereferencing.
+ * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
+ * [Fearless FFI](/blog/fearless-ffi), which allows us to call into C without risk of accidentally corrupting Vale objects.
+ * [Perfect Replayability](/blog/perfect-replayability-prototyped), to record all inputs and replay execution, and completely solve heisenbugs and race bugs.
+
+
+These techniques have also opened up some new emergent possibilities, which we hope to implement:
 
  * [Region Borrow Checking](/blog/zero-cost-refs-regions), which adds mutable aliasing support to a Rust-like borrow checker.
- * [Generational Memory](/blog/generational-references), for a language to ensure an object still exists at the time of dereferencing.
  * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
-
-
-These techniques have also opened up some new emergent possibilities:
-
  * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
  * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
- * [Fearless FFI](/blog/fearless#safe-externs), which allows us to call into C without risk of accidentally corrupting Vale objects.
- * Deterministic replayability, to record all inputs and replay execution. Goodbye races and heisenbugs!
- * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
 
 
 We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
@@ -298,18 +299,18 @@ We also gain a lot of inspiration from other languages, and are finding new ways
 ...plus a lot more interesting ideas to explore!
 
 
-The Vale programming language is only one combination of the features we've found. Our goal is to publish all the techniques we've found, even the ones that couldn't fit in Vale, so that other languages can make strides in this area.
+The Vale programming language is a novel combination of ideas from the research world and original innovations. Our goal is to publish our techniques, even the ones that couldn't fit in Vale, so that the world as a whole can benefit from our work here, not just those who use Vale.
 
 
 Our medium-term goals:
 
+ * Finish the Region Borrow Checker, to show the world that shared mutability can work with borrow checking!
+ * Prototype Hybrid-Generational Memory in Vale, to see how fast and easy we can make single ownership.
  * Publish the Language Simplicity Manifesto, a collection of principles to keep programming languages' learning curves down.
  * Publish the Memory Safety Grimoire, a collection of "memory safety building blocks" that languages can potentially use to make new memory models, just like Vale combined generational references and scope tethering.
- * Prototype the Region Borrow Checker in Vale, to show the world that shared mutability can work with borrow checking!
- * Prototype Hybrid-Generational Memory in Vale, to see how fast and easy we can make single ownership.
 
 
-We aim to publish articles biweekly on all of these topics, and inspire the next generation of fast, safe, and easy programming languages.
+We aim to publish articles biweekly on all of these topics, and create and inspire the next generation of fast, safe, and easy programming languages.
 
 
 If you want to support our work, please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
@@ -328,3 +329,4 @@ With enough sponsorship, we can:
      Sponsor us on GitHub!
   </a>
 </center>
+

@@ -30,6 +30,24 @@ b {
 .date {
 }
 
+/*.anecdote:after {
+  content: "";
+  width: 12px;
+  height: 12px;
+  display: inline-block;
+  background-color: #2a6496;
+  background-size: 12px 12px;
+  margin-left: 3px;
+  margin-bottom: -1px;
+  opacity: .45;
+}*/
+
+.anecdote {
+  text-decoration: underline;
+  margin-left: 2px;
+  margin-right: 2px;
+}
+
 .external-link {
 	padding-right: 20px;
 	background-image: url('./images/external-link.png');
@@ -201,6 +219,13 @@ h5 {
 }
 
 .callout {
+  margin: 0 0 8px 0;
+  background-color: #FFFFE0;
+  padding: 8px;
+  border: 1px solid #FFE0A0;
+}
+
+.attention {
   margin: 0 0 8px 0;
   background-color: #FFF0E0;
   padding: 8px;

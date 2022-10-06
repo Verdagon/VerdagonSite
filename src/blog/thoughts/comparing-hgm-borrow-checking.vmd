@@ -1,0 +1,90 @@
+(Pulled from the HGM article)
+
+
+# Afterword: How might it compare to Rust?
+
+Vale is a high-level language with zero `unsafe`, so an apples-to-apples comparison would be with a Rust where the only `unsafe` is in the standard library.
+
+Memory safety is never free, except for the most trivial of programs. Cyclone, Rust, ATS, Fortran, and every other language incurs _some_ overhead to ensure safety. This usually comes in the form of branching, cache misses, and extra memory usage, see [Beyond Rust: Innovations in Safety, Speed, and Flexibility](/blog/beyond-rust-innovations) for more.
+
+<slice />
+
+
+## Speed
+
+Rust programs uses borrow references where they can. Where the borrow checker gets in their way, they incur costs:
+
+ * From `RefCell`:
+    * Branching, to check if someone else has locked it.
+    * Possible cache missing, if the lock bit isn't in the same cache line as the object or we don't dereference the object at all.
+ * From `Rc`:
+    * Incrementing and decrementing costs,
+    * Branching, to check if the counter is zero.
+    * Possible cache missing if the counter isn't in the same cache line.
+    * Possible cache missing if we never dereference the object's members.
+ * From generational indices:
+    * Bounds checking, to make sure the index is in bounds,
+    * Reallocation when we need to add more objects, [# This is often amortized, but often not, if a generational array is temporary.]
+    * Branching, to check the generation matches.
+    * Possible cache missing, if the generation isn't in the same cache line as the object.
+
+<slice/>
+
+
+Hybrid-generational memory also has some speed costs, depending on how it's using a particular reference:
+
+ * From generational references:
+    * Branching, to check the generation matches.
+    * Possible cache missing, if the generation isn't in the same cache line as the object.
+ * From scope tethering:
+    * Cost of loading the generation and setting the tethered bit, [# Setting the tethered bit is generally free because loading the generation brought the tethered bit into the cache.]
+    * Possible cache missing if the bit and generation aren't in the same cache line as the object.
+
+
+Note that not all Rust code uses `Rc` or `RefCell` or generational indices. Sometimes, a piece of code's requirements are such that they can use `Cell` (which is free) or just `Vec`s (which still have bounds checking).
+
+<slice/>
+
+
+## Memory
+
+The borrow checker tends to force Rust code to overuse `Vec`s (even when `Vec`s iteration benefits don't apply [# Iterating over `Vec`s is very fast, if the Vec is large enough for the CPU to pre-fetch the next elements from the cache, which happens after ~50 elements.]), which incur rather massive memory costs; a `Vec` will use up to 2x as much memory as the _most elements the Vec has ever had_.
+
+Hybrid-generational memory doesn't rely on expanding arrays. However, the generational stack does keep ten stacks, each which contains the maximum amount of memory it's ever had.
+
+`RefCell`, and generational indices use 8b per object, and `Rc` uses 16. Hybrid-generational memory uses 8b per object. Though once again, it should be noted that not all Rust code uses `Rc` or `RefCell` or generational indices.
+
+
+<slice/>
+
+
+## Immutability, Arenas, Pools
+
+Rust has its borrow checker and Vale has its [region borrow checker](/blog/zero-cost-refs-regions). Both allow the language to know when something's immutable, to optimize away redundant loads. Additionally, Vale lets us specify structs and interfaces as deeply immutable, which does the same thing without any borrow checking.
+
+Rust's borrow checker often forces us to use `Vec`s, and Vale's regions allow us to use pool or arena allocation. Both enable incredibly fast allocation. Vale's regions can apply it to any type, whereas in Rust we need to specifically add and keep track of every `Vec`, and some Rust allocations can't be put into `Vec`s. [# For example, `Rc`d objects are put on the heap.]
+
+Regions make hybrid-generational memory even faster, because inside a pool or arena region, an object doesn't need a generation at all.
+
+Rust's borrow checker is more difficult [# Rust's borrow checker enforces mutability xor aliasability, while Vale's region borrow checker doesn't need that restriction.]. Rust also forces the user to use the borrow checker uniformly across the entire program, whereas Vale's region borrow checking is opt-in.
+
+In the end, this could mean:
+
+ * Vale programs could be faster, because it takes so little effort to use pool and arena regions.
+ * Rust programs could be faster, because a Vale programmer will stop once they get it working, whereas Rust doesn't allow the program to work until it is also fast.
+ * They could be the same; a Vale program could take half the time to write, giving extra time for optimizing the hot path with regions, equalling the Rust program in the end.
+
+
+<slice/>
+
+
+## Conclusion
+
+Hybrid-generational memory looks very promising, and could have Rust-like speed, while being much easier to learn and use.
+
+Of course, this is all just theories until we see some benchmarking. Unfortunately, it's impossible to get a meaningful benchmark yet, firstly because hybrid-generational memory isn't implemented yet, and because Rust has ten years of unrelated optimizations that would confound a meaningful comparison.
+
+Once we implement hybrid-generational memory fully, we'll benchmark it against Rust, and then optimize until it catches up.
+
+Time will tell how hybrid-generational memory compares with the borrow checker!
+
