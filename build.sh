@@ -73,10 +73,10 @@ if [ $TARGET == "comparing-hgm-traditional-reference-counting" ] || [ $TARGET ==
   fi
 fi
 
-if [ $TARGET == "when-to-use-memory-safe-languages" ] || [ $TARGET == "all" ] ; then
-  echo "Doing when-to-use-memory-safe-languages"
-  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/when-to-use-memory-safe-languages src/blog/thoughts/when-to-use-memory-safe-languages.vmd
-  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/when-to-use-memory-safe-languages src/blog/thoughts/when-to-use-memory-safe-languages.vmd
+if [ $TARGET == "when-to-use-memory-safe-part-1" ] || [ $TARGET == "all" ] ; then
+  echo "Doing when-to-use-memory-safe-part-1"
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/when-to-use-memory-safe-part-1 src/blog/memory-safe-languages/when-to-use-memory-safe-part-1.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/when-to-use-memory-safe-part-1 src/blog/memory-safe-languages/when-to-use-memory-safe-part-1.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
