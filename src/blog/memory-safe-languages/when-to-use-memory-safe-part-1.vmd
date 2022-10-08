@@ -50,7 +50,7 @@ There are generally four approaches to memory safety:
 There's also a fifth approach, [generational references](https://verdagon.dev/blog/generational-references). We'll talk more about that elsewhere, this series is comparing the more traditional approaches.
 
 
-Note that this is only Part 1, where we talk about the memory safety aspect of MMM languages. Subscribe to my [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), or [subreddit](https://reddit.com/r/vale) to keep an eye out for the rest!
+Note that this is only Part 1, where we talk about the memory safety aspect of MMM languages. Subscribe to the [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), or [subreddit](https://reddit.com/r/vale) to keep an eye out for the rest!
 
 
 # The Tradeoffs
@@ -62,7 +62,7 @@ Memory safety approaches generally influence six aspects of a language:
  * *Speed*: How fast does the code run?
  * *Memory*: How much memory does it consume?
  * *Simplicity*: Is your code simpler or more complex than with other approaches?
- * *Correctness*: Is the language more vulnerable to certain kinds of bugs?
+ * *Correctness*: Is the language more vulnerable to other kinds of bugs?
 
 
 Different situations will prioritize these aspects differently, and will call for different languages.
@@ -75,7 +75,7 @@ Let's dive into the first one!
 
 To what extent does each approach help with memory safety?
 
-Gauging this is a surprisingly nuanced topic. It's not a black-and-white thing, approaches can be anywhere on the memory safety spectrum.
+This is a surprisingly nuanced topic. It's not a black-and-white thing, approaches can be anywhere on the memory safety spectrum.
 
 
  1. Manual memory management (MMM) has no built-in memory safety protection.
@@ -118,30 +118,7 @@ There is, of course, a much better and safer way to use MMM languages.
 But before that, let's be a little more specific: what _is_ memory safety, really?
 
 
-## Memory safety isn't what you might think \[variant 1\]
-
-Like said above, memory safety is the prevention of common memory access bugs such as buffer overflows and use-after-free.
-
- * A *buffer overflow* is when we attempt to access the nth element of an array, when n is actually past the end of the array. We end up accessing some other memory, and hijinks ensue.
-
- * A *use-after-free* is when we dereference a pointer after we `free` it. This might result in undefined behavior ("UB"), a segmentation fault, or _mysterious shenanigans._
-
-
-However, this understanding doesn't cover everything. Let's improve it a bit so we can more accurately judge the various approaches.
-
-There's also *use-after-return*, where we dereference a pointer to an object that already went [out of scope](https://stackoverflow.com/questions/13888268/what-happens-when-a-variable-goes-out-of-scope).
-
-In fact, use-after-free and use-after-return are so similar, that we might think of them both as "use after release": we've used them after we've released them back to the system. [# "The system" meaning the allocator, language, or operating system.]
-
-
-But sometimes, accessing the wrong data won't trigger undefined behavior, if the data there is still the type that we expect. [# Even this understanding isn't quite accurate. Memory unsafety can't occur if the memory is reused for a _different struct type with the same layout_. If we want to be even more accurate, we'd say that memory unsafety can only occur if we interpret a non-pointer as a pointer.]
-
-So really, the goal of memory safety is to *access data that is the type we expect.*
-
-This more accurate definition opens the door to a lot more useful, efficient, and safe approaches, as we'll see below.
-
-
-## Memory safety isn't what you might think \[variant 2\]
+## Memory safety isn't what you might think
 
 Memory safety prevents common memory access bugs, including:
 
@@ -153,17 +130,17 @@ Memory safety prevents common memory access bugs, including:
 These all have one thing in common: they risk accessing the wrong data, triggering [undefined behavior](https://en.wikipedia.org/wiki/Undefined_behavior) ("UB") which can result in cantankerous shenanigans like security vulnerabilities, segmentation faults, or random nearby data changing. [# Undefined behavior has also been known to cause computers to grow AIs and become sentient and hostile, probably.]
 
 
-But sometimes, accessing the wrong data won't trigger undefined behavior, if the data there is still the type that we expect. [# Even this understanding isn't quite accurate. Memory unsafety can't occur if the memory is reused for a _different struct type with the same layout_. If we want to be even more accurate, we'd say that memory unsafety can only occur if we interpret a non-pointer as a pointer.]
+But sometimes, accessing the wrong data won't trigger undefined behavior, if the data there is still the type that we expect. [# Even this understanding isn't quite accurate. UB can't occur if the memory is reused for a _different struct type with the same layout_. If we want to be even more accurate, we'd say that memory unsafety can only occur if we interpret a non-pointer as a pointer.]
 
 So really, the goal of memory safety is to *access data that is the type we expect.*
 
 This more accurate definition opens the door to a lot more useful, efficient, and safe approaches, as we'll see below.
 
 
-\[end variants\]
+## And sometimes, it doesn't completely solve the problem
 
+Note that sometimes, we can trade a memory safety bug for another kind of bug.
 
-Note that we trade some memory safety bugs for other kinds of bugs.
 
 For example, if we `free`'d a `ResponseHandler` but never unregistered it, the `NetworkManager` might still have a pointer to it when the response comes, triggering a use-after-free.
 
@@ -171,6 +148,7 @@ The outcome might be different in another paradigm:
 
  * In GC, we'd still act on the response, resulting in mysterious behavior on the client. We might also cause a [memory leak](https://www.baeldung.com/java-memory-leaks), despite having GC. [# This is why [Higher RAII](https://verdagon.dev/blog/higher-raii-7drl) is so nice, as it helps us remember to unregister handlers like this.]
  * In a borrow checked approach, we might look up the handler by index from a central array, but something else has reused that slot, so we give the response to the wrong handler, resulting in odd behavior. [# The proper solution to this is to use something like a SlotMap or HashMap that trades some performance for more intelligent reuse of space. In that case, we'd get an `Option`, and we can either panic, ignore it, or bubble it upward.]
+
 
 These are technically logic bugs, better than undefined behavior, but our work is not done. We still need good engineering discipline, testing, and proper data handling practices no matter what approach we use.
 
@@ -191,10 +169,10 @@ There are some basic guidelines to follow:
  * Always use bounds checking.
 
 
-This is how a lot of embedded, safety-critical, and real-time software works, including many servers, databases, and games.
+This is how a lot of embedded, safety-critical, and real-time software works, including many servers, databases, and games. [# For example, [TigerBeetleDB](https://github.com/tigerbeetledb/tigerbeetle/blob/main/docs/TIGER_STYLE.md#safety) has a similar set of rules.]
 
 
-! Interestingly, the borrow checker also nudges us in this direction, though we often use things like Vec, SlotMap, or HashMap instead of arrays to trade a little bit of speed for better memory usage.
+! Interestingly, the borrow checker also nudges us in this direction, though we often use things like Vec, SlotMap, or HashMap instead of arrays to trade a little bit of speed for better memory usage. [# Also check out [Hard Mode Rust](https://matklad.github.io//2022/10/06/hard-mode-rust.html) to see someone try to do this with completely pre-allocated data.]
 
 
 This system mostly solves the aforementioned use-after-type-change bugs. To illustrate:
@@ -211,7 +189,7 @@ Looking at modern MMM languages, this seems to be the direction they're emphasiz
 Both languages also have bounds checking by default, and all unions are tagged. [# The creator of Zig is also looking into adding [escape analysis](https://news.ycombinator.com/item?id=31853964), which is pretty exciting.]
 
 
-The benefit of this approach is that it gets us much closer to memory safety without the drawbacks of GC, RC, or borrow checking.
+The benefit of this approach is that it gets us much closer to memory safety without the particular drawbacks of GC, RC, or borrow checking.
 
 
 ## The safest way to use MMM languages
@@ -240,8 +218,8 @@ This is particularly nice because:
 
  * Without GC or RC, we can be as fast as possible.
  * We don't have to deal with the cognitive overhead or iteration slowdowns of SPARK and the borrow checker.
- * We can use fast approaches that the borrow checker or SPARK have trouble with, such as [intrusive data structures](https://lwn.net/Articles/907876/) and [graphs](https://news.ycombinator.com/item?id=24996001), plus useful patterns like [observers](https://www.reddit.com/r/rust/comments/pwqju6/is_there_an_underlying_reason_that_idiomatic_rust/), [back-references](https://users.rust-lang.org/t/back-reference-to-the-parent-struct/7413/2), [dependency references](https://en.wikipedia.org/wiki/Dependency_injection), [callbacks](https://news.ycombinator.com/item?id=12029238), [delegates](https://medium.com/@nimjea/delegation-pattern-in-swift-4-2-f6aca61f4bf5) and many forms of RAII [# RAII is about automatically affecting the world outside our object. To affect the outside world, the borrow checker often requires us to take a `&mut` parameter or return a value, but we can't change `drop`'s signature. To see this in action, try to make a handle that automatically removes something from a central collection. Under the hood we usually use `unsafe` mechanisms, including FFI.] and [higher RAII](https://verdagon.dev/blog/higher-raii-7drl).
- * We can reuse code written in non-memory-safe languages.
+ * We can use fast approaches that the borrow checker and SPARK have trouble with, such as [intrusive data structures](https://lwn.net/Articles/907876/) and [graphs](https://news.ycombinator.com/item?id=24996001), plus useful patterns like [observers](https://www.reddit.com/r/rust/comments/pwqju6/is_there_an_underlying_reason_that_idiomatic_rust/), [back-references](https://users.rust-lang.org/t/back-reference-to-the-parent-struct/7413/2), [dependency references](https://en.wikipedia.org/wiki/Dependency_injection), [callbacks](https://news.ycombinator.com/item?id=12029238), [delegates](https://medium.com/@nimjea/delegation-pattern-in-swift-4-2-f6aca61f4bf5) and many forms of RAII [# RAII is about automatically affecting the world outside our object. To affect the outside world, the borrow checker often requires us to take a `&mut` parameter or return a value, but we can't change `drop`'s signature. To see this in action, try to make a handle that automatically removes something from a central collection. Under the hood we usually use `unsafe` mechanisms, including FFI.] and [higher RAII](https://verdagon.dev/blog/higher-raii-7drl).
+ * We can reuse code and libraries written in non-memory-safe languages.
  * We can use interesting features unique to `unsafe` and non-memory-safe languages.
 
 
@@ -259,7 +237,7 @@ However, a real software engineer puts their bias aside, and strives to know _wh
 
 Sometimes, we need memory safety to protect against very real risks:
 
- * When working with untrusted input, it can help protect us against security breaches. [# ordering weird, bad good bad. try reordering wording in this and below ones]
+ * When working with untrusted input, it can help protect us against security breaches.
  * When working with multiple users' data, it can help protect their privacy from errant use-after-free reads.
  * When working on safety critical devices, it can protect our users from harm.
 
@@ -267,13 +245,13 @@ Sometimes, we need memory safety to protect against very real risks:
 But for other situations, like many games and apps, the costs and burdens of certain memory safety approaches might not be worth it.
 
 
-Let's talk more about these risks, when they occur, and how these apprpoaches might help them.
+Let's talk more about these risks and when they occur.
 
 
 ### Memory Safety for Security-Sensitive Situations
 
 
-Some programs handle untrusted input, such as web servers. An attacker can carefully craft input that takes advantage of memory unsafety to gain access to sensitive data or take control of the system. Memory safety helps guard against that.
+Some programs handle untrusted input, such as web servers. An attacker can carefully craft input that takes advantage of UB to gain access to sensitive data or take control of the system. Memory safety helps guard against that.
 
 
 For example, if working on a server or a multiplayer game, you're handling a lot of untrusted input and you'll want memory safety to help with that.
@@ -282,7 +260,7 @@ For example, if working on a server or a multiplayer game, you're handling a lot
 However, not all programs handle untrusted input.
 
 
-For example, the [Google Earth](https://earth.google.com/web/) app is written in a non-memory-safe language. However, it only takes input from the user and from a trusted first-party server, which reduces the security risk. [# Its sandboxing also helps, whether from webassembly, iOS, or Android.]
+For example, the [Google Earth](https://earth.google.com/web/) app is written in a non-memory-safe language but it only takes input from the user and from a trusted first-party server, which reduces the security risk. [# Its sandboxing also helps, whether from webassembly, iOS, or Android.]
 
 
 In cases like these, security doesn't need to be as much of a factor in language choice.
@@ -359,7 +337,7 @@ The easiest way to detect most memory safety bugs is to use tools like [ASan](ht
 
 The Google Earth folks used these pretty religiously. It might be surprising to hear, but the vast majority of memory safety bugs were caught in development and automated tests by Address Sanitizer. [# They didn't even use shared_ptr, they mostly used unique_ptr and raw pointers.]
 
-In an average Google Earth quarter, they would get perhaps 60-80 bug reports, and memory unsafety was the root cause of perhaps 3-5% of them.
+In an average Google Earth quarter, they would get perhaps 60-80 bug reports, and memory unsafety was the root cause of *only 3-5% of them.* That's how effective Address Sanitizer can be.
 
 
 ## CHERI
@@ -367,10 +345,10 @@ In an average Google Earth quarter, they would get perhaps 60-80 bug reports, an
 On more modern hardware, you can also compile MMM languages with [CHERI](https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/).
 
 
-CHERI works by bundling a 64-bit "capability" with every pointer, thus making every pointer effectively 128 bits.
+CHERI works by bundling a 64-bit "capability" with every pointer, thus making every pointer effectively 128 bits. When we try to dereference the pointer, the CPU will check that the capability is correct, to help with memory safety.
 
 
-It has [surprisingly little run-time overhead](https://lobste.rs/s/nw7hsd/how_memory_safe_is_zig_updated#c_tyzbaf).
+It has [surprisingly little run-time overhead](https://lobste.rs/s/nw7hsd/how_memory_safe_is_zig_updated#c_tyzbaf)!
 
 
 ## Sandboxing with wasm2c
@@ -381,34 +359,46 @@ If you want to call into a library written in an MMM language, then you might be
 Note that there can still be memory corruption _inside_ the sandbox, which may or may not be an acceptable risk for the situation.
 
 
+## Memory Tagging
+
+[Memory tagging](https://source.android.com/docs/security/memory%20safety/arm-mte) is a technique that takes advantage of how pointers and addresses work on modern operating systems.
+
+
+A pointer is 64 bits, which means we theoretically have 2^64 bytes of address space. In reality, operating systems only use 48 to 56 bits of that, and don't use the other bits for addressing.
+
+
+Memory tagging will generate a random 4-bit number for every chunk of memory. Whenever we create a pointer to that memory, it will put that 4-bit number *into the top unused bits of the pointer*. Later, when we try to dereference the pointer, it will check that those 4 bits still match the original 4 bits of the object. If they're different, that means the object has been freed already, and it will halt the program.
+
+
+This is particularly good for debugging and testing. If this is enabled for your integration tests, then any invalid access bug has a 94% chance of being caught. [# And that chance increases to 99.6% if you run your integration tests twice, and so on!]
+
+
+## MMM and Memory Safety
+
+That pretty much covers the various approaches one can use with MMM, and to what extent they help with memory safety.
+
 
 # A bloody _tome_
 
-...said my friend when he saw how long this post was. It was 37 pages, so he had me cut it off here at 9 and push the rest to the next ones.
-
-
-So far, we've talked about the memory safety aspect of non-memory-safe languages, and when we might use them:
-
- * If working on a privacy-sensitive, security-sensitive, or safety-critical system, use a memory-safe approach.
- * If working on a server or a multiplayer game, you'll probably want memory safety.
- * If making an Android/iOS/webassembly app and you're only receiving data from the user and a single trusted server, then manual memory management can be fine.
- * If working on a single player game, you can probably use whatever you like!
+...said my friend when he saw how long this post was! It was already 45 pages and growing, so he had me cut it off here at 11. [# And I haven't even covered the more interesting tools like [ReleaseSafe mode](https://ziglang.org/learn/overview/), UBSan, or the various temporal memory safety approaches! But we've covered the basics.]
 
 
 In the next posts, we talk about:
 
- * Memory safety of borrow checking, GC, and RC.
+ * The extent of memory safety offered by borrow checking, GC, and RC.
  * Development velocity.
  * Run-time speed.
  * Memory usage.
- * Simplicity.
  * Correctness.
+ * Simplicity.
+
+And at the very end, we'll have a comprehensive answer for when to use which approaches.
 
 
 Thanks for reading! I hope this post has been intriguing and enlightening.
 
 
-In the coming weeks I'll be continuing this series, so subscribe to the [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), or the [subreddit](https://reddit.com/r/vale), and come hang out in the [discord server](https://discord.gg/SNB8yGH).
+In the coming weeks I'll be continuing this series, so subscribe to the [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), or the [subreddit](https://reddit.com/r/vale), and come hang out in the [discord server](https://discord.gg/SNB8yGH)!
 
 
 If you found this interesting or entertaining, please consider sponsoring me:
