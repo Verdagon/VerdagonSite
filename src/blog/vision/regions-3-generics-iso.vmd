@@ -1,0 +1,87 @@
+---
+title: Zero-Cost Memory Safety with Vale Regions, Part 3: Parameterized Isolates
+subtitle: Watch how we split our memory into regions, for more performance!
+author: Evan Ovadia
+date: Draft
+realm: blog
+path: blog/zero-cost-memory-safety-regions-part-1-pure-functions
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: us
+---
+
+
+talk about how this lets us truly have an opt-in borrow checker thats much more usable, flexible, and intuitive. it fits the natural structure of our programs much better.
+
+
+
+talk about how a tuple can point at two different regions.
+
+struct Tup2<A, B> {
+  a A;
+  b B;
+}
+
+Tup2<serv'Ship, req'Missile>
+
+
+talk about how this is how maps work
+
+Map<@str, req'Stuff>
+
+
+
+
+now talk about how we can make a eg Document class that's an iso, but can point outside to things like network managers.
+
+struct Program {
+  net NetworkManager;
+  doc iso'Document<self'>;
+}
+
+and now, if we ever want to read document immutably, we just need to lock it and read it immutably. easy.
+
+
+
+the iso is what truly makes it an opt-in borrow checker.
+
+
+
+
+
+
+
+if a third party library has a
+
+struct MyLongLivedThing<HandlerType> {
+  ...
+}
+
+then we can use this to completely contain everything about that third party library in an iso. the HandlerType would probably have a reference to an
+
+
+
+
+they can have an interface, and we can give them something that has an &iso'MyThing. theyll call into the interface, and we'll lock the iso from there and open it up for reading and/or writing.
+the best part about all of this is that all of their stuff can be captured in their own iso. our stuff is iso, their stuff is iso, everyone's having a grand ol time.
+we need to figure out how much of this is really doable though. we might need to constrain the third party thing to our own region so it doesnt escape? `TheirThing : myregion'`
+
+
+
+
+iso is part of the coord, so that we can wrap third party libraries in it.
+and also so we can associate an allocator with it.
+and also so we can hand iso things in as constructor args to a newly iso larger object.
+
+
+
+
+
+an object can actually contain memory from another region.
+of course, if we want to swap something out of it, both need to be mutable.
+
+if parent imm and child mut, then we can get that mut child borrow ref, but cant mute it.
+if parent mut and child imm, we can get that mut parent borrow ref, but cant move it or the child.
+
+
+

@@ -1,0 +1,13 @@
+
+
+
+We often think that there are only three approaches to memory safety: reference counting, tracing garbage collection, and borrow checking.
+
+
+By my count, there are actually *nine*. [# Generational references, regions, neverfree, va, val, and basilesque] They're hidden, rarely talked about, but if you keep your ear to the ground and your eyes open you can find them.
+
+there are actually eight other mechanisms [# This article talks about two: generational references and regions. 
+
+
+By combining these mechanisms in the right way, with the right semantics, one can discover some pretty incredible things.
+

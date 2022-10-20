@@ -1,5 +1,13 @@
 
 
+maybe combine this with the impling the region borrow checker?
+
+
+goto was universally used, until we found some higher-level patterns in how we used it.
+
+
+
+
 
 "Within Rust, there is a much smaller and cleaner language struggling to get out", Part 1
 

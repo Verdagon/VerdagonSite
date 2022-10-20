@@ -24,6 +24,17 @@
          <height>48</height>
       </image-->
 
+
+
+      <item>
+         <guid>https://verdagon.dev/blog/when-to-use-memory-safe-part-1</guid>
+         <link>https://verdagon.dev/blog/when-to-use-memory-safe-part-1</link>
+         <pubDate>Fri, Oct 7 2022 10:15:00 -0400</pubDate>
+         <category>Programming Languages</category>
+         <title>When to Use Memory Safe Languages, Part 1: Safety in Non-Memory-Safe Languages</title>
+         <author>noreply@verdagon.dev (Evan Ovadia)</author>
+      </item>
+
       <item>
          <guid>https://verdagon.dev/blog/perfect-replayability-prototyped</guid>
          <link>https://verdagon.dev/blog/perfect-replayability-prototyped</link>

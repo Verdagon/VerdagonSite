@@ -314,10 +314,20 @@ if [ $TARGET == "version-0.2-released" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
-if [ $TARGET == "regions-1-pure-functions" ] || [ $TARGET == "all" ] ; then
-  echo "Doing regions-1-pure-functions"
-  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-1-pure-functions src/blog/vision/regions-1-pure-functions.vmd
-  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-1-pure-functions src/blog/vision/regions-1-pure-functions.vmd
+if [ $TARGET == "regions-1-immutable-borrowing" ] || [ $TARGET == "all" ] ; then
+  echo "Doing regions-1-immutable-borrowing"
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing src/blog/vision/regions-1-immutable-borrowing.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing src/blog/vision/regions-1-immutable-borrowing.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
+if [ $TARGET == "making-regions-part-1-coord" ] || [ $TARGET == "all" ] ; then
+  echo "Doing making-regions-part-1-coord"
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-1-coord src/blog/making-regions/making-regions-part-1-coord.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-1-coord src/blog/making-regions/making-regions-part-1-coord.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -325,7 +335,7 @@ if [ $TARGET == "regions-1-pure-functions" ] || [ $TARGET == "all" ] ; then
 fi
 
 if [ $TARGET == "next-gen-languages-gpu" ] || [ $TARGET == "all" ] ; then
-  echo "Doing regions-1-pure-functions"
+  echo "Doing next-gen-languages-gpu"
   echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/next-gen-languages-gpu src/blog/next/next-gen-languages-gpu.vmd
   eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/next-gen-languages-gpu src/blog/next/next-gen-languages-gpu.vmd
   if [ $? != 0 ]; then

@@ -9,6 +9,14 @@ namespace: c-blog m-annotated
 ---
 
 
+https://stackoverflow.com/questions/16445094/is-javas-hashcode-deterministic
+
+https://stackoverflow.com/questions/40678964/how-to-get-a-correct-array-hashcode-in-scala
+
+https://stackoverflow.com/questions/3796699/will-hashcode-return-a-different-int-due-to-compaction-of-tenure-space
+
+
+
 Until recent events, I've firmly believed the most terrifying thing known to mankind is the kraken.
 
 

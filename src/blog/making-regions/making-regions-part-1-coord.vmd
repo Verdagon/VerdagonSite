@@ -1,0 +1,191 @@
+---
+title: Implementing a New Memory Safety Approach with Vale Regions, Part 1
+subtitle: A new paradigm, for easy and flexible speed and safety!
+author: Evan Ovadia
+date: Draft, Preview
+realm: blog
+path: blog/implementing-regions-part-1-coord
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: us
+---
+
+
+In late 2019, I was lying in bed listening to my [favorite fanfiction podcast](https://www.hpmor.com/) for the 47th time, [# The series really is that good, [give it a listen](https://hpmorpodcast.com/)!] drifting in and out of sleep and bouncing between the various features and bugs I'd programmed that day.
+
+
+Suddenly, my eyes flew open as a realization hit me.
+
+
+That 2:00am realization sparked a chain reaction of events that spanned years, and led to the discovery of an *entire new memory safety paradigm.*
+
+
+This is the first post (of hopefully many!) about creating, designing, and implementing [regions](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing) in Vale.
+
+
+# The Chronobase, Superstructures, and "Regions"
+
+<img width="100%" src="/images/incendian2.png" />
+
+
+In the [7DRL Challenge](https://7drl.com/), I created a game [Incendian Falls](https://verdagon.itch.io/incendian-falls), which involved *time traveling to team up with your past self* to defeat hordes of enemies.
+
+
+Time traveling is _hard_ to do efficiently; one cannot simply copy the entire game state for every turn. Instead, I used [journaling](https://en.wikipedia.org/wiki/Journaling_file_system) and [persistent hash maps](https://en.wikipedia.org/wiki/Persistent_data_structure) to be able to reconstruct the game state from any point in time, in a tool I called the *chronobase*.
+
+
+In time-honored fashion, I then made a [domain specific language](https://en.wikipedia.org/wiki/Domain-specific_language) named [VSS](https://github.com/Verdagon/IncendianFalls/tree/master/ChronobaseCS/resources) (Vale Superstructure) and a [tiny Scala-based compiler](https://github.com/Verdagon/IncendianFalls/tree/master/ChronobaseCS) to convert it into the code I needed for the chronobase.
+
+
+It worked beautifully! And by the end of the week, I had so many kinds of items, enemies, tiles, and components in the game that the resulting generated code was over [150,000 lines](https://github.com/Verdagon/IncendianFalls/tree/master/Atharia/Atharia/Core).
+
+
+Eventually, I realized that the chronobase could be used for more than just a game. It could be used for a word processor, an image editing tool, anything with an undo history or save history.
+
+
+In fact, if we added [stored procedures](https://en.wikipedia.org/wiki/Stored_procedure) and made it completely deterministic, we could have it record all of its inputs and be able to perfectly replay and reproduce any bugs we encountered. I added that in, and it later inspired Vale's [Perfect Replayability](https://verdagon.dev/blog/perfect-replayability-prototyped) feature.
+
+
+Late 2019 came around, and I was thinking about how we might make it so these stored procedures could read data from the outside world.
+
+
+At 2am that night, it occurred to me that *the type system could track that.* A `req'Spaceship` would be a Spaceship from the outside, and a `my'Spaceship` would be a spaceship inside the database.
+
+
+This idea is exactly what inspired how [pure functions](http://localhost:8001/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing) work in Vale.
+
+
+# An Alien Concept
+
+
+I feverishly scribbled it in a notebook until 3am, and then finally fell asleep. When I woke up, I discovered this notebook, and read the page.
+
+
+"...what the hell am I looking at?"
+
+
+This was a common occurrence, honestly. "Notes from Night Evan" is an ongoing joke in my circle, about the weirdest things I'd written to myself. And this was definitely up there.
+
+
+"Huh."
+
+
+It _kind of_ made sense.
+
+
+And then I noticed a triple-underlined statement: *"can skip reference counting overhead! Vale?"*.
+
+
+"Holy crap!" I said to myself and sprang out of bed. It all came rushing back, and I finally remembered all the details.
+
+
+At the time, Vale was an experimental language based on a single-ownership form of reference counting called [constraint references](https://verdagon.dev/blog/raii-next-steps), and Night Evan had realized that references into immutable regions could [completely skip the reference counting overhead](https://verdagon.dev/blog/zero-cost-refs-regions). Nowadays, Vale is based on [generational references](/blog/generational-references), but regions have the same optimizing effect for them too.
+
+
+This was a _major game changer._ A few months later, I decided to do whatever it took to make Vale a complete language, so the world could see what was possible with regions.
+
+
+# Other Alien Concepts
+
+
+I started seeing regions _everywhere_. They were some sort of unifying generalized form of affine typing (one of the concepts underlying Rust's borrow checker), Pony's iso permission, Pony's [iso permission](https://tutorial.ponylang.io/reference-capabilities/reference-capabilities.html#isolated-data-is-safe), and a bunch of other languages' special cases.
+
+
+I posted [Zero-Cost References with Regions in Vale](https://verdagon.dev/blog/zero-cost-refs-regions), and people started reaching out to me about other designs in the space. I had a call with [Forty2](http://forty2.is/)'s Marco Servetti and we talked for hours about our different takes on regions, and someone shared [Milano, Turcotti, and Myers](https://www.cs.cornell.edu/andru/papers/gallifrey-types/gallifrey-types.pdf)'s work on concurrency models.
+
+
+The biggest revelation came when I was lying on the floor in a random Georgia AirBnB [# The house was called "Little Mexico" and had nary a square foot of unoccupied wall space, it was so full of Mexico decorations. Hands-down one of the coolest AirBnBs ever!] When I realized that we could blend region annotations to make "one-way isolation". But that's a story for a few posts from now!
+
+
+Later, I even found a way to use regions to obviate most of [Hybrid-Generational Memory](https://verdagon.dev/blog/hybrid-generational-memory), another concept I was pursuing in Vale.
+
+
+Eventually, generational references and regions combined to form an entire new paradigm. One person in our server described it as a "higher-level, opt-in Rust".
+
+
+# The Design
+
+
+I'm describing the full design in a parallel series, [Zero-Cost Memory Safety with Vale Regions](blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing):
+
+ * Part 1 talks about how we can use pure functions to establish immutable regions, so we can access memory with zero overhead.
+ * Part 2 covers how we can also establish immutable regions even outside of pure functions, using "`iso`lated sub-regions".
+ * Part 3 shows how we can enable "one-way isolation", for sub-regions to have references outside their own region.
+ * Part 4 talks about how one-way isolation lets us read private data, which also automatically eliminates generation checks for data-oriented designs like entity component systems.
+
+
+Take a look!
+
+
+# Implementing It
+
+
+Implementing something like this is no easy task, especially when one has a full-time job. Luckily, I recently dropped down to part-time, which gave me enough time to really make progress on all of this.
+
+
+2021 and most of 2022 were spent laying the foundations we would need for regions:
+
+ * Instead of C++-style templates, I transitioned the Vale compiler to full generics, which would help with the more interesting monomorphization tricks that would make regions even more composable than traditional borrow checking.
+ * I refactored the backend to decouple the memory management strategy from the code itself, and added two "regions" to start out: raw and generational references. [# I later even used this to benchmark generational references!]
+ * I rounded out the rest of the compiler's unfinished in-progress features, such as [Higher RAII](https://verdagon.dev/blog/higher-raii-7drl), [Fearless FFI](https://verdagon.dev/blog/fearless-ffi), [Perfect Replayability](https://verdagon.dev/blog/perfect-replayability-prototyped), internal namespacing, and a faster generics solver. Regions is a massive endeavor that will break _everything_ that's not already finished and well-tested, so I spent some time to finish and add tests for these features.
+
+
+Finally, a month ago, I was able to start adding regions to the frontend.
+
+
+# Tackling the Details
+
+
+When designing a large system like a language, one gets a sense for what open questions are central to a design, and what open questions are peripheral. Peripheral concerns can be left for later, to preserve limited mental bandwidth and sanity.
+
+
+
+
+I hit one such open question almost immediately: *Is the region part of the reference, or part of the type?*
+
+
+Let's unpack that question, and see what it's really asking.
+
+
+To the user, we can have a `r'Spaceship`; that `r'` is something independent of the type and the type doesn't need to know that it's in one region or the other. Rather, the `r'` is part of the _reference_.
+
+
+However, we don't have to represent it that way under the hood. The parser can transform that `r'Spaceship` to `Spaceship<r'>`, and we can have the rule that the struct is "in" its last region parameter. Here, the `r'` is part of the _type_. This can be advantageous in that it greatly simplifies some of the implementation.
+
+
+A similar design question comes up in other languages:
+
+ * In C#, a `class Spaceship { ... }` can instead be a `struct Spaceship { ... }`. We only ever have references to a class. We can never have a reference to a struct, we only have copies of it and hold them directly. C does the other approach, and leaves it up to the user to say `Spaceship` vs `Spaceship*`. The C approach is slightly more flexible.
+ * In Rust, whether a function is async depends on the function definition. In Zig, a function can be async or not [depending on how it's used](https://kristoff.it/blog/zig-colorblind-async-await/). Rust later backtracked, and is trying to achieve the same thing with [keyword generics](https://blog.rust-lang.org/inside-rust/2022/07/27/keyword-generics.html).
+
+
+There are a few interesting other factors:
+
+ * Strings can't have region parameters. There's no such thing as a `str<r'>`... yet we want to separately track different regions' strings.
+ * There may be other types that arent structs, but we want to track their region. For example, we might want an opaque handle to some native memory.
+ * In Vale, a struct can actually _own_ data in other regions. This might seem unrelated, but it rules out some clever perspectives we can use to resolve this decision.
+
+
+These seem to suggest that we should go with the first option: have it has part of the reference. However, I'm actually going to go with a surprise third option: *have it in both,* at least for structs.
+
+
+In other words, if it's a struct, then `r'Spaceship` will actually be lowered to `r'Spaceship<r'>`. This should give us a lot of the implementation simplifications, and it also leaves open the door to take out one or the other later on.
+
+
+Redundancies like this can be dangerous sometimes, if they can become out of sync. However, as long as we have an assertion that upholds this redundancy, nothing can become out of sync.
+
+
+With that, the next step is to get a basic pure function working!
+
+
+# Uncomfortably Exciting
+
+
+At Google, we often used the phrase "uncomfortably exciting" to describe when you're a bit scared of your own idea. That definitely captures how I'm feeling right now.
+
+
+This idea has been _years_ in the making, and it's finally happening. And if it's as good as I think it is, it will completely change the way some of us program.
+
+
+Onward, to the gates of invention and glory!
+

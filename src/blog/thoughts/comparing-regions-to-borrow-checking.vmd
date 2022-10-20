@@ -1,0 +1,51 @@
+---
+title: Comparing Regions to Borrow Checking
+author: Evan Ovadia
+date: Draft, Preview
+realm: blog
+path: blog/comparing-regions-to-borrow-checking
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: us
+---
+
+
+! Note: This article is only a draft, describing how we think regions will work out in practice. Once we finish regions and benchmark it to determine how much overhead this eliminates, we'll publish it for real.
+
+
+In [this article](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing), we explain how regions work in Vale.
+
+
+These mechanisms likely sound similar to the traditional borrow checking approach seen in Rust, Cyclone, BorrowScript, and a couple others.
+
+
+There are a few key differences, however.
+
+
+In traditional borrow checking, we can't hold a reference to any data that someone else might change. [# Unless we have a `&mut` reference, and we're passing it to that someone else. Here, the "someone else" refers to a mutable reference stored somewhere.]
+
+This means the borrow checker doesn't allow certain fast approaches like [intrusive data structures](https://lwn.net/Articles/907876/) and [graphs](https://news.ycombinator.com/item?id=24996001), plus useful patterns like [observers](https://www.reddit.com/r/rust/comments/pwqju6/is_there_an_underlying_reason_that_idiomatic_rust/), [back-references](https://users.rust-lang.org/t/back-reference-to-the-parent-struct/7413/2), [dependency references](https://en.wikipedia.org/wiki/Dependency_injection), [callbacks](https://news.ycombinator.com/item?id=12029238), [delegates](https://medium.com/@nimjea/delegation-pattern-in-swift-4-2-f6aca61f4bf5) and many forms of RAII [# RAII is about automatically affecting the world outside our object. To affect the outside world, the borrow checker often requires us to take a `&mut` parameter or return a value, but we can't change `drop`'s signature. To see this in action, try to make a handle that automatically removes something from a central collection. Under the hood we usually use `unsafe` mechanisms, including FFI.] and [higher RAII](https://verdagon.dev/blog/higher-raii-7drl). The workarounds for this can often cause emergent artificial complexity in a codebase, and sometimes unnecessary dependencies or framework usage.
+
+In Vale, we lift borrowing to the region level, and individual pieces of data can refer to each other as much as they like; we can *alias data freely*.
+
+
+In traditional borrow checking, if we need to call a function that takes in a mutable reference (`&mut AObject`), then we can't have any other references (`&AObject`) and neither can our caller, our caller's caller, etc.
+
+This is known as a "viral restriction" [# This is a common complaint with async/await systems, and why Go's and Loom's concurrency models are so desirable.] and when we don't see it coming it can lead to increased refactoring, API churn, data layout changes, and the occasional architectural deadlock. [# This happens when we need to change our API to accommodate a viral restriction, but we can't because we're overriding a certain third-party or otherwise unchangeable API.]
+
+In Vale, if a function takes in a read-only region `a'` and a read-write region `b'`, the caller can supply the same region for both. [# In a way, Vale's read-only regions are similar to C++'s `const`: we can have a `const` pointer to an object that someone else can change, only _we_ can't change it.] [# Under the hood, Vale creates two versions of the function: one where the region is truly immutable, and one where it's read-write.] This makes the functions more *composable and reusable*.
+
+
+In traditional borrow checking, the viral restrictions mean that we need to deal with the borrow checker's complexity almost everywhere in our code. [# After all, `unsafe` doesn't turn off the borrow checker, and we still need to think about it when we open up a `RefCell`.]
+
+In Vale, because functions are more composable and reusable, region borrowing is entirely *optional and opt-in*. One can write an entire program without thinking about regions, and they'll even get the benefits.
+
+In BenchmarkRL, even when using no region annotations, the system still eliminates the vast majority [# Draft TODO: This number should be 96% per manual counting, but replace this with an actual number once we have actual measurements.] of generation checks, [# Draft TODO: Put actual performance numbers here too, so we can speak in more real terms.]. This is because the standard library itself uses regions, and the compiler automatically uses region-based optimizations for certain patterns like iteration and pure blocks.
+
+This also means we can *iterate and prototype faster.* Later, if we want that extra few percentage points [# Draft TODO: Replace with actual percentage one we have it.] we can add regions in the specific paths of our code that would benefit from it.
+
+
+This isn't to say that traditional borrow checking is worse. Some kinds of programs, especially stateless ones, naturally align with the borrow checker and are less likely to incur any artificial complexity.
+
+Region borrowing will likely be be an excellent fit for domains like game development, app development, and web servers. Its flexibility and composability while remaining fast and memory-safe could be a game-changer in those domains. Time will tell!
+

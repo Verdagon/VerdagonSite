@@ -1,5 +1,6 @@
 ---
-title: Flavors of Memory Safety and When to Use Them, Part 1
+title: Safety in Non-Memory-Safe Languages
+subtitle: Part 1 of the Memory Safety Expedition
 author: Evan Ovadia
 date: Oct 8, 2022
 realm: blog
@@ -12,10 +13,10 @@ sponsor: me
 
 A few weeks ago, I was asked four questions all on the same day:
 
- * "Why do people use non-memory-safe languages?"
- * "What are the benefits of borrow checking besides memory-safety and speed?"
- * "Why doesn't everyone use Rust for web servers?"
+ * "When would we use C-like languages?"
  * "What language should I use for my game?"
+ * "Why don't more people use Rust for web servers?"
+ * "What are the benefits of borrow checking besides memory-safety and speed?"
 
 
 The discussion had so many factors that I made it into a post, which very quickly exploded into a whole series. So here we are!
@@ -29,7 +30,7 @@ We'll mostly be comparing languages' approaches to *memory safety*, which is the
 
 Even if you're familiar with memory management, you'll likely learn some interesting things:
 
- * Non-memory-safe languages are really well suited to a lot of situations!
+ * Less memory-safe languages are really well suited to a lot of situations!
  * Borrow checking has some pervasive hidden costs, and hidden architectural benefits!
  * Reference counting can be _way_ faster than we thought.
  * Development velocity is often more important than run-time performance!
@@ -50,7 +51,7 @@ There are generally four approaches to memory safety:
 There's also a fifth approach, [generational references](https://verdagon.dev/blog/generational-references). We'll talk more about that elsewhere, this series is comparing the more traditional approaches.
 
 
-Note that this is only Part 1, where we talk about the memory safety aspect of MMM languages. Subscribe to the [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), or [subreddit](https://reddit.com/r/vale) to keep an eye out for the rest!
+Note that this is only Part 1. Subscribe to the [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), or [subreddit](https://reddit.com/r/vale) to watch for the rest!
 
 
 # The Tradeoffs
@@ -79,7 +80,7 @@ This is a surprisingly nuanced topic. It's not a black-and-white thing, approach
 
 
  1. Manual memory management (MMM) has no built-in memory safety protection.
- 1. Tool-assisted MMM uses things like [ASan](https://en.wikipedia.org/wiki/AddressSanitizer), [memory tagging](https://source.android.com/docs/security/memory%20safety/arm-mte), and [CHERI](https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/) to detect a lot of problems in development and testing.
+ 1. Tool-assisted MMM uses things like [ASan](https://en.wikipedia.org/wiki/AddressSanitizer), [memory tagging](https://source.android.com/docs/security/test/memory-safety/arm-mte), and [CHERI](https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/) to detect a lot of problems in development and testing.
  1. Architected MMM [# This isn't an actual term in the industry, but I think it captures the spirit nicely.] uses more resilient patterns and architectures to drastically reduce the risk of memory unsafety even more.
  1. Statically-analyzed MMM uses frameworks like SPARK to be memory safe.
  1. Borrow checking is _almost_ safe, but comes with the `unsafe` escape hatch which can cause UB, even in the safe code around it.
@@ -89,7 +90,7 @@ This is a surprisingly nuanced topic. It's not a black-and-white thing, approach
 Let's talk about MMM first!
 
 
-## MMM is usually non-memory-safe
+## MMM Languages' Memory Safety
 
 Manual memory management by default has no memory safety protections.
 
@@ -130,7 +131,7 @@ Memory safety prevents common memory access bugs, including:
 These all have one thing in common: they risk accessing the wrong data, triggering [undefined behavior](https://en.wikipedia.org/wiki/Undefined_behavior) ("UB") which can result in cantankerous shenanigans like security vulnerabilities, segmentation faults, or random nearby data changing. [# Undefined behavior has also been known to cause computers to grow AIs and become sentient and hostile, probably.]
 
 
-But sometimes, accessing the wrong data won't trigger undefined behavior, if the data there is still the type that we expect. [# Even this understanding isn't quite accurate. UB can't occur if the memory is reused for a _different struct type with the same layout_. If we want to be even more accurate, we'd say that memory unsafety can only occur if we interpret a non-pointer as a pointer.]
+But sometimes, accessing the wrong data won't trigger undefined behavior, if the data there is still the type that we expect. [# Even this understanding isn't quite accurate. Memory unsafety theoretically can't occur if the memory is reused for a _different struct type with the same layout_, though in practice today's optimizers do interpret that as UB. If we want to go even further, we'd say that memory unsafety can only occur if we interpret a non-pointer as a pointer.]
 
 So really, the goal of memory safety is to *access data that is the type we expect.*
 
@@ -180,6 +181,8 @@ This system mostly solves the aforementioned use-after-type-change bugs. To illu
  * If we use a `Ship` after we've released it, we'll just dereference a different `Ship`, which isn't a memory safety problem.
  * If we use something in an arena allocator after we've released it, it will still be there because we never reuse an arena allocation for anything else.
 
+These are still logic problems, but are no longer memory safety problems, and no longer risk undefined behavior.
+
 
 Looking at modern MMM languages, this seems to be the direction they're emphasizing and heading toward:
 
@@ -211,7 +214,7 @@ This is also why we use languages like Rust, even though `unsafe` blocks can und
 If one needs _absolute_ safety, there are languages like Pony which have zero memory unsafety and less run-time errors than any other language, and tools like [Coq](https://coq.inria.fr/).
 
 
-But in the real world we often don't need absolute guarantees, and we can use something with _sufficient_ memory safety, whether it uses constructs like `unsafe` blocks or tools like [ASan](https://en.wikipedia.org/wiki/AddressSanitizer) or [memory tagging](https://source.android.com/docs/security/memory%20safety/arm-mte) or [CHERI](https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/). [#bias]
+But in the real world we often don't need absolute guarantees, and we can use something with _sufficient_ memory safety, whether it uses constructs like `unsafe` blocks or tools like [ASan](https://en.wikipedia.org/wiki/AddressSanitizer) or [memory tagging](https://source.android.com/docs/security/test/memory-safety/arm-mte) or [CHERI](https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/). [#bias]
 
 
 This is particularly nice because:
@@ -257,7 +260,7 @@ Some programs handle untrusted input, such as web servers. An attacker can caref
 For example, if working on a server or a multiplayer game, you're handling a lot of untrusted input and you'll want memory safety to help with that.
 
 
-However, not all programs handle untrusted input.
+However, not all programs handle untrusted input. [# "Untrusted input" can also be in the form of files. But if those files came with the program, such as assets for a game, then they are [trusted input and not as much of a problem](https://news.ycombinator.com/item?id=32879598).]
 
 
 For example, the [Google Earth](https://earth.google.com/web/) app is written in a non-memory-safe language but it only takes input from the user and from a trusted first-party server, which reduces the security risk. [# Its sandboxing also helps, whether from webassembly, iOS, or Android.]
@@ -318,7 +321,7 @@ For example:
  * In a music player app, the user just restarts the app.
 
 
-Bugs like these are generally as severe as logic problems, and we can use less burdensome techniques to detect and resolve them: tooling like [ASan](https://en.wikipedia.org/wiki/AddressSanitizer), [Valgrind](https://valgrind.org/), [release-safe mode](https://www.scattered-thoughts.net/writing/how-safe-is-zig/), [memory tagging](https://source.android.com/docs/security/memory%20safety/arm-mte), [CHERI](https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/), etc. They aren't perfect, but they're very effective. We'll talk about these more below.
+Bugs like these are generally as severe as logic problems, and we can use less burdensome techniques to detect and resolve them: tooling like [ASan](https://en.wikipedia.org/wiki/AddressSanitizer), [Valgrind](https://valgrind.org/), [release-safe mode](https://www.scattered-thoughts.net/writing/how-safe-is-zig/), [memory tagging](https://source.android.com/docs/security/test/memory-safety/arm-mte), [CHERI](https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/), etc. They aren't perfect, but they're very effective. We'll talk about these more below.
 
 
 So what are these tools, and how might they help us easily improve our memory safety?
@@ -328,7 +331,7 @@ So what are these tools, and how might they help us easily improve our memory sa
 
 ## Sanitizers
 
-The easiest way to detect most memory safety bugs is to use tools like [ASan](https://en.wikipedia.org/wiki/AddressSanitizer), [memory tagging](https://source.android.com/docs/security/memory%20safety/arm-mte), [valgrind](https://valgrind.org/), etc. These are usually turned off in production, but we turn them on in:
+The easiest way to detect most memory safety bugs is to use tools like [ASan](https://en.wikipedia.org/wiki/AddressSanitizer), [memory tagging](https://source.android.com/docs/security/test/memory-safety/arm-mte), [valgrind](https://valgrind.org/), etc. These are usually turned off in production, but we turn them on in:
 
  * Development.
  * Testing, especially integration tests.
@@ -361,7 +364,7 @@ Note that there can still be memory corruption _inside_ the sandbox, which may o
 
 ## Memory Tagging
 
-[Memory tagging](https://source.android.com/docs/security/memory%20safety/arm-mte) is a technique that takes advantage of how pointers and addresses work on modern operating systems.
+[Memory tagging](https://source.android.com/docs/security/test/memory-safety/arm-mte) is a technique that takes advantage of how pointers and addresses work on modern operating systems.
 
 
 A pointer is 64 bits, which means we theoretically have 2^64 bytes of address space. In reality, operating systems only use 48 to 56 bits of that, and don't use the other bits for addressing.
@@ -413,5 +416,4 @@ If you found this interesting or entertaining, please consider sponsoring me:
 </center>
 
 With your help, I can write this kind of nonsense more often!
-
 

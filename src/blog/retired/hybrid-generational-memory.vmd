@@ -10,6 +10,8 @@ namespace: c-blog m-annotated
 sponsor: me
 ---
 
+! Note: This design later evolved into the LifeCell approach, which we'll be using to improve Vale's speed. This post is up to show the history and what led to the newer design.
+
 
 Vale's *hybrid-generational memory* is a new memory model that aims to combine all the best parts of existing memory strategies: easy as garbage collection, deterministic as reference counting, and as fast as borrow checking. [#resilient]
 
