@@ -106,7 +106,7 @@ Eventually, generational references and regions combined to form an entire new p
 # The Design
 
 
-I'm describing the full design in a parallel series, [Zero-Cost Memory Safety with Vale Regions](blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing):
+I'm describing the full design in a parallel series, [Zero-Cost Memory Safety with Vale Regions](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing):
 
  * Part 1 talks about how we can use pure functions to establish immutable regions, so we can access memory with zero overhead.
  * Part 2 covers how we can also establish immutable regions even outside of pure functions, using "`iso`lated sub-regions".

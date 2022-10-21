@@ -14,13 +14,13 @@ sponsor: us
 ! Note: This article is only a draft, describing how we think regions will work out in practice. Once we finish regions and benchmark it to determine how much overhead this eliminates, we'll publish it for real.
 
 
-Vale has an interesting challenge, to be *fast, safe, and easy.* There are a lot of stellar languages that have two, and I suspect it's possible to really maximize all three.
+Vale has an interesting challenge, to be *fast, safe, and easy.* There are a lot of stellar languages that have two, and we suspect it's possible to really maximize all three.
 
 
-This isn't quite possible with today's more well-known approaches. Languages with borrow checking tend to have better run-time speed, and languages with garbage collection tend to have better flexibility, simplicity, and development velocity, and we haven't yet seen a way to get all these benefits at once.
+This isn't quite possible with today's more well-known approaches. Languages with borrow checking have stellar run-time speed, and languages with garbage collection tend to have better flexibility, simplicity, and development velocity, and we haven't yet seen a way to get all these benefits at once.
 
 
-However, there are two more approaches which are making the memory safety landscape a lot more interesting, and I suspect we can blend them into something that gives us the best of all worlds.
+However, there are two more approaches which are making the memory safety landscape a lot more interesting, and we suspect we can blend them into something that gives us the best of all worlds.
 
 
 

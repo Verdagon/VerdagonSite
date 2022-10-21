@@ -181,7 +181,7 @@ if [ $TARGET == "observer-challenge" ] || [ $TARGET == "all" ] ; then
     echo "Failed!"
     exit 1
   fi
-  cp src/blog/observer-challenge-example.js public/blog/observer-challenge-example.js
+  cp src/blog/architecture/observer-challenge-example.js public/blog/architecture/observer-challenge-example.js
 fi
 
 if [ $TARGET == "observer-challenge-conclusions" ] || [ $TARGET == "all" ] ; then
@@ -318,6 +318,16 @@ if [ $TARGET == "regions-1-immutable-borrowing" ] || [ $TARGET == "all" ] ; then
   echo "Doing regions-1-immutable-borrowing"
   echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing src/blog/vision/regions-1-immutable-borrowing.vmd
   eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing src/blog/vision/regions-1-immutable-borrowing.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
+if [ $TARGET == "regions-2-isolates" ] || [ $TARGET == "all" ] ; then
+  echo "Doing regions-2-isolates"
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-2-isolates src/blog/vision/regions-2-isolates.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-2-isolates src/blog/vision/regions-2-isolates.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1

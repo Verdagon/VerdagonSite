@@ -11,118 +11,91 @@ sponsor: us
 ---
 
 
-
-
-
-
-
-
-
-
-
 [# an iso object can come with an allocator attached to it perhaps... maybe that should be a special syntax or something. `MyAllocator^iso Fleet`]
-
 [# perhaps this article should just have isos as messages between threads?]
-
-
 [# nobody cares about iso objects. talk about zero cost message passing? maybe also talk about channels...]
-
-
-Vale has an interesting challenge, to be *fast, safe, and easy.*  There are a lot of stellar languages that have two, and we think it's possible to really maximize all three.
-
-
-In part 1, we saw how to use `pure` functions to freeze existing data, and eliminate overhead when accessing it.
-
-In this article, we'll see how to do it without pure functions, using `iso` data.
-
-
-(image of shattered forest)
-
-
-(more explanation here, this ones pretty weak. talk about how this can harness the power of a borrow checker, without the AxM restrictions on objects.)
-
-
-Pure functions and `iso` data are only a couple pieces of Vale's strategy. [Hybrid-Generational Memory](https://verdagon.dev/blog/hybrid-generational-memory), `uni`, and memory-safe allocators, and a lot of other mechanisms combine to make Vale fast.
+[# talk about how this can harness the power of a borrow checker, without the AxM restrictions on objects.]
+[# TODO: finish BenchmarkRL, think about how many checks might be eliminated by iso regions.]
 
 
 ! Generational references are complete but *the rest of these mechanisms are works in progress.* We'll be implementing these features over the next two years, per the [roadmap](https://vale.dev/roadmap).
 
 
-Let's see some `iso` data in action!
+Vale has an interesting challenge, to be *fast, safe, and easy.* There are a lot of stellar languages that have two, and we suspect it's possible to really maximize all three.
 
 
-# What's `iso` data?
-
-`iso` is a keyword applied to an object, to inform the type system that it, plus everything it indirectly owns, form their own "isolated region".
+In [Part 1](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing), we showed how we can use regions to "immutably borrow" existing data, to eliminate memory safety costs when accessing it. With that, it looks like we've found a mechanism for fast, safe, and easy memory safety! At least, for the sections of our program that can be phrased as pure functions. [#puref]
 
 
-Nothing inside this region points out, and nothing outside the region points in. We have a reference to that "root" object, and that's it.
+But what about the rest of our code? Not everything can be a pure function of course, so how do we use regions to speed up everything else?
+
+
+For that, we use a concept called *isolates*.
+
+
+# Isolates
+
+An `iso`late is an object that contains a bunch of data that nobody outside can point to. Most `priv`ate fits this criteria cleanly. Most programs will be a hierarchy of `iso`s. [# We can even take this to the extreme and make everything `iso`, and we'd end up with data roughly the same shape as in Rust programs. In practice, there's a balance somewhere in-between.]
+
+
+By default, nothing _inside_ can point _out_ either, but we can opt into that in Part 3.
+
+
+<slice>
+#puref: Which is quite a lot, really. Our sample roguelike game, a very stateful mutation-heavy program, actually spent PERCENT_HERE of its time inside pure functions.
+
+DRAFT TODO: Figure out that figure. Pretty sure it's well above 90%; pathfinding, AI, and turn resolution take most of the time.
+</slice>
+
+
+
+# Zero-Cost Reading
+
+
+The compiler uses the same logic as when reading pure functions, described in [Part 1 / How Regions Work](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing#how-regions-work).
+
+
+Similar to how a `pure` function can read pre-existing data to make a program much faster, `read`ing data from an `iso` is very powerful for optimization.
+
+
+
+(more explanation here)
 
 
 # A Simple Example
 
-<<<<
-Here we see a `ship` variable that has the type `iso Ship`.
+Draft TODO: Show an example that's simpler than the one below. Perhaps just a simple function call? Or perhaps show how its easy and needs few annotations, as long as the two regions dont cross.
 
 
-If we try to make a reference to it or anything inside it, the compiler notices and shows an error.
-////
-```vale
-struct Engine {
-  fuel int;
-}
-struct Ship {
-  engine Engine;
-}
-exported func main() {
-  ship iso Ship = Ship(Engine(42));
-
-  // Error: Making a reference to
-  // an object inside an iso region.
-  s = &ship;
-
-  // Error: Making a reference to
-  // an object inside an iso region.
-  e = &ship.engine;
-}
-```
-
-
-# The Power of `iso`
-
-
-
-We can temporarily "open up" an `iso` region as mutable or immutable, whatever's convenient.
+# A Real World Example
 
 
 A common pattern is to open it up as mutable while we're building it, then close it, then reopen it as immutable when we only want to read it. Doing this helps eliminate memory safety overhead.
 
 
-## Show me!
-
 <<<<
-Let's say we want a level generator for a simple game. We're going to *coalesce a black-and-white image's pixels* until it gives us something interesting to use for our level.
+Let's say we want a level generator for a simple game. We're going to *coalesce a black-and-white image's pixels* until it gives us something interesting, and then use that to inspire our level's terrain.
 
 
 This is known as a Cellular Automata algorithm, and is very similar to blurring an image.
 ////
-(image here)
+Draft TODO: Image here showing the various stages of a cellular automata run.
 >>>>
 
 
 <<<<
-Here's our `main` function which shows the general structure of our program
+Here's our `main` function which shows the general structure of our program.
 
 
-There are two important parts here:
+The `iso` in front of `[][]bool`, which specifies the array is isolated. [# Draft TODO: We might say `iso'` instead, TBD whether that's more confusing or less.]
 
- * The `iso` in front of `[][]bool`, which specifies the array is isolated.
- * `coalesceImage(&rand, &image)` which should treat `rand` as mutable, and `image` as immutable.
+
+The `image.imm` in `coalesceImage(&rand, image.imm)` will open up the `image` isolate as immutable, and then pass it in as an argument to coalesceImage.
 
 
 Further below, we'll see how `coalesceImage` keeps the two inputs separate from each other.
 ////
-```vale
+```
 exported func main() {
   // Our random number generator,
   // for the initial image and for
@@ -141,29 +114,27 @@ exported func main() {
   // the input rand as mutable, and
   // the input image as immutable.
   image_coalesced =
-      coalesceImage(&rand, &image);
+      coalesceImage(&rand, image.imm);
 
   // And do it again, it'll look nice.
   image_coalesced_again =
-      coalesceImage(&rand, &image_coalesced);
+      coalesceImage(&rand, read image_coalesced);
 
   display(&image_coalesced_again);
 }
 ```
 >>>>
 
-<slice>
+<slice/>
 
-</slice>
 
 Here's the `coalesceImage` function.
 
 
-```vale
-func coalesceImage(
+```
+func coalesceImage<r'>(
   rand &LCGRand,
-  // ' means we're borrowing a region in a read-only way.
-  tiles '&[][]bool)
+  tiles &r'[][]bool)
 iso [][]bool { // Returns a new isolated array.
 
   // Make a new isolated array.
@@ -179,13 +150,13 @@ iso [][]bool { // Returns a new isolated array.
 ```
 
 
-The important part here is the `'` in `'&[][]bool`. It means this parameter is in a separate region from the rest of the parameters, and we only see the region as read-only. (One could also do `'!` for a _read-write_ region here.)
+The important part here is the `r'` in `&r'[][]bool`. It means this parameter is in a separate region from the rest of the parameters, and we only see the region as read-only. (In general, one can change `<r'>` to `<r' rw>` for a _read-write_ region here.)
 
 
 When `main` calls coalesceImage, the compiler sees two things:
 
  * We're passing an `iso`lated object.
- * The function parameter sees it as read-only.
+ * The function parameter sees it as from a read-only region.
 
 
 The compiler concludes that nobody's going to change anything in the region, therefore it's temporarily immutable. It generates a `coalesceImage` function that is optimized accordingly, eliminating memory safety overhead when reading from that region.
@@ -198,8 +169,8 @@ The compiler concludes that nobody's going to change anything in the region, the
 
 If you're curious, here's the `averageNeighbors` function, which takes its parameters in a similar way:
 
-```vale
-func averageNeighbors(rand &LCGRand, tiles '&[][]bool, x int, y int) bool {
+```
+func averageNeighbors<r'>(rand &LCGRand, tiles &r'[][]bool, x int, y int) bool {
   num_neighbors = 0;
   num_white_neighbors = 0;
   foreach neighbor_x in range(x - 1, x + 1) {
@@ -218,25 +189,127 @@ func averageNeighbors(rand &LCGRand, tiles '&[][]bool, x int, y int) bool {
         // true if most neighbors are white
         num_white_neighbors > num_neighbors / 2
       };
-  result_is_white
+  return result_is_white;
 }
 ```
 
 
-# Summary
+# A Common Pattern: Option Swapping
 
-Here's what we just saw:
-
- * The compiler will enforce that nothing inside an `iso` points out, and nothing outside an `iso` points in.
+Above, we showed how an `iso` in a variable can be passed to a function that read from it.
 
 
+`iso`s are incredibly versatile when held in local variables, as we saw above.
+
+
+Unless we use option swapping (explained below), an `iso` inside a struct can't be opened [# This is because an `iso` must never be opened twice at the same time, it must only be opened once. If we allowed opening a struct member `iso`, then it could indirectly be opened twice simultaneously.] unless:
+
+ * The containing struct is destroyed first. [# This restriction can be combined with [Higher RAII](https://verdagon.dev/blog/higher-raii-7drl) to make some pretty interesting mechanisms, such as the below `Cell`. It's also conceptually similar to `GhostToken` in Rust.] [# Draft TODO: Can an iso be used like a ghosttoken, to pass around permission to open, say, a mutex? It would be zero cost.]
+ * The containing struct is also `iso`.
+ * The containing struct is in an immutable region.
+
+
+But most of the time, we can just use a simple solution instead: wrap it in an `Option`!
+
+
+<<<<
+Here, a Spaceship has a private `Engine` that nobody outside needs to access.
+
+
+We'd also like to make it faster to read this engine, so this is a perfect use case for an `iso`!
+
+
+When we want to access it, we swap a None into its place, and then open it and put it in a local. Then we can use it like we did above.
+
+
+In the next section, we show a class that uses RAII to handle this for us automatically.
+////
+```
+struct Spaceship {
+  engine! Option<iso Engine>;
+}
+exported func blah(something &Something) {
+  thing_iso =
+      // Swaps a None into its place.
+      (set something.thing = None())
+      // Pull the iso out of the Some.
+      .expect();
+  // Immutably borrow from the iso!
+  thing_imm = thing_iso.imm;
+
+  // Can use the thing_imm freely!
+
+  // When we're done, we put it back.
+  set something.thing = Some(thing_iso);
+}
+```
+>>>>
+
+
+This is such a common pattern that we added a `Cell` type [# Not to be confused with Rust's `Cell`; it can be said that every field in Vale is implicitly a `Cell`. Rather, Vale's `Cell` is more like Rust's `RefCell`.] to the standard library to handle it all for us.
+
+
+# Cells
+
+<<<<
+[#cellro]
+////
+```
+struct Something {
+  thing! Cell<Spaceship>;
+}
+exported func blah(something &Something) {
+  thing_guard = «guard»
+      something.thing.open();
+  thing_imm = thing_iso.imm;
+
+  // ... use thing_imm
+
+  // thing_guard's drop() is automatically
+  // called here, which puts the iso back
+  // into the original Cell.
+}
+```
+>>>>
+
+<slice>
+
+#opencost: This is similar to how C++'s `lock' and Rust's `RefCell::borrow` work. It's a bit more efficient though: if the compiler already knows it's immutable, there won't be any cost to open it.
+
+Draft TODO: TBD if we actually want to add an assertion there to make sure we aren't opening something that someone else already has opened, even when in a pure function. It wouldnt cause any problems for a pure function to read something someone has opened, but a function's readwrite monomorph _would_ have an assertion so it might be good to be consistent. Perhaps a debug-only assertion, since it's not unsafe.
+
+#syntaxtbd: Draft TODO: Actual syntax TBD. It might even become something like `s = read(ship);`.
+
+#mostlyzero: Accessing any owned data, like the `.engine` and `.fuel` in this example, will be zero cost.
+
+Accessing any non-owning references, such as if `Spaceship` had a `fleet &Fleet`, might incur a "generation pre-check" as it reads it.
+
+#guard: This cell_guard is an `iso CellGuard<Spaceship>`. It will automatically put the Spaceship back into the original Cell at the end of the scope.
+
+Draft TODO: Note somewhere that if we have a local that's an iso container with an iso field, we can freely access what's contained in the isos.
+
+#cellro: Draft TODO: An rw region can use option swapping, an imm region can just read the thing directly but TBD how we can use a Cell in a region that's just readonly. Some options:
+
+ * Use a flavor of region overloading; have an overload that's used for the rw monomorph and a different overload for an imm region.
+ * Whitelist region overloading to only the standard library for now.
+ * Use a language builtin `cell` that does that instead.
+
+</slice>
 
 
 
 
 
 
-[] if given a bunch of iso elements will itself be iso. hmm.
+`[]` if given a bunch of iso elements will itself be iso. well more specifically, theyll be `iso [] iso T`.
+
+i dont think we can implicitly convert that to an `iso []T` though. we'd be throwing away that elements can have locks open to other elements or something.
+well maybe we can... if the outer iso isn't open then the inner cant be. i think.
+or perhaps we can default `iso` to be unique, and have something called a `cell` if we want to refer to it and lock it and stuff.
+
+
+
+hmm.
 ah, it will inherit the region of the elements. of course.
 
 foreach will do the same, but with a block.
@@ -249,28 +322,32 @@ can we do it without pure functions? no, things might be pointing into it.
 
 
 
-TODO: finish BenchmarkRL, think about how many checks might be eliminated by iso regions.
+
 
 
 
 with iso regions, we can make the inside or outside temporarily immutable.
 
 we can make outside temporarily imm, keeping inside mut. good for:
-- threads
-- coroutines that operate concurrently
-- ECS? a couple systems can be concurrently mutable and calculating, while previous stages are immutable?
+
+ * threads
+ * coroutines that operate concurrently
+ * ECS? a couple systems can be concurrently mutable and calculating, while previous stages are immutable?
 
 
 we can make inside temporarily imm, keeping outside mut. good for:
-- the AST in the compiler case
-- Pattern in Atharia
-- the giant state like in redux
-- reading a lot of data that we previously constructed. very similar pattern to rust things.
+
+ * the AST in the compiler case
+ * Pattern in Atharia
+ * the giant state like in redux
+ * reading a lot of data that we previously constructed. very similar pattern to rust things.
 
 
 can even flip them back and forth. in earth, we:
-- computed the new state based on an immutable understanding of the outside world.
-- immutably read the new state, while the outside world was mutable.
+
+ * computed the new state based on an immutable understanding of the outside world.
+ * immutably read the new state, while the outside world was mutable.
+
 This can prevent single-threaded race conditions in a lot of cases.
 this can help us enforce unidirectional data flow.
 
@@ -289,8 +366,9 @@ i'm really excited about what this can do for our architectures.
 
 
 How does this compare?
-- In Rust, every object is hard-isolated. it gets very few of the benefits we describe here.
-- In Pony, we can have `iso` objects which are hard-isolated.
+
+ * In Rust, every object is hard-isolated. it gets very few of the benefits we describe here.
+ * In Pony, we can have `iso` objects which are hard-isolated.
 
 
 
@@ -373,7 +451,7 @@ At the end of `templar`, the locks are dropped, automatically closing the mutexe
 
 With our `Mutexes` and region annotations, the compiler can give us free, zero-cost access to everything in the `inAst`.
 ////
-```vale
+```
 func templar(
     inAstMutex &Mutex<InAst>) {
   inAstLock = inAstMutex.openro();
@@ -418,7 +496,7 @@ We can take this even further: we can combine explicit locking and implicit lock
 
 
 
-```vale
+```
 struct AppState {
   card_id ?str;
   panel_open bool;
@@ -478,3 +556,10 @@ func updateFrom<'r ro>(card &Card, state 'r &AppState) {
   }
 }
 ```
+
+
+
+
+\#deepiso: `iso` can be applied to any pure function call. It will enforce that all arguments we pass in are also `iso`. Here, the compiler is automatically applying `iso` to the `Engine(...)` and `Radar(...)` calls.
+
+Draft TODO: See if there are any bad interactions with universal references. Last resort, `iso` calls might need a new implicit region instance with a new generation.
