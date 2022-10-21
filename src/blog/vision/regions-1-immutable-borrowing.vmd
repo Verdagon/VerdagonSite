@@ -11,7 +11,7 @@ sponsor: us
 ---
 
 
-! Note: This article is only a draft, describing how we think regions will work out in practice. Once we finish regions and benchmark it to determine how much overhead this eliminates, we'll publish it for real.
+! Note: This article is only a draft, describing how we think regions will work out in practice. Once we finish regions and benchmark it to determine how much overhead this eliminates, we'll publish it for real. [# Draft TODO: Add a diagram showing the incoming region becoming immutable.]
 
 
 Vale has an interesting challenge, to be *fast, safe, and easy.* There are a lot of stellar languages that have two, and we suspect it's possible to really maximize all three.
@@ -444,8 +444,6 @@ See you next time!
 
 - Evan Ovadia
 
-
-[# nobody cares about pure functions. talk about an easier borrow checker or something.]
 
 [# somewhere talk about how its kind of an automatic form of rust, since readonly lowers to both immutable and mutable. we kind of found a way to parameterize mutability, really]
 

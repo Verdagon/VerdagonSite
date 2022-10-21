@@ -12,9 +12,8 @@ sponsor: us
 
 
 
-lets come up with a better name.
+need to figure out what we need in functions to express that a region's objects can own other regions' objects inline.
 
-LifeCell likely not good. refcell has a bad name.
 
 
 
@@ -95,3 +94,9 @@ hard cuz we literally need two locals for this. one for the lock, one for the it
 rusts refcell likely faces this trouble too...
 
 foreach loops actually have a local for their iterable, you know. we could have it call lock for it perhaps? or user can do it explicitly, that kind of works.
+
+
+
+
+with channels, we can send isolated messages that point outside to mutable data.
+
