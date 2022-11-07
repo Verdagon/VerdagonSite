@@ -1,0 +1,364 @@
+---
+title: Draft Preview: Zero-Cost Memory Safety with Vale Regions, Part 4: Multi-Region Data
+subtitle: Watch how we split our memory into regions, for more performance!
+author: Evan Ovadia
+date: Draft, Preview
+realm: blog
+path: blog/zero-cost-memory-safety-regions-part-4-multi-region-data
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: us
+---
+
+
+Vale has an ambitious goal: to be fast, memory safe, and most importantly, _easy_. There are a lot of stellar languages that have two, and we suspect it's possible to really maximize all three.
+
+
+To do this, we're harnessing a new concept called *regions*.
+
+
+In [Part 1](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing) we saw how we can use *pure functions* to easily *immutably borrow* data to make it faster to access.
+
+
+[Part 2](/blog/zero-cost-memory-safety-regions-part-2-isolates) showed us how we could more precisely create regions via *isolates*, and immutably borrow them too.
+
+
+[Part 3](/blog/zero-cost-memory-safety-regions-part-3-one-way-isolation) showed us how we can get the benefit of isolates with many more kinds of data.
+
+
+Let's kick it up a notch, and use regions to *immutably borrow _part_ of an object* while being able to modify the rest of it.
+
+
+This pattern is incredibly versatile, and helps us eliminate memory safety overhead for iterating over collections, accessing private data, and even entire architectures such as [entity-component-system](https://en.wikipedia.org/wiki/Entity_component_system).
+
+
+# A simple example
+
+Later on, we'll show how to use this for arrays, hash maps, and larger data structures.
+
+
+First, let's see how we can use regions to make zero-cost iteration of a linked list.
+
+
+<<<<
+Here's a singly-linked list of `Ship`s.
+////
+```
+struct ShipListNode {
+  ship Ship;
+  next priv vary ?^ShipListNode; «questioncaret»
+}
+
+struct Ship {
+  name str;
+  hp int;
+}
+```
+>>>>
+
+
+<<<<
+Here we iterate over it. There's a much cleaner way to do this, but we'll be verbose here for clarity.
+
+
+Iterating over this list incurs a few generation checks:
+
+ * `maybe_cur.NonEmpty()`
+ * `maybe_cur.Expect()`
+ * `cur.ship`
+ * `ship.hp`
+ * `ship.name`
+ * `cur.next`
+
+////
+```
+exported func main() {
+  head =
+    Some(
+      ^ShipListNode(
+        Ship("Serenity", 10),
+        Some(
+          ^ShipListNode(
+            Ship("Raza", 22),
+            None))));
+
+  maybe_cur = head;
+  while maybe_cur.NonEmpty() {
+    cur = maybe_cur.Expect();
+
+    ship = cur.ship;
+    set cur.hp -= 5;
+    println("Damaged {cur.name}!");
+
+    maybe_cur = cur.next;
+  }
+}
+```
+>>>>
+
+
+Generation checks usually aren't a significant source of overhead, for various reasons. [#itsfine] But if we want to squeeze every ounce of performance out of this part of the program, and the profiler tells us that this area of the code is worth optimizing, we can bring out our region skills to get the job done.
+
+
+The first question to ask is: which parts of my data shouldn't change right now?
+
+
+The data in the contained `Ship` is changing, when we do `set cur.hp -= 5`.
+
+The `ShipListNode`s themselves don't seem to be changing though. Perhaps we can put them in a region?
+
+
+But... the `ShipListNode` contains a `Ship` _inline_. Can we have a struct in one region contain a struct in another one?
+
+
+Yes we can!
+
+
+# A struct in two worlds
+
+
+
+<<<<
+Here are those same structs, but now `ShipListNode` has some region annotations:
+
+
+Note the `ship a'Ship`. The `a'` here means that this data, even though it's inline, is still part of another region.
+////
+```
+struct ShipListNode<a'> {
+  ship a'Ship;
+  next priv vary ?^ShipListNode<a'>;
+}
+
+struct Ship {
+  name str;
+  hp int;
+}
+```
+>>>>
+
+
+<<<<
+Here, we put the list into an isolate with `'`. We specify `self'` for the `Ship`s to tell the compiler that they're in `main`'s region.
+
+
+`head` is of type `'?^ShipListNode<main'>`.
+
+
+And now, we borrow it immutably, using `.imm`. This makes `maybe_cur` and `cur` both immutable, which eliminates the generation checks from:
+
+ * `maybe_cur.NonEmpty()`
+ * `maybe_cur.Expect()`
+ * `cur.ship`
+ * `cur.next`
+
+
+There are still a couple generation checks: `ship.hp` and `ship.name`.
+
+In this example, the compiler actually eliminates these too with static analysis, because it knows they are owned by a region that's currently immutable.
+
+This is pretty common; a region's immutability often helps optimize things around it.
+////
+```
+exported func main() {
+  head =
+    'Some(
+      ^ShipListNode(
+        main'Ship("Serenity", 10),
+        Some(
+          ^ShipListNode(
+            main'Ship("Raza", 22),
+            None))));
+
+  maybe_cur = head.imm;
+  while maybe_cur.NonEmpty() {
+    cur = maybe_cur.Expect();
+
+    ship = cur.ship;
+    set cur.hp -= 5;
+    println("Damaged {cur.name}!");
+
+    maybe_cur = cur.next;
+  }
+}
+```
+>>>>
+
+
+<slice>
+#questioncaret: `?X` means "Option<X>", and `^` means "on the heap", so this is an optional ShipListNode on the heap.
+
+#itsfine: A couple reasons:
+
+ * They're perfectly predicted; the language always knows which way the CPU should speculatively execute.
+ * The generations are usually on the same cache line as the data itself.
+
+</slice>
+
+
+# Most generic structures are multi-region objects
+
+<<<<
+If we made the above list into a generic struct, it would look like this.
+////
+```
+struct ListNode<T> {
+  ship T;
+  next priv vary ?^ListNode<T>;
+}
+```
+>>>>
+
+
+It looks like an ordinary generic struct; there's not even any region annotations.
+
+
+That's because in Vale, `T` actually includes three things:
+
+ * The type, such as `Ship`.
+ * The ownership, whether it be owned, heap-owned ('^'), non-owning ('&'), or weak ('weak&')
+ * The region.
+
+When someone says `ListNode<&myiso'Ship>`, `T` is: non-owning (`&`) reference to a `Ship` from region `myiso`.
+
+
+If `T` is a `x'Ship`, that means `ListNode` owns data in another region, just like we saw with `ShipListNode`.
+
+
+So really, any generic struct might own data in another region.
+
+
+
+
+
+[# talk about how a tuple can point at two different regions. `struct Tup2<A, B> { a A; b B; }`, `Tup2<serv'Ship, req'Missile>`.]
+
+
+# Conclusion
+
+Every array, list, hash map, and other generic container in Vale is using multi-region data under the hood.
+
+
+This is incredibly powerful, because it lets us freeze the container while accessing the contained data, such as we saw in the above `ShipListNode`, and makes our entire program much faster. [# Draft TODO: estimate how many checks are eliminated just from the stdlib doing this]
+
+
+Between pure functions, isolates, and multi-region objects, we can eliminate the vast majority of memory safety overhead for our programs.
+
+
+The best thing about all of these mechanisms is that they are *opt-in*:
+
+ * A programmer can write a complete Vale program without ever learning about regions or multi-region-objects.
+ * A programmer can ignore any region annotations and still understand the code; regions don't affect a program's semantics.
+
+This is consistent with Vale's philosophy of [avoiding forced complexity](https://www.nngroup.com/articles/progressive-disclosure/).
+
+
+Next up is [Part 5](/blog/zero-cost-memory-safety-regions-part-5-region-scoped-data), where we talk about how we can make iteration much faster, and how to use regions to make entire architectures (such as [entity-component-system](https://en.wikipedia.org/wiki/Entity_component_system)) zero-cost.
+
+
+*That's all for now!* We hope you enjoyed this article. Stay tuned for the next article, which shows how one-way isolation works.
+
+
+If you're impressed with our [track record](https://vale.dev/roadmap#recent-additions) and believe in the [direction we're heading](https://vale.dev/roadmap), please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>
+
+With your support, we can bring regions to programmers worldwide.
+
+
+See you next time!
+
+- Evan Ovadia
+
+[#note0] [#note1] [#note2] [#note3] [# talk about how this lets us truly have an opt-in borrow checker thats much more usable, flexible, and intuitive. it fits the natural structure of our programs much better. the iso is what truly makes it an opt-in borrow checker.]
+
+
+<slice new-color="afterword">
+#note0: Draft TODO: mention somewhere that with channels, we can send isolated messages that point outside to mutable data.
+
+#note1: What happens when we have `MyStruct<T>` impl `MyInterface`, but then try to upcast `MyStruct<a'Bork>`? Does it become a a'MyInterface? but it itself isn't in region `a'`. Perhaps we need something like `MyInterface + a'`? Maybe we can get around it with a &''Something?
+
+#note2: Seamless concurrency threads use this under the hood. I think even regular threads might be able to as well.
+
+#note3: Possible workaround: They can have an interface, and we can give them something that has an &''MyThing. Theyll call into the interface, and we'll lock the cell from there and open it up for reading and/or writing. The best part about all of this is that all of their stuff can be captured in their own iso. our stuff is iso, their stuff is iso, everyone's having a grand ol time. We need to figure out how much of this is really doable though. We might need to constrain the third party thing to our own region so it doesnt escape? `TheirThing : myregion'`.
+</slice>
+
+
+# Vale's Vision
+
+Vale aims to bring a new way of programming into the world that offers *speed*, *safety*, and *ease of use.*
+
+
+*The world needs something like this!* Currently, most programming language work is in:
+
+ * High-overhead languages involving reference counting and tracing garbage collection.
+ * Complex languages (Ada/Spark, Coq, Rust, Haskell, etc.) which impose higher complexity burden and mental overhead on the programmer.
+
+These are useful, but there is a *vast field of possibilities* in between, waiting to be explored!
+
+
+Our aim is to explore that space, discover what it has to offer, and make *speed and safety easier than ever before.*
+
+
+In this quest, we've discovered and implemented a lot of new techniques:
+
+ * [Generational Memory](/blog/generational-references), for a language to ensure an object still exists at the time of dereferencing.
+ * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
+ * [Fearless FFI](/blog/fearless-ffi), which allows us to call into C without risk of accidentally corrupting Vale objects.
+ * [Perfect Replayability](/blog/perfect-replayability-prototyped), to record all inputs and replay execution, and completely solve heisenbugs and race bugs.
+
+
+These techniques have also opened up some new emergent possibilities, which we hope to implement:
+
+ * [Region Borrow Checking](/blog/zero-cost-refs-regions), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
+ * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
+ * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
+
+
+We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
+
+ * We can mix an `unsafe` block with Fearless FFI to make a much safer systems programming language!
+ * We can mix Erlang's isolation benefits with functional reactive programming to make much more resilient programs!
+ * We can mix region borrow checking with Pony's `iso` to support shared mutability.
+
+...plus a lot more interesting ideas to explore!
+
+
+The Vale programming language is a novel combination of ideas from the research world and original innovations. Our goal is to publish our techniques, even the ones that couldn't fit in Vale, so that the world as a whole can benefit from our work here, not just those who use Vale.
+
+
+Our medium-term goals:
+
+ * Finish the Region Borrow Checker, to show the world that shared mutability can work with borrow checking!
+ * Prototype Hybrid-Generational Memory in Vale, to see how fast and easy we can make single ownership.
+ * Publish the Language Simplicity Manifesto, a collection of principles to keep programming languages' learning curves down.
+ * Publish the Memory Safety Grimoire, a collection of "memory safety building blocks" that languages can potentially use to make new memory models, just like Vale combined generational references and scope tethering.
+
+
+We aim to publish articles biweekly on all of these topics, and create and inspire the next generation of fast, safe, and easy programming languages.
+
+
+If you want to support our work, please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+With enough sponsorship, we can:
+
+ * Work on this full-time.
+ * Turn the Vale Language Project into a 501(c)(3) non-profit organization.
+ * Make Vale into a production-ready language, and push it into the mainstream!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>

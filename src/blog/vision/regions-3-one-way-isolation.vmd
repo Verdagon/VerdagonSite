@@ -1,0 +1,311 @@
+---
+title: Draft Preview: Zero-Cost Memory Safety with Vale Regions, Part 3: One-Way Isolation
+subtitle: Watch how we split our memory into regions, for more performance!
+author: Evan Ovadia
+date: Draft, Preview
+realm: blog
+path: blog/zero-cost-memory-safety-regions-part-3-one-way-isolation
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: us
+---
+
+
+Vale has an ambitious goal: to be fast, memory safe, and most importantly, _easy_. There are a lot of stellar languages that have two, and we suspect it's possible to really maximize all three.
+
+
+To do this, we're harnessing a new concept called *regions*.
+
+
+In [Part 1](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing) we saw how we can use *pure functions* to easily *immutably borrow* data to make it faster to access.
+
+
+[Part 2](/blog/zero-cost-memory-safety-regions-part-2-isolates) showed us how we could more precisely create regions via *isolates*, and immutably borrow them too.
+
+
+The isolates we've seen so far have had *complete isolation*: no outside data can point to any inside data, and vice versa. This is useful for a lot of things, but there are times when we want inside data to point out.
+
+
+Luckily, with *one-way isolation*, we can make data inside the region point to data outside the region.
+
+
+# An Example
+
+Here's something similar to the example we saw in Part 2.
+
+This snippet doesn't yet use isolation, we'll show that further below.
+
+
+<<<<
+
+
+There are a couple differences from what we saw in part 2:
+
+ * Cannon now points to an `EnergySource`.
+ * We subtract from the `EnergySource` whenever we fire on a ship.
+
+
+In Part 2, we were able to optimize this by making `cannon` isolated, because it didn't point to anything outside itself, and nothing outside pointed in.
+
+
+However, `Cannon` now points to an `EnergySource` outside itself, so we can't use the isolation we saw in Part 2.
+
+////
+```
+struct Cannon {
+  source &EnergySource;
+  strength int;
+  ...
+}
+
+struct EnergySource {
+  energy int;
+}
+
+struct Ship {
+  hp int;
+}
+
+exported func main() {
+  source = EnergySource(200);
+  cannon = Cannon(&source, 12);
+  ship = Ship(100);
+  fire(&cannon, &ship);
+  println("Ship's new hp: {ship.hp}");
+}
+
+func fire(
+  cannon &Cannon,
+  ship &Ship)
+void {
+  // Calculate damage using a very
+  // complex algorithm.
+  damage = cannon.strength * 2;
+
+  // Use up that much energy.
+  set cannon.source.energy -= damage;
+
+  // Now hit the ship!
+  set ship.hp -= damage;
+}
+```stdout
+Ship's new hp: 88
+```
+>>>>
+
+
+
+The answer is to use *one-way isolation*. Here's how!
+
+
+## Using One-Way Isolation
+
+
+Even though something inside the Cannon points outside itself, there's still nothing _outside_ that points _in_.
+
+
+In this case, we can still make `cannon` isolated, as long as we tell the compiler which parts of `Cannon` might point to outside itself.
+
+
+<<<<
+We still make the changes from Part 2:
+
+ * By putting the `'` in front of the `Cannon` call, `cannon` is now of type `'Cannon` which means it's isolated.
+ * `&cannon` became `cannon.imm`, which immutably borrows the iso's contents.
+ * We added `<c'>` after `func fire` so that the function can receive things in a read-only region, referred to as `c`.
+ * We added a `c'` to the `&Cannon` to show that it's in that read-only region.
+
+
+But there are a couple extra changes now, in `Cannon` and `fire`:
+
+ * `cannon` is now of type `'Cannon<main'>` which means it's isolated, but it can point to things inside main's region.
+ * We made fire's parameter into a `&c'Cannon<fire'>`, so that it can point to things inside `fire`'s own region.
+
+////
+```
+struct Cannon<e'> {
+  source &e'EnergySource;
+  strength int;
+  ...
+}
+
+struct EnergySource {
+  energy int;
+}
+
+struct Ship {
+  hp int;
+}
+
+exported func main() {
+  source = EnergySource(200);
+  cannon = Cannon(&source, 12);
+  ship = Ship(100);
+  fire(cannon.imm, &ship);
+  println("Ship's new hp: {ship.hp}");
+}
+
+func fire<c'>(
+  cannon &c'Cannon<fire'>,
+  ship &Ship)
+void {
+  // Very fast, no generation checks!
+  damage = cannon.strength;
+
+  // Take energy from energy source.
+  set cannon.source.energy -= damage;
+
+  // Now hit the ship!
+  set ship.hp -= damage;
+}
+```
+>>>>
+
+
+
+As you can see, we're still able to isolate `Cannon` and open it immutably, even though it points to something outside its own isolated region.
+
+
+A lot of real-world code can fit easily with one-way isolation. Most languages have a notion of "private" data, that's not exposed via an object's API. Those objects can be in the object's isolate, yet they can still point outside.
+
+
+With one-way isolation, we can immutably borrow much more of our programs data a lot more often.
+
+
+
+# Architectural Benefits
+
+
+The best thing about one-way isolation is that it's *opt-in*:
+
+ * A programmer can write a complete Vale program without ever learning about regions.
+ * A programmer can ignore any region annotations and still understand the code; regions don't affect a program's semantics.
+
+This is consistent with Vale's philosophy of [avoiding forced complexity](https://www.nngroup.com/articles/progressive-disclosure/).
+
+
+This has two extra benefits to the programmer:
+
+ * They can get started with Vale right away without learning these more advanced concepts.
+ * They can focus on the problem at hand while still iterating and building out the program, and add regions later once their profiling identifies where optimization is needed.
+
+
+In a way, regions and isolation allow us to get the optimization power of borrow checking, with less restrictions and constraints.
+
+
+# Conclusion
+
+
+As we saw, one-way isolation can allow us to use isolation even for data that points to things outside itself.
+
+
+[Part 4](/blog/zero-cost-memory-safety-regions-part-4-multi-region-data) shows how one object can contain another region's data inline, and [Part 5](/blog/zero-cost-memory-safety-regions-part-5-region-scoped-data) shows how that combined with one-way isolation can make certain patterns (iterating collections, calculating determinants, etc.) and entire architectures (like entity-component-system) zero-cost. [# Together, isolates, `pure` functions, and one-way isolation combine to form something that looks suspiciously like an entire new programming paradigm... whether that's true remains to be seen!]
+
+
+
+*That's all for now!* We hope you enjoyed this article. Stay tuned for the next article, which shows how one-way isolation works.
+
+
+If you're impressed with our [track record](https://vale.dev/roadmap#recent-additions) and believe in the [direction we're heading](https://vale.dev/roadmap), please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>
+
+With your support, we can bring regions to programmers worldwide.
+
+
+See you next time!
+
+- Evan Ovadia
+
+[#note0] [#note1] [#note2] [#note3] [# talk about how this lets us truly have an opt-in borrow checker thats much more usable, flexible, and intuitive. it fits the natural structure of our programs much better. the iso is what truly makes it an opt-in borrow checker.]
+
+
+<slice new-color="afterword">
+#note0: Draft TODO: mention somewhere that with channels, we can send isolated messages that point outside to mutable data.
+
+#note1: What happens when we have `MyStruct<T>` impl `MyInterface`, but then try to upcast `MyStruct<a'Bork>`? Does it become a a'MyInterface? but it itself isn't in region `a'`. Perhaps we need something like `MyInterface + a'`? Maybe we can get around it with a &''Something?
+
+#note2: Seamless concurrency threads use this under the hood. I think even regular threads might be able to as well.
+
+#note3: Possible workaround: They can have an interface, and we can give them something that has an &''MyThing. Theyll call into the interface, and we'll lock the cell from there and open it up for reading and/or writing. The best part about all of this is that all of their stuff can be captured in their own iso. our stuff is iso, their stuff is iso, everyone's having a grand ol time. We need to figure out how much of this is really doable though. We might need to constrain the third party thing to our own region so it doesnt escape? `TheirThing : myregion'`.
+</slice>
+
+
+# Vale's Vision
+
+Vale aims to bring a new way of programming into the world that offers *speed*, *safety*, and *ease of use.*
+
+
+*The world needs something like this!* Currently, most programming language work is in:
+
+ * High-overhead languages involving reference counting and tracing garbage collection.
+ * Complex languages (Ada/Spark, Coq, Rust, Haskell, etc.) which impose higher complexity burden and mental overhead on the programmer.
+
+These are useful, but there is a *vast field of possibilities* in between, waiting to be explored!
+
+
+Our aim is to explore that space, discover what it has to offer, and make *speed and safety easier than ever before.*
+
+
+In this quest, we've discovered and implemented a lot of new techniques:
+
+ * [Generational Memory](/blog/generational-references), for a language to ensure an object still exists at the time of dereferencing.
+ * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
+ * [Fearless FFI](/blog/fearless-ffi), which allows us to call into C without risk of accidentally corrupting Vale objects.
+ * [Perfect Replayability](/blog/perfect-replayability-prototyped), to record all inputs and replay execution, and completely solve heisenbugs and race bugs.
+
+
+These techniques have also opened up some new emergent possibilities, which we hope to implement:
+
+ * [Region Borrow Checking](/blog/zero-cost-refs-regions), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
+ * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
+ * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
+
+
+We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
+
+ * We can mix an `unsafe` block with Fearless FFI to make a much safer systems programming language!
+ * We can mix Erlang's isolation benefits with functional reactive programming to make much more resilient programs!
+ * We can mix region borrow checking with Pony's `iso` to support shared mutability.
+
+...plus a lot more interesting ideas to explore!
+
+
+The Vale programming language is a novel combination of ideas from the research world and original innovations. Our goal is to publish our techniques, even the ones that couldn't fit in Vale, so that the world as a whole can benefit from our work here, not just those who use Vale.
+
+
+Our medium-term goals:
+
+ * Finish the Region Borrow Checker, to show the world that shared mutability can work with borrow checking!
+ * Prototype Hybrid-Generational Memory in Vale, to see how fast and easy we can make single ownership.
+ * Publish the Language Simplicity Manifesto, a collection of principles to keep programming languages' learning curves down.
+ * Publish the Memory Safety Grimoire, a collection of "memory safety building blocks" that languages can potentially use to make new memory models, just like Vale combined generational references and scope tethering.
+
+
+We aim to publish articles biweekly on all of these topics, and create and inspire the next generation of fast, safe, and easy programming languages.
+
+
+If you want to support our work, please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+With enough sponsorship, we can:
+
+ * Work on this full-time.
+ * Turn the Vale Language Project into a 501(c)(3) non-profit organization.
+ * Make Vale into a production-ready language, and push it into the mainstream!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>

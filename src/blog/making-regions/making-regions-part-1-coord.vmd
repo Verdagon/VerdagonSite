@@ -17,13 +17,13 @@ In late 2019, I was lying in bed listening to my [favorite fanfiction podcast](h
 Suddenly, my eyes flew open as a realization hit me.
 
 
-That 2:00am realization sparked a chain reaction of events that spanned years, and led to the discovery of an *entire new memory safety paradigm.*
+That 2:00am realization sparked a chain reaction of events that spanned years, and led to the discovery of *an entire new memory safety paradigm.*
 
 
 This is the first post (of hopefully many!) about creating, designing, and implementing [regions](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing) in Vale.
 
 
-# The Chronobase, Superstructures, and "Regions"
+# Chronobase, Superstructures, and "Regions"
 
 <img width="100%" src="/images/incendian2.png" />
 
@@ -49,10 +49,10 @@ In fact, if we added [stored procedures](https://en.wikipedia.org/wiki/Stored_pr
 Late 2019 came around, and I was thinking about how we might make it so these stored procedures could read data from the outside world.
 
 
-At 2am that night, it occurred to me that *the type system could track that.* A `req'Spaceship` would be a Spaceship from the outside, and a `my'Spaceship` would be a spaceship inside the database.
+At 2am that night, it occurred to me that *the type system could track that.* A `req'Spaceship` would be a Spaceship from the outside, and a `db'Spaceship` would be a spaceship inside the database.
 
 
-This idea is exactly what inspired how [pure functions](http://localhost:8001/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing) work in Vale.
+This idea eventually led to the design of Vale's [pure functions](https://verdagon.dev/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing).
 
 
 # An Alien Concept
@@ -94,7 +94,7 @@ I started seeing regions _everywhere_. They were some sort of unifying generaliz
 I posted [Zero-Cost References with Regions in Vale](https://verdagon.dev/blog/zero-cost-refs-regions), and people started reaching out to me about other designs in the space. I had a call with [Forty2](http://forty2.is/)'s Marco Servetti and we talked for hours about our different takes on regions, and someone shared [Milano, Turcotti, and Myers](https://www.cs.cornell.edu/andru/papers/gallifrey-types/gallifrey-types.pdf)'s work on concurrency models.
 
 
-The biggest revelation came when I was lying on the floor in a random Georgia AirBnB [# The house was called "Little Mexico" and had nary a square foot of unoccupied wall space, it was so full of Mexico decorations. Hands-down one of the coolest AirBnBs ever!] When I realized that we could blend region annotations to make "one-way isolation". But that's a story for a few posts from now!
+The biggest revelation came when I was lying on the floor in a random Georgia AirBnB [# The house was called "Little Mexico" and had nary a square foot of unoccupied wall space, it was so full of Mexico decorations. Hands-down one of the coolest AirBnBs ever.] When I realized that we could blend region annotations to make "one-way isolation". But that's a story for a few posts from now!
 
 
 Later, I even found a way to use regions to obviate most of [Hybrid-Generational Memory](https://verdagon.dev/blog/hybrid-generational-memory), another concept I was pursuing in Vale.
@@ -108,13 +108,14 @@ Eventually, generational references and regions combined to form an entire new p
 
 I'm describing the full design in a parallel series, [Zero-Cost Memory Safety with Vale Regions](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing):
 
- * Part 1 talks about how we can use pure functions to establish immutable regions, so we can access memory with zero overhead.
- * Part 2 covers how we can also establish immutable regions even outside of pure functions, using "`iso`lated sub-regions".
- * Part 3 shows how we can enable "one-way isolation", for sub-regions to have references outside their own region.
- * Part 4 talks about how one-way isolation lets us read private data, which also automatically eliminates generation checks for data-oriented designs like entity component systems.
+ * [Part 1](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing) talks about how we can use pure functions to establish immutable regions, and then access that memory with zero overhead.
+ * [Part 2](/blog/zero-cost-memory-safety-regions-part-2-isolates) covers how we don't need a pure function to establish an immutable region! We can have an isolated sub-region (we have the only reference to it) and open it immutably.
+ * [Part 3](/blog/zero-cost-memory-safety-regions-part-3-one-way-isolation) shows how we can enable "one-way isolation", for sub-regions to have references outside their own region, and how we can eliminate generation checks for private data.
+ * [Part 4](/blog/zero-cost-memory-safety-regions-part-4-multi-region-data) talks about how an object or array can contain other regions' objects inline, which helps automatically eliminate generation checks for [data-oriented designs](https://en.wikipedia.org/wiki/Data-oriented_design) like [entity component systems](https://en.wikipedia.org/wiki/Entity_component_system).
+ * [Part 5](/blog/zero-cost-memory-safety-regions-part-5-region-scoped-data) shows how regions can make iteration much faster, and how to use regions to make entire architectures (such as [entity-component-system](https://en.wikipedia.org/wiki/Entity_component_system)) zero-cost.
 
 
-Take a look!
+Take a look! But note that these are just a preview of how it _will_ work, not how it works today.
 
 
 # Implementing It
@@ -147,10 +148,16 @@ I hit one such open question almost immediately: *Is the region part of the refe
 Let's unpack that question, and see what it's really asking.
 
 
-To the user, we can have a `r'Spaceship`; that `r'` is something independent of the type and the type doesn't need to know that it's in one region or the other. Rather, the `r'` is part of the _reference_.
+To the user, we can have a `r'Spaceship`; that `r'` is something independent of the type (`Spaceship`) and the type doesn't need to know that it's in one region or the other. Rather, the `r'` is part of the _reference_.
 
 
-However, we don't have to represent it that way under the hood. The parser can transform that `r'Spaceship` to `Spaceship<r'>`, and we can have the rule that the struct is "in" its last region parameter. Here, the `r'` is part of the _type_. This can be advantageous in that it greatly simplifies some of the implementation.
+However, we don't have to represent it that way under the hood. We _could_ make it so:
+
+ * The parser transforms that `r'Spaceship` to `Spaceship<r'>`. Now, `r'` is part of the _type_.
+ * Have a rule that every type implicitly has at least one region parameter.
+ * Consider any type to be "in" its last region parameter.
+
+This can simplify some of the implementation, for arcane reasons I won't go into here.
 
 
 A similar design question comes up in other languages:
@@ -172,7 +179,7 @@ These seem to suggest that we should go with the first option: have it has part 
 In other words, if it's a struct, then `r'Spaceship` will actually be lowered to `r'Spaceship<r'>`. This should give us a lot of the implementation simplifications, and it also leaves open the door to take out one or the other later on.
 
 
-Redundancies like this can be dangerous sometimes, if they can become out of sync. However, as long as we have an assertion that upholds this redundancy, nothing can become out of sync.
+Redundancies like this can be dangerous sometimes, if they can become out of sync. However, as long as we have assertions that upholds this redundancy, there's no problems.
 
 
 With that, the next step is to get a basic pure function working!
@@ -181,11 +188,107 @@ With that, the next step is to get a basic pure function working!
 # Uncomfortably Exciting
 
 
-At Google, we often used the phrase "uncomfortably exciting" to describe when you're a bit scared of your own idea. That definitely captures how I'm feeling right now.
+At my old job, we often used the phrase "uncomfortably exciting" to describe when you're a bit scared of your own idea. That definitely captures how I'm feeling right now.
 
 
-This idea has been _years_ in the making, and it's finally happening. And if it's as good as I think it is, it will completely change the way some of us program.
+This idea has been _years_ in the making, and it's finally happening now that all the foundations are complete. And if it's as good as I think it is, it will completely change the way some of us program.
 
 
-Onward, to the gates of invention and glory!
+*That's all for now!* I hope you enjoyed this article. Keep an eye out for the next one on our [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), [discord server](https://discord.gg/SNB8yGH), or [subreddit](https://reddit.com/r/vale)!
+
+
+
+If you're impressed with our [track record](https://vale.dev/roadmap#recent-additions) and believe in the [direction we're heading](https://vale.dev/roadmap), please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>
+
+With your support, we can bring regions to programmers worldwide.
+
+
+See you next time!
+
+- Evan Ovadia
+
+
+<slice new-color="afterword"/>
+
+# Vale's Vision
+
+Vale aims to bring a new way of programming into the world that offers *speed*, *safety*, and *ease of use.*
+
+
+*The world needs something like this!* Currently, most programming language work is in:
+
+ * High-overhead languages involving reference counting and tracing garbage collection.
+ * Complex languages (Ada/Spark, Coq, Rust, Haskell, etc.) which impose higher complexity burden and mental overhead on the programmer.
+
+These are useful, but there is a *vast field of possibilities* in between, waiting to be explored!
+
+
+Our aim is to explore that space, discover what it has to offer, and make *speed and safety easier than ever before.*
+
+
+In this quest, we've discovered and implemented a lot of new techniques:
+
+ * [Generational Memory](/blog/generational-references), for a language to ensure an object still exists at the time of dereferencing.
+ * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
+ * [Fearless FFI](/blog/fearless-ffi), which allows us to call into C without risk of accidentally corrupting Vale objects.
+ * [Perfect Replayability](/blog/perfect-replayability-prototyped), to record all inputs and replay execution, and completely solve heisenbugs and race bugs.
+
+
+These techniques have also opened up some new emergent possibilities, which we hope to implement:
+
+ * [Region Borrow Checking](/blog/zero-cost-refs-regions), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
+ * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
+ * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
+
+
+We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
+
+ * We can mix an `unsafe` block with Fearless FFI to make a much safer systems programming language!
+ * We can mix Erlang's isolation benefits with functional reactive programming to make much more resilient programs!
+ * We can mix region borrow checking with Pony's `iso` to support shared mutability.
+
+...plus a lot more interesting ideas to explore!
+
+
+The Vale programming language is a novel combination of ideas from the research world and original innovations. Our goal is to publish our techniques, even the ones that couldn't fit in Vale, so that the world as a whole can benefit from our work here, not just those who use Vale.
+
+
+Our medium-term goals:
+
+ * Finish the Region Borrow Checker, to show the world that shared mutability can work with borrow checking!
+ * Prototype Hybrid-Generational Memory in Vale, to see how fast and easy we can make single ownership.
+ * Publish the Language Simplicity Manifesto, a collection of principles to keep programming languages' learning curves down.
+ * Publish the Memory Safety Grimoire, a collection of "memory safety building blocks" that languages can potentially use to make new memory models, just like Vale combined generational references and scope tethering.
+
+
+We aim to publish articles biweekly on all of these topics, and create and inspire the next generation of fast, safe, and easy programming languages.
+
+
+If you want to support our work, please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+With enough sponsorship, we can:
+
+ * Work on this full-time.
+ * Turn the Vale Language Project into a 501(c)(3) non-profit organization.
+ * Make Vale into a production-ready language, and push it into the mainstream!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>
+
 

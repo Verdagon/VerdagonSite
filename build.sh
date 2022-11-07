@@ -143,10 +143,20 @@ if [ $TARGET == "grimoire" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
+if [ $TARGET == "generational-references-v1" ] || [ $TARGET == "all" ] ; then
+  echo "Doing generational-references-v1"
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/generational-references-v1 src/blog/retired/generational-references-v1.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/generational-references-v1 src/blog/retired/generational-references-v1.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
 if [ $TARGET == "generational-references" ] || [ $TARGET == "all" ] ; then
   echo "Doing generational-references"
-  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/generational-references src/blog/retired/generational-references.vmd
-  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/generational-references src/blog/retired/generational-references.vmd
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/generational-references src/blog/vision/generational-references.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/generational-references src/blog/vision/generational-references.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -328,6 +338,36 @@ if [ $TARGET == "regions-2-isolates" ] || [ $TARGET == "all" ] ; then
   echo "Doing regions-2-isolates"
   echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-2-isolates src/blog/vision/regions-2-isolates.vmd
   eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-2-isolates src/blog/vision/regions-2-isolates.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
+if [ $TARGET == "regions-3-one-way-isolation" ] || [ $TARGET == "all" ] ; then
+  echo "Doing regions-3-one-way-isolation"
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-3-one-way-isolation src/blog/vision/regions-3-one-way-isolation.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-3-one-way-isolation src/blog/vision/regions-3-one-way-isolation.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
+if [ $TARGET == "regions-4-multi-region-data" ] || [ $TARGET == "all" ] ; then
+  echo "Doing regions-4-multi-region-data"
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-4-multi-region-data src/blog/vision/regions-4-multi-region-data.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-4-multi-region-data src/blog/vision/regions-4-multi-region-data.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
+if [ $TARGET == "regions-5-region-scoped-data" ] || [ $TARGET == "all" ] ; then
+  echo "Doing regions-5-region-scoped-data"
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-5-region-scoped-data src/blog/vision/regions-5-region-scoped-data.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-5-region-scoped-data src/blog/vision/regions-5-region-scoped-data.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1

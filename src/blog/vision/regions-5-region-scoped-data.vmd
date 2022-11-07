@@ -1,0 +1,320 @@
+---
+title: Draft Preview: Zero-Cost Memory Safety with Vale Regions, Part 5: Region-Scoped Data
+subtitle: Watch how we split our memory into regions, for more performance!
+author: Evan Ovadia
+date: Draft, Preview
+realm: blog
+path: blog/zero-cost-memory-safety-regions-part-5-region-scoped-data
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: us
+---
+
+
+
+Vale has an ambitious goal: to be fast, memory safe, and most importantly, _easy_. There are a lot of stellar languages that have two, and we suspect it's possible to really maximize all three.
+
+
+To do this, we're harnessing a new concept called *regions*.
+
+
+In [Part 1](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing) we saw how we can use *pure functions* to easily *immutably borrow* data to make it faster to access.
+
+
+[Part 2](/blog/zero-cost-memory-safety-regions-part-2-isolates) showed us how we could more precisely create regions via *isolates*, and immutably borrow them too.
+
+
+[Part 3](/blog/zero-cost-memory-safety-regions-part-3-one-way-isolation) showed us how we can get the benefit of isolates with many more kinds of data.
+
+
+Then in [Part 4](/blog/zero-cost-memory-safety-regions-part-4-multi-region-data), we saw how we could immutably borrow only part of an object, so that we could have more precise control over what parts of our data were immutable.
+
+
+In this final part, we'll show how we can limit some data to never outlive a certain region, and how that enables useful optimizations like zero-cost iteration.
+
+
+# Cells and Iteration
+
+
+<<<<
+In Part 4, we saw a basic linked list.
+
+
+Here it is again, renamed to `LinkedListNode` to be consistent with Vale's standard library.
+
+
+Now, we're going to add a `LinkedList` class which holds the head of the linked list.
+
+
+The `''` in `''?^LinkedListNode<T>` means we're holding the head of the list in a *cell*, like we saw in [Part 2](/blog/zero-cost-memory-safety-regions-part-2-isolates).
+////
+```
+struct LinkedListNode<T> {
+  ship T;
+  next priv vary ?^LinkedListNode<T>;
+}
+
+struct LinkedList<T> {
+  head ''?^LinkedListNode<T>;
+}
+```
+>>>>
+
+
+<<<<
+Here's a basic use case, where we're turning the list immutable to iterate over it faster, and subtracting from each ship's fuel.
+////
+```
+exported func main() {
+  list = LinkedList<Ship>();
+  list.add(Ship("Serenity", 10));
+  list.add(Ship("Raza", 22));
+
+  foreach x in list.iter() {
+    set x.fuel -= 5;
+    println("Reduced {x.name}'s fuel");
+  }
+}
+```stdout
+Reduced Serenity's fuel
+Reduced Raza's fuel
+```
+>>>>
+
+
+There are three surprising things here:
+
+ * There's no change in the List's API, the usage of a cell is entirely encapsulated within `LinkedList` and its functions.
+ * Even though the list is immutable, we can still modify the ships inside. This is because of Vale's "multi-region data" described back in [Part 4](/blog/zero-cost-memory-safety-regions-part-4-multi-region-data).
+ * We get these benefits even when iterating!
+
+
+Let's talk about that last one, as it involves some concepts we haven't really covered before.
+
+
+<slice />
+
+
+## `foreach` is just `while` with an iterator
+
+
+Under the hood, this is using an *iterator*, a small struct that keeps track of where we are in the list.
+
+
+<<<<
+`foreach` is just syntactic sugar for using iterators.
+
+Here's the above program, without the `foreach` syntactic sugar.
+
+
+First, it takes the expression after `in` (here, `list.iter()`) and puts it in a local, `iterable`. (1)
+
+Then, it makes an iterator for it using its `Begin` function. (2)
+
+Every iteration, it will first call `HasNext` to see if there's a next element (3), and then call `Next` to get it. (4)
+////
+```
+exported func main() {
+  list = ...;
+
+  iterable = list.imm; // 1
+  iterator = iterable.Begin(); // 2
+  while iterator.HasNext() { // 3
+    x = iterator.Next(); // 4
+
+    println(x);
+  }
+}
+```
+>>>>
+
+
+There are two interesting things happening here, regarding regions.
+
+
+First, `list.iter()` is borrowing a cell immutably, and producing a cell guard like we saw in [Part 2](/blog/zero-cost-memory-safety-regions-part-2-isolates). Here we're _returning_ that cell guard. [# Draft TODO: Talk about how this requires an RC, or scope tether uprooting.]
+
+
+Second, we're using `Begin` to make an iterator that is _scoped_ to the lifetime of that cell guard. The compiler then makes sure the iterator won't outlive the cell guard.
+
+
+Let's talk about that a bit more!
+
+
+<slice />
+
+
+## Limiting Structs
+
+
+When we say `iterable.Begin()`, we're giving `Begin` a `?&i'LinkedListNode<Ship>`, where `i'` is the implicit hidden region tied to the lifetime of the `iterable` cell guard, like we saw in [Part 2](/blog/zero-cost-memory-safety-regions-part-2-isolates).
+
+
+`LinkedList.vale` has a function which accepts that type:
+
+
+```
+func Begin<x', T>(head ?&x'LinkedListNode<T>) LinkedListIter<x', T> {
+  return LinkedListIter<x', T>(head); «xandt»
+}
+```
+
+The call will return a `LinkedListIter<i', Ship>` which we can later call `.HasNext()` and `.Next()` on.
+
+
+Note the `i'` in `LinkedListIter<i', Ship>`.
+
+
+When a struct has a region generic parameter, the compiler makes sure that *the struct doesn't outlive that region.*
+
+
+So here, we know that `LinkedListIter<i', Ship>` won't outlive `i'`. `i'` came from the cell guard, so the iterator won't outlive the cell guard.
+
+
+That's what it means to "limit" a struct; if a struct has a region parameter, the compiler makes sure it does not outlive that region.
+
+
+<slice>
+#xandt: The `<x', T>` is just included for clarity, the compiler can infer it if we leave it out.
+</slice>
+
+
+# Other Collections, Classes, and Architectures
+
+We can use this pattern for any data structure, not just LinkedList.
+
+
+<<<<
+Vale's `List` is an array list with a cell.
+
+
+This lets us iterate over the array with zero generation checks.
+////
+```
+struct List<T> {
+  array priv vary ''[]E;
+}
+```
+>>>>
+
+
+HashSet, HashMap, and all the collections have cells under the hood. These are private implementation details that the user doesn't have to worry about.
+
+
+We can use this for any class; Part 2 showed us how a Ship can have a private Engine in a cell.
+
+
+These techniques can even make entire architectures fast. [Entity-component-system](https://en.wikipedia.org/wiki/Entity_component_system) is an architecture that holds all of its state in `List<T>`s, and iterates through them a lot. Since iterating is now zero-cost, architectures like this become much faster in Vale.
+
+
+<slice />
+
+
+# Conclusion
+
+
+As you can see, structs can be "scoped" to the lifetime of an existing region, such as one that's produced by opening a cell. This lets us more flexibly access data from a region.
+
+
+This is especially useful for iterators, which like to immutably open a collection's contents and read them much faster.
+
+
+[# Draft TODO: talk about how all these techniques come together to give us a ton of optimization power. kind of like a super-powered blend of borrow checking, shared mutability, and other stuff.]
+
+
+*That's all for now!* We hope you enjoyed this article. Stay tuned for the next article, which shows how one-way isolation works.
+
+
+If you're impressed with our [track record](https://vale.dev/roadmap#recent-additions) and believe in the [direction we're heading](https://vale.dev/roadmap), please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>
+
+With your support, we can bring regions to programmers worldwide.
+
+
+See you next time!
+
+- Evan Ovadia
+
+
+<slice new-color="afterword"/>
+
+
+# Vale's Vision
+
+Vale aims to bring a new way of programming into the world that offers *speed*, *safety*, and *ease of use.*
+
+
+*The world needs something like this!* Currently, most programming language work is in:
+
+ * High-overhead languages involving reference counting and tracing garbage collection.
+ * Complex languages (Ada/Spark, Coq, Rust, Haskell, etc.) which impose higher complexity burden and mental overhead on the programmer.
+
+These are useful, but there is a *vast field of possibilities* in between, waiting to be explored!
+
+
+Our aim is to explore that space, discover what it has to offer, and make *speed and safety easier than ever before.*
+
+
+In this quest, we've discovered and implemented a lot of new techniques:
+
+ * [Generational Memory](/blog/generational-references), for a language to ensure an object still exists at the time of dereferencing.
+ * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
+ * [Fearless FFI](/blog/fearless-ffi), which allows us to call into C without risk of accidentally corrupting Vale objects.
+ * [Perfect Replayability](/blog/perfect-replayability-prototyped), to record all inputs and replay execution, and completely solve heisenbugs and race bugs.
+
+
+These techniques have also opened up some new emergent possibilities, which we hope to implement:
+
+ * [Region Borrow Checking](/blog/zero-cost-refs-regions), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
+ * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
+ * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
+
+
+We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
+
+ * We can mix an `unsafe` block with Fearless FFI to make a much safer systems programming language!
+ * We can mix Erlang's isolation benefits with functional reactive programming to make much more resilient programs!
+ * We can mix region borrow checking with Pony's `iso` to support shared mutability.
+
+...plus a lot more interesting ideas to explore!
+
+
+The Vale programming language is a novel combination of ideas from the research world and original innovations. Our goal is to publish our techniques, even the ones that couldn't fit in Vale, so that the world as a whole can benefit from our work here, not just those who use Vale.
+
+
+Our medium-term goals:
+
+ * Finish the Region Borrow Checker, to show the world that shared mutability can work with borrow checking!
+ * Prototype Hybrid-Generational Memory in Vale, to see how fast and easy we can make single ownership.
+ * Publish the Language Simplicity Manifesto, a collection of principles to keep programming languages' learning curves down.
+ * Publish the Memory Safety Grimoire, a collection of "memory safety building blocks" that languages can potentially use to make new memory models, just like Vale combined generational references and scope tethering.
+
+
+We aim to publish articles biweekly on all of these topics, and create and inspire the next generation of fast, safe, and easy programming languages.
+
+
+If you want to support our work, please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+With enough sponsorship, we can:
+
+ * Work on this full-time.
+ * Turn the Vale Language Project into a 501(c)(3) non-profit organization.
+ * Make Vale into a production-ready language, and push it into the mainstream!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>

@@ -1,5 +1,5 @@
 ---
-title: Zero-Cost Memory Safety with Vale Regions, Part 1: Immutable Region Borrowing
+title: Preview: Zero-Cost Memory Safety with Vale Regions, Part 1: Immutable Region Borrowing
 subtitle: Watch regions eliminate memory safety overhead!
 author: Evan Ovadia
 date: Draft, Preview
@@ -11,10 +11,10 @@ sponsor: us
 ---
 
 
-! Note: This article is only a draft, describing how we think regions will work out in practice. Once we finish regions and benchmark it to determine how much overhead this eliminates, we'll publish it for real. [# Draft TODO: Add a diagram showing the incoming region becoming immutable.]
+! Note: This article is only a preview, describing how we think regions will work out in practice. Once we finish regions and benchmark it to determine how much overhead this eliminates, we'll publish it for real.
 
 
-Vale has an interesting challenge, to be *fast, safe, and easy.* There are a lot of stellar languages that have two, and we suspect it's possible to really maximize all three.
+Vale has an ambitious goal: to be fast, safe, _and_ easy. There are a lot of stellar languages that have two, and we suspect it's possible to really maximize all three.
 
 
 This isn't quite possible with today's more well-known approaches. Languages with borrow checking have stellar run-time speed, and languages with garbage collection tend to have better flexibility, simplicity, and development velocity, and we haven't yet seen a way to get all these benefits at once.
@@ -62,7 +62,7 @@ In this article, we'll show you how it's all possible!
 <slice/>
 
 
-# Immutable Borrowing Example: Pure Function
+# Immutable Borrowing Example: Pure Function [# Draft TODO: Add a diagram showing the incoming region becoming immutable.]
 
 Regions can eliminate memory safety overhead for impure functions [# Most functions are impure. A function is only pure if it doesn't modify any data that existed before the call.] and for groups of data marked `iso`, but let's start with the simplest example, a pure function.
 
@@ -403,9 +403,10 @@ We've only covered one basic example, showing how pure functions use regions to 
 
 There are a lot of other ways regions help:
 
- * Part 2 covers how we don't need a pure function to establish an immutable region! We can have an `iso`lated sub-region (we have the only reference to it) and open it immutably.
- * Part 3 shows how we can enable "one-way `iso`lation", for sub-regions to have references outside their own region, and how we can eliminate generation checks for private data.
- * Part 4 talks about how an object or array can contain other regions' objects inline, which helps automatically eliminate generation checks for [data-oriented designs](https://en.wikipedia.org/wiki/Data-oriented_design) like [entity component systems](https://en.wikipedia.org/wiki/Entity_component_system).
+ * [Part 2](/blog/zero-cost-memory-safety-regions-part-2-isolates) covers how we don't need a pure function to establish an immutable region! We can have an `iso`lated sub-region (we have the only reference to it) and open it immutably.
+ * [Part 3](/blog/zero-cost-memory-safety-regions-part-3-one-way-isolation) shows how we can enable "one-way `iso`lation", for sub-regions to have references outside their own region, and how we can eliminate generation checks for private data.
+ * [Part 4](/blog/zero-cost-memory-safety-regions-part-4-multi-region-data) talks about how an object or array can contain other regions' objects inline, which helps automatically eliminate generation checks for [data-oriented designs](https://en.wikipedia.org/wiki/Data-oriented_design) like [entity component systems](https://en.wikipedia.org/wiki/Entity_component_system).
+ * [Part 5](/blog/zero-cost-memory-safety-regions-part-5-region-scoped-data) shows how regions can make iteration much faster, and how to use regions to make entire architectures (such as [entity-component-system](https://en.wikipedia.org/wiki/Entity_component_system)) zero-cost.
 
 
 Regions don't just help performance, they also enable some *novel features:*

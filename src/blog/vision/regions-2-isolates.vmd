@@ -1,8 +1,8 @@
 ---
-title: Zero-Cost Memory Safety with Vale Regions, Part 2: Isolates and Message Passing
+title: Draft Preview: Zero-Cost Memory Safety with Vale Regions, Part 2: Isolates
 subtitle: Watch how we split our memory into regions, for more performance!
 author: Evan Ovadia
-date: Draft
+date: Draft, Preview
 realm: blog
 path: blog/zero-cost-memory-safety-regions-part-2-isolates
 layout: annotated
@@ -11,29 +11,22 @@ sponsor: us
 ---
 
 
-[# an iso object can come with an allocator attached to it perhaps... maybe that should be a special syntax or something. `MyAllocator^iso Fleet`]
-[# perhaps this article should just have isos as messages between threads?]
-[# nobody cares about iso objects. talk about zero cost message passing? maybe also talk about channels...]
-[# talk about how this can harness the power of a borrow checker, without the AxM restrictions on objects.]
-[# TODO: finish BenchmarkRL, think about how many checks might be eliminated by iso regions.]
-[# Instead of eg `iso [][]bool`, can we say `'[][]bool`? An iso _is_ kind of like an anonymous region after all.]
-[# Can we use `iso`s to create a pattern, and then we somehow freeze it for the rest of its lifetime? Would be super useful for Patterns.]
-[# Talk about how we can combine iso regions and pure functions to make the outside immutable while keeping the inside mutable. Friggin crazy, if you ask me. This is what enables pure functions and seamless concurrency, if you squint. You can also flip back and forth: do that when constructing a thing, and then return the new thing as an immutable.]
+Vale has an ambitious goal: to be fast, memory safe, and most importantly, _easy_. There are a lot of stellar languages that have two, and we suspect it's possible to really maximize all three.
 
 
-! Generational references are complete but *the rest of these mechanisms are works in progress.* We'll be implementing these features over the next two years, per the [roadmap](https://vale.dev/roadmap).
+To do this, we're harnessing a new concept called *regions*.
 
 
-Vale has an interesting challenge, to be *fast, safe, and easy.* There are a lot of stellar languages that have two, and we suspect it's possible to really maximize all three.
-
-
-To do this, we're harnessing a new concept called *regions*. [Part 1](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing) showed how we can use a `pure` function to "immutably borrow" a region, to eliminate memory safety costs when accessing it.
+In [Part 1](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing), we saw how we can use `pure` functions to easily "immutably borrow" a region, to eliminate memory safety costs when accessing it.
 
 
 That works really well for the sections of our program that can be phrased as pure functions. [#puref]
 
 
 We can use regions to eliminate memory safety overhead in other places too, using a concept called "isolates".
+
+
+! Generational references are complete but *the rest of these mechanisms are works in progress.* We'll be implementing these features over the next two years, per the [roadmap](https://vale.dev/roadmap). [#drafttodos]
 
 
 # Isolates
@@ -47,37 +40,40 @@ Some examples:
  * In an [entity-component-system](https://en.wikipedia.org/wiki/Entity_component_system) architecture, each separate component (and the arrays holding them) are isolates.
  * A webapp might choose to centralize each component's state into an isolate.
  * A compiler could put a stage's [Abstract Syntax Tree](https://en.wikipedia.org/wiki/Abstract_syntax_tree) into an isolate.
- * A message passed from one thread to another would be an isolate, giving a language [fearless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency).
+ * A message sent via a channel from one thread to another would be an isolate, giving a language [fearless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency).
 
 
-By default, nothing _inside_ an `iso` can point _out_ either, though Part 3 shows how we can enable that using *one-way isolation*. Most private data can actually be expressed very cleanly with one-way isolation. [# `pure` functions use it under the hood as well, if you squint hard enough.]
+By default, nothing _inside_ an isolate can point _out_ either, though [Part 3](/blog/zero-cost-memory-safety-regions-part-3-one-way-isolation) shows how we can enable that using *one-way isolation*. Most private data can actually be expressed very cleanly with one-way isolation. [# `pure` functions use it under the hood as well, if you squint hard enough.]
 
-Part 4 also shows how one-way isolation can make certain patterns (iterating, determinants, etc.) and entire architectures (like [entity-component-system](https://en.wikipedia.org/wiki/Entity_component_system)) zero-cost. [# Together, `iso`lates, `pure` functions, and one-way isolation combine to form something that looks suspiciously like an entire new programming paradigm... whether that's true remains to be seen!]
+[Part 4](/blog/zero-cost-memory-safety-regions-part-4-multi-region-data) also shows how one-way isolation can make certain patterns (iterating, determinants, etc.) and entire architectures (like [entity-component-system](https://en.wikipedia.org/wiki/Entity_component_system)) zero-cost. [# Together, isolates, `pure` functions, and one-way isolation combine to form something that looks suspiciously like an entire new programming paradigm... whether that's true remains to be seen!]
 
-For the rest of this post though, we'll focus on regular `iso`lates, where nothing inside can point out.
-
-
-Most programs are naturally hierarchies of isolated data, [# More specifically, they're naturally hierarchies of _one-way_ isolated data. Private data often points outward, especially in stateful code.] no matter what language they're written in. `iso` can be used to help the compiler know where those isolates are, so it can make more optimal code. [# We can even take this to the extreme and make everything `iso`, and we'd end up with data roughly the same shape as in Rust programs. In practice, there's a balance somewhere in-between.]
+For the rest of this post though, we'll focus on regular isolates, where nothing inside can point out.
 
 
-One doesn't need to use `iso` for everything, of course. Consistent with Vale's philosophy of [reducing default complexity](https://www.nngroup.com/articles/progressive-disclosure/), `iso`lates are *opt-in*.
+Most programs are naturally hierarchies of isolated data, [# More specifically, they're naturally hierarchies of _one-way_ isolated data. Private data often points outward, especially in stateful code.] no matter what language they're written in. We can use the `'` syntax to help the compiler know where those isolates are, so it can make more optimal code. [# We can even take this to the extreme and `'` everything, and we'd end up with data roughly the same shape as in Rust programs. In practice, there's a balance somewhere in-between.]
 
-One would use `iso` on the parts of their program that profiling suggests would benefit from optimization.
+
+One doesn't need to `'`-annotate everything, of course. Consistent with Vale's philosophy of [avoiding forced complexity](https://www.nngroup.com/articles/progressive-disclosure/), isolates are *opt-in*.
+
+One would `'`-annotate only the parts of their program that profiling suggests would benefit from optimization.
 
 
 
 <slice>
-#puref: Which is quite a lot, really. Our sample roguelike game, a very stateful mutation-heavy program, actually spent PERCENT_HERE of its time inside pure functions.
+#puref: Which is quite a lot, really. Our sample roguelike game, a very stateful mutation-heavy program, actually spent the vast majority of its time inside pure functions.
 
-DRAFT TODO: Figure out that figure. Pretty sure it's well above 90%; pathfinding, AI, and turn resolution take most of the time.
+Draft TODO: Final measurements. Pretty sure it's well above 90%; pathfinding, AI, and turn resolution take most of the time.
+
+#drafttodos: Draft TODO: Finish BenchmarkRL, then measure how many checks could be eliminated by iso regions.
+
 </slice>
 
 
 
-# Zero-Cost Reading
+# Immutable Borrowing
 
 
-We can immutably borrow an `iso`late's data, allowing the compiler to skip generation checks when reading it.
+We can immutably borrow an isolate's data, allowing the compiler to skip generation checks when reading it. This can make our code faster.
 
 
 This is the same mechanism used by `pure` functions, described in [Part 1](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing#how-regions-work).
@@ -86,50 +82,233 @@ This is the same mechanism used by `pure` functions, described in [Part 1](/blog
 This allows us to get the optimization benefits of affine types (like those seen in Rust and Cyclone), but with a vital improvement: it doesn't have aliasing restrictions, and enables techniques and optimizations that require shared mutability. [# Techniques like [intrusive data structures](https://lwn.net/Articles/907876/) and [graphs](https://news.ycombinator.com/item?id=24996001), plus useful patterns like [observers](https://www.reddit.com/r/rust/comments/pwqju6/is_there_an_underlying_reason_that_idiomatic_rust/), [back-references](https://users.rust-lang.org/t/back-reference-to-the-parent-struct/7413/2), [dependency references](https://en.wikipedia.org/wiki/Dependency_injection), [callbacks](https://news.ycombinator.com/item?id=12029238), [delegates](https://medium.com/@nimjea/delegation-pattern-in-swift-4-2-f6aca61f4bf5) and many forms of RAII and [higher RAII](https://verdagon.dev/blog/higher-raii-7drl).]
 
 
-# A Simple Example
 
-Draft TODO: Show an example that's simpler than the one below. Perhaps just a simple function call? Or perhaps show how its easy and needs few annotations, as long as the two regions dont cross.
+
+
+# An Example
+
+First, here's an example _before_ we use isolation. We'll add isolation to it afterward.
+
+
+<<<<
+This is a simple Cannon. [# Originally designed in the year 2347, this cannon an ion-based Hawking Propulsor, historically used pretty heavily in the Hegemony fleet. With the invention of the Shearing Field it has largely fallen out of use, but it's still a vital component in some outworld colony defenses like ours.]
+
+
+Here, we see it `fire` on an enemy ship.
+
+
+`fire` isn't defined here, we show it further below.
+////
+```
+struct Cannon {
+  strength int;
+  ...
+}
+
+struct Ship {
+  hp int;
+}
+
+exported func main() {
+  cannon = Cannon(12, ...);
+  ship = Ship(100);
+  fire(&cannon, &ship);
+  println("Ship's new hp: {ship.hp}");
+}
+```stdout
+Ship's new hp: 88
+```
+>>>>
+
+
+<<<<
+When it `fire`s on something it first calculates its strength, based on a _very_ complex algorithm.
+
+
+This algorithm has a little bit of overhead: whenever we read from `cannon`, such as the `cannon.strength`, it incurs a generation check.
+////
+```
+func fire(
+  cannon &Cannon,
+  ship &Ship)
+void {
+  // Read cannon to calculate damage.
+  damage = cannon.strength * 2;
+
+  // Now hit the ship!
+  set ship.hp -= damage;
+}
+```
+>>>>
+
+
+Generation checks are rarely a source of significant slowdowns. However, if we're in the hot path of a performance-critical program, profiling might suggest that we optimize this function.
+
+
+Let's optimize!
+
+
+## Optimizing with Isolation
+
+
+If we can immutably borrow `cannon`, then we can skip those generation checks!
+
+
+One way to do this is to make `cannon` isolated, and then open it up `.imm`utably. [# The other way is to pull the `damage = cannon.strength * 2` out into a pure function. That usually works well, but this post is about isolation so we'll show that instead.]
+
+
+<<<<
+There are four changes here:
+
+ * By putting the `'` in front of the `Cannon` call, `cannon` is now of type `'Cannon` which means it's isolated.
+ * `&cannon` became `cannon.imm`, which immutably borrows the iso's contents.
+ * We added `<c'>` after `func fire` so that the function can receive things in a read-only region, referred to as `c`.
+ * Lastly, we made `&Cannon` into `&c'Cannon` to show that it's in that read-only region.
+
+////
+```
+// (using above Cannon and Ship)
+
+exported func main() {
+  cannon = 'Cannon(12, ...);
+  ship = Ship(100);
+  fire(cannon.imm, &ship);
+  println("Ship's new hp: {ship.hp}");
+}
+
+func fire<c'>(
+  cannon &c'Cannon,
+  ship &Ship)
+void {
+  // This is faster now, no more
+  // generation checks!
+  damage = cannon.strength * 2;
+
+  // Now hit the ship!
+  set ship.hp -= damage;
+}
+```
+>>>>
+
+
+Now, `cannon` is immutably borrowed, so reading it (like `cannon.strength`) is faster because it doesn't incur any generation checks.
+
+
+In this example, reading anything from `cannon` is zero cost, because we used `.imm` to open the isolate immutably.
+
+
+This is the true strength of isolates: they tell the compiler when areas of our data are immutable, so it can read them with zero cost.
+
 
 
 # A Real World Example
 
 
-A common pattern is to open it up as mutable while we're building it, then close it, then reopen it as immutable when we only want to read it. Doing this helps eliminate memory safety overhead.
+Let's say we want a level generator for a simple game. 
 
 
 <<<<
-Let's say we want a level generator for a simple game. We're going to *coalesce a black-and-white image's pixels* until it gives us something interesting, and then use that to inspire our level's terrain.
+We're going to *coalesce a black-and-white image's pixels* until it gives us something interesting, and then use that to inspire our level's terrain.
 
 
 This is known as a Cellular Automata algorithm, and is very similar to blurring an image.
 ////
-Draft TODO: Image here showing the various stages of a cellular automata run.
+<div style="position: relative; width: 128px; margin: auto">
+<style>
+.fade {
+  animation-iteration-count: infinite;
+  animation-timing-function: linear;
+  animation-duration: 8s;
+}
+.fade-in-1 {
+  opacity: 1;
+  animation-name: fadeIn1Opacity;
+}
+.map-image {
+  width: 128px;
+  height: 128px;
+  image-rendering: pixelated;
+}
+@keyframes fadeIn1Opacity {
+  0%   { opacity: 1; }
+  27%  { opacity: 1; }
+  33%  { opacity: 0; }
+  62%  { opacity: 0; }
+  66%  { opacity: 0; }
+  94%  { opacity: 0; }
+  100%  { opacity: 1; }
+}
+.fade-in-2 {
+  opacity: 0;
+  animation-name: fadeIn2Opacity;
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+@keyframes fadeIn2Opacity {
+  0%   { opacity: 0; }
+  27%  { opacity: 0; }
+  33%  { opacity: 1; }
+  62%  { opacity: 1; }
+  66%  { opacity: 0; }
+  94%  { opacity: 0; }
+  100%  { opacity: 0; }
+}
+.fade-in-3 {
+  opacity: 0;
+  animation-name: fadeIn3Opacity;
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+@keyframes fadeIn3Opacity {
+  0%   { opacity: 0; }
+  27%  { opacity: 0; }
+  33%  { opacity: 0; }
+  62%  { opacity: 0; }
+  66%  { opacity: 1; }
+  94%  { opacity: 1; }
+  100%  { opacity: 0; }
+}
+</style>
+<div class="fade fade-in-1">
+<div style="text-align: left;"><b>0</b></div>
+<img class="map-image" src="/images/cellular-automata-1.png"/>
+</div>
+<div class="fade fade-in-2">
+<div style="text-align: center;"><b>1</b></div>
+<img class="map-image" src="/images/cellular-automata-2.png"/>
+</div>
+<div class="fade fade-in-3">
+<div style="text-align: right;"><b>2</b></div>
+<img class="map-image" src="/images/cellular-automata-3.png"/>
+</div>
+</div>
 >>>>
+
 
 
 <<<<
 Here's our `main` function which shows the general structure of our program.
 
 
-The `iso` in front of `[][]bool`, which specifies the array is isolated. [# Draft TODO: We might say `iso'` instead, TBD whether that's more confusing or less.]
+The `'` in front of `[][]bool` specifies the array is isolated.
 
 
-The `image.imm` in `coalesceImage(&rand, image.imm)` will open up the `image` isolate as immutable, and then pass it in as an argument to coalesceImage.
+The `image.read` in `coalesceImage(&rand, image.read)` will open up the `image` isolate as immutable, and then pass it in as an argument to coalesceImage.
 
 
 Further below, we'll see how `coalesceImage` keeps the two inputs separate from each other.
 ////
 ```
 exported func main() {
-  // Our random number generator,
-  // for the initial image and for
-  // tiebreaking.
+  // Our random number generator.
   rand = LCGRand(1337);
 
-  // An isolated 30x20 array of bools.
+  // An isolated 16x16 array of bools.
   image = «imagetype»
-      iso [][]bool(30, x => {
-        iso []bool(20, y => {
+      '[][]bool(16, x => {
+        '[]bool(16, y => {
           rand.next() mod 2 == 0
         })
       });
@@ -138,20 +317,20 @@ exported func main() {
   // the input rand as mutable, and
   // the input image as immutable.
   image_coalesced =
-      coalesceImage(&rand, image.imm);
+      coalesceImage(&rand, image.read);
 
   // And do it again, it'll look nice.
   image_coalesced_again =
       coalesceImage(
-          &rand, image_coalesced.imm);
+          &rand, image_coalesced.read);
 
-  display(image_coalesced_again.imm);
+  display(image_coalesced_again.read);
 }
 ```
 >>>>
 
 <slice>
-#imagetype: `image`'s type is `iso [][]bool`.
+#imagetype: `image`'s type is `'[][]bool`.
 </slice>
 
 
@@ -162,10 +341,10 @@ Here's the `coalesceImage` function.
 func coalesceImage<r'>(
   rand &LCGRand,
   tiles &r'[][]bool)
-iso [][]bool { // Returns a new array.
+'[][]bool { // Returns a new array.
 
   // Make a new isolated array.
-  tiles iso [][]bool =
+  tiles '[][]bool =
       foreach [x, column] in tiles.entries() { «foreachiso»
         foreach [y, walkable] in column.entries() {
           // Produces a boolean
@@ -177,12 +356,13 @@ iso [][]bool { // Returns a new array.
 ```
 
 
-The important part here is the `r'` in `&r'[][]bool`. It means this parameter is in a separate region from the rest of the parameters, and we only see the region as read-only. (In general, one can change `<r'>` to `<r' rw>` for a _read-write_ region here.)
+
+The important part here is the `r'` in `&r'[][]bool`. It means this parameter is in a separate region from the rest of the parameters, and we only see the region as read-only. [# In general, one can change `<r'>` to `<r' rw>` for a _read-write_ region here.]
 
 
 When `main` calls coalesceImage, the compiler sees two things:
 
- * We're passing an `iso`lated object.
+ * We're passing an isolated object.
  * The function parameter sees it as from a read-only region.
 
 
@@ -190,7 +370,7 @@ The compiler concludes that nobody's going to change anything in the region, the
 
 
 <slice>
-#foreachiso: `foreach` will automatically create an `iso` array if it's constructed with a bunch of `iso` elements.
+#foreachiso: `foreach` will automatically create an isolated array if it's constructed with a bunch of isolated elements.
 </slice>
 
 
@@ -221,117 +401,158 @@ func averageNeighbors<r'>(rand &LCGRand, tiles &r'[][]bool, x int, y int) bool {
 ```
 
 
-# A Common Pattern: Option Swapping
-
-Above, we showed how an `iso` in a variable can be passed to a function that read from it.
-
-
-`iso`s are incredibly versatile when held in local variables, as we saw above.
-
-
-Unless we use option swapping (explained below), an `iso` inside a struct can't be opened [# This is because an `iso` must never be opened twice at the same time, it must only be opened once. If we allowed opening a struct member `iso`, then it could indirectly be opened twice simultaneously.] unless:
-
- * The containing struct is destroyed first. [# This restriction can be combined with [Higher RAII](https://verdagon.dev/blog/higher-raii-7drl) to make some pretty interesting mechanisms. It's also conceptually similar to `GhostToken` in Rust.] [# Draft TODO: Can an iso be used like a ghosttoken, to pass around permission to open, say, a mutex? It would be zero cost.]
- * The containing struct is also `iso`.
- * The containing struct is in an immutable region.
-
-
-But most of the time, we can just use a simple solution instead: wrap it in an `Option`!
-
-
-In this example, a Spaceship has a private `Engine` that nobody outside needs to access.
-
-
-We'd also like to make it faster to read this engine, so this is a perfect use case for an `iso`!
-
-
-<<<<
-When we want to access it, we swap a None into its place, and then put the `iso` into a local.
-
-When we're done, we put the iso back into the Spaceship.
-
-In the next section, we show a class that uses RAII to handle this for us automatically.
-////
-```
-struct Spaceship {
-  engine! Option<iso Engine>;
-}
-exported func blah(ship &Spaceship) {
-  engine_iso =
-      (set ship.engine = None()).expect();
-  engine = engine_iso.imm;
-
-  // Can read engine freely!
-
-  set ship.engine = Some(engine_iso);
-}
-```
->>>>
-
 
 # Cells
 
+Above, we showed how an isolate in a variable can be passed to a function that reads from it.
 
-This kind of option swapping is so useful that we added a `Cell` type [# Not to be confused with Rust's `Cell`; it can be said that every field in Vale is implicitly a `Cell`. Rather, Vale's `Cell` is more like Rust's `RefCell`.] to the standard library to handle it for us, which uses RAII to ensure we put the iso back into the `Cell`.
 
-It also has the benefit of being zero-cost for immutable regions. [# It does this with a certain feature called "region overloading", which specifies one function to use for immutable regions, and another for readwrite regions.] [# Draft TODO: We might actually want to add an assertion even when in immutable regions too, that someone else doesn't already have it opened. It wouldnt cause any unsafety if we don't, but it might be good to be consistent. At least in debug mode, perhaps.]
+Isolates are incredibly versatile when held in local variables, as we saw above.
+
+
+However, when a struct member is an isolate, it can only be accessed when: [# This is because an isolate must never be opened twice at the same time, it must only be opened once. If we allowed opening a struct member isolate, then it could indirectly be opened twice simultaneously.]
+
+ * The containing struct is destroyed first. [# This restriction can be combined with [Higher RAII](https://verdagon.dev/blog/higher-raii-7drl) to make some pretty interesting mechanisms. It's also conceptually similar to `GhostToken` in Rust.] [# Design TBD: Can an isolate be used like a ghosttoken, to pass around permission to open, say, a mutex? It would be zero cost.]
+ * The containing struct is also an isolate.
+ * The containing struct is in an immutable region.
+ * We use a *cell*.
+
+
+A cell relaxes these restrictions by moving some checks to run-time. [#refcell]
 
 
 <<<<
-Here, we have a `Cell<Engine>` instead of a `Option<iso Engine>`.
+For example, this `Ship` contains an "Engine cell".
 
 
-We call the `open` method to gain access to the contained `iso Engine`.
-
-
-This returns an `iso CellGuard<Engine>`, which contains an `iso Engine` inside.
-
-
-To immutably borrow the engine, we say `engine_handle.contents.imm`. [# We might add special syntax for this, something like `open ship.engine imm { ... }`. TBD!]
+`foo` uses the `.read` syntax to gain access to the contained `'Engine`.
 ////
 ```
-struct Spaceship {
-  engine Cell<Engine>;
+struct Ship {
+  engine ''Engine;
 }
-exported func blah(ship &Spaceship) {
-  engine_handle = ship.engine.open();
-  engine = engine_handle.contents.imm;
+
+struct Engine {
+  fuel int;
+}
+
+func foo(ship &Ship) {
+  engine = ship.engine.imm;
 
   // Can read engine freely!
-
-  // engine_handle.drop() closes it.
+  println(engine.fuel);
 }
 ```
 >>>>
 
-<slice/>
+
+The above example did an immutable borrow using `.imm`. We can also:
+
+ * Mutably borrow the Engine with `.open`.
+ * Readonly borrow the Engine with `.read`, which lets us read it while others modify it.
+
+
+There are two caveats to using cells:
+
+ * We can borrow it with `.read` and `.open` as much as we want, but the program will halt if it's ever borrowed with `.imm` and `.open` at the same time.
+ * The program will halt if someone destroys that `Ship` while someone is borrowing it.
+
+
+So what's actually happening with that line, `engine = ship.engine.imm;`?
+
+
+<slice>
+#refcell: For anyone familiar with Rust, a cell is similar to a `RefCell`, but with some improvements:
+
+ * There's no shared mutability restrictions; anyone can open it in a read-only or read-write way.
+ * There's no async restrictions; it doesn't cause any data coloring that could get in the way of Seamless Concurrency.
+</slice>
+
+
+## Cell Guards
+
+
+When we borrow from a cell, we get a *cell guard*.
+
+
+For example, if `ship.engine` is a `''Engine`, then immutably borrowing it like `engine = ship.engine.imm` will make `engine` a `CellGuard<imm, Engine>`.
+
+
+Under the hood, a CellGuard contains a pointer to the original cell.
+
+
+When the CellGuard goes out of scope, will inform the original cell that we're done borrowing it.
+
+
+This is how the language enforces that we don't immutably borrow and readwrite borrow the cell at the same time, which protects us from memory problems.
+
+
+So if `engine` is a `CellGuard<imm, Engine>`, how is it possible to say `engine.fuel`, like in `println(engine.fuel)`?
+
+
+## A Cell Guard's Mask
+
+
+A cell guard has an interesting quirk: it *wears a mask*.
+
+
+Mentioning its name, like the `engine` in `println(engine.fuel)`, does not give us the `CellGuard<imm, Engine>`.
+
+
+Instead, it gives us the contents, `&e'Engine`. `e` is hidden, an implicit region that's conceptually tied to the cell guard.
+
+
+The compiler then makes sure that no references into this region outlive the cell guard itself, similar to when we open a regular isolate.
+
 
 
 # Architectural Benefits
 
-Besides their performance benefits, `iso`lates can also have an architectural benefit as well. When we don't want our private data to escape the containing struct, we can put it in an `iso` and the compiler will tell us when a reference to it accidentally gets out.
+Besides having better performance via immutable borrowing, isolates and cells can also have architectural benefits as well.
 
 
-This helps us reason about our data little easier, and often means we don't have to make defensive copies.
+First, it indirectly helps us stick to *unidirectional data flow*, the pattern where after we're done modifying the data, it's read-only for the rest of the operation. This pattern might be familiar:
+
+ * React (and other functional reactive programming approaches) are built upon this principle.
+ * The borrow checker steers us in this direction; we commonly construct some data and then only read it afterward.
+ * Functional programming enforces this pattern, by not letting us change data after it's constructed.
+ * This pattern is common in object-oriented code too, as a way to uphold invariants.
 
 
-We can even use `iso`s to assist and enforce [unidirectional data flow](https://www.geeksforgeeks.org/unidirectional-data-flow/), the same technique that makes it so functional programming and Rust programs tend to work on the first try more often.
+Second, it ensures that a struct's private data won't be unexpectedly changed by anyone outside.
+
+In other languages, we can accidentally make a reference to some private data that escapes to someone outside our class. Then, someone uses that reference to modify the data that we thought was private, in unexpected ways that cause bugs. With regionsthe compiler prevents this from ever happening.
+
+
+The best thing about isolation however is that it is *opt-in*. Consistent with Vale's philosophy of [avoiding forced complexity](https://www.nngroup.com/articles/progressive-disclosure/), we never _have_ to use isolation, or isolates, or regions at all. As more of us experiment with regions, we can learn the best places to apply them.
 
 
 # Conclusion
 
 
-As we saw, `iso`lates can be surprisingly powerful for optimization, and using them well can make a program much faster.
+As we saw, isolates can be surprisingly powerful for optimization, and using them well can make a program much faster.
 
 
-Part 3 shows how we can enable that using *one-way isolation*. Most structs' private data can actually be expressed very cleanly with one-way isolation, `pure` functions also use it under the hood.
+There are some details we didn't cover in the article:
+
+ * We can attach an allocator to an isolate, such as `BumpAllocator^'Fleet`. [# Actual syntax TBD.]
+ * We can use an isolate to create something and then permanently freeze it. [# This might be merged with how immutable structs currently work. It would recursively call `drop` first, presumably.]
+ * We can hand a mutably-opened isolate into a pure function, and _have it remain mutable._
+ * We can't mutably `.open` a cell that's inside a read-only region (this has some benefits later for seamless concurrency), unless inside a mutex.
+ * We can completely contain a third-party library's code inside an isolate if we wanted to; isolates are very composable.
 
 
-Part 4 also shows how one-way isolation can make certain patterns (iterating collections, calculating determinants, etc.) and entire architectures (like entity-component-system) zero-cost. [# Together, `iso`lates, `pure` functions, and one-way isolation combine to form something that looks suspiciously like an entire new programming paradigm... whether that's true remains to be seen!]
+[Part 3](/blog/zero-cost-memory-safety-regions-part-3-one-way-isolation) also shows how an isolate's contents can point outside the isolate using *one-way isolation*, which fits well with most structs' private data.
+
+
+[Part 4](/blog/zero-cost-memory-safety-regions-part-4-multi-region-data) shows how we can have one object contain another region's data inline.
+
+
+[Part 5](/blog/zero-cost-memory-safety-regions-part-5-region-scoped-data) then shows how to combine that with one-way isolation to make certain patterns (iterating collections, calculating determinants, etc.) and entire architectures (like entity-component-system) zero-cost. [# Together, isolates, `pure` functions, and one-way isolation combine to form something that looks suspiciously like an entire new programming paradigm... whether that's true remains to be seen!]
 
 
 
-*That's all for now!* We hope you enjoyed this article. Stay tuned for the next article, which shows how `iso`lated sub-regions work.
+*That's all for now!* We hope you enjoyed this article. Stay tuned for the next article, which shows how one-way isolation works.
 
 
 If you're impressed with our [track record](https://vale.dev/roadmap#recent-additions) and believe in the [direction we're heading](https://vale.dev/roadmap), please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
@@ -354,21 +575,7 @@ See you next time!
 
 
 
-[#deepiso]
-[#mostlyzero]
-
-<slice new-color="afterword">
-
-#deepiso: `iso` can be applied to any pure function call. It will enforce that all arguments we pass in are also `iso`. Here, the compiler is automatically applying `iso` to the `Engine(...)` and `Radar(...)` calls.
-
-Draft TODO: See if there are any bad interactions with universal references. Last resort, `iso` calls might need a new implicit region instance with a new generation.
-
-
-
-#mostlyzero: Accessing any owned data, like the `.engine` and `.fuel` in this example, will be zero cost.
-
-Accessing any non-owning references, such as if `Spaceship` had a `fleet &Fleet`, might incur a "generation pre-check" as it reads it.
-</slice>
+<slice new-color="afterword"/>
 
 
 # Vale's Vision

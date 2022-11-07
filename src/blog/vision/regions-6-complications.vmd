@@ -1,0 +1,109 @@
+
+# The Generic `!`
+
+
+```
+struct ListNode<T> {
+  contents T;
+  next priv vary ?^ListNode<T>;
+}
+
+struct Ship {
+  name str;
+  hp int;
+}
+
+exported func main() {
+  head =
+    'Some(
+      ^ListNode(
+        main'Ship("Serenity", 10),
+        Some(
+          ^ListNode(
+            main'Ship("Raza", 22),
+            None))));
+
+  each(head.imm, ship => {
+    set ship.hp -= 5;
+    println("Damaged {ship.name}!");
+  });
+}
+
+func each<r', T, F>(
+  maybe_cur r'?ListNode<T>,
+  func F)
+void
+where func(&F, &T)void {
+
+  while maybe_cur.NonEmpty() {
+    cur = maybe_cur.Expect();
+
+    func(cur.contents);
+
+    maybe_cur = cur.next;
+  }
+}
+```
+
+This is pretty straightforward.
+
+
+Now let's see an `UpdateLast` function:
+
+```
+func UpdateLast<list' rw, T!>(
+  self list'ListNode<T>,
+  val T)
+T {
+  if self.next.NonEmpty() {
+    return set self.contents = val;
+  } else {
+    add(self.next.Expect(), val!);
+  }
+}
+```
+
+
+We can only call this if T is either:
+
+ * A non-owning reference into an immutable region. We can move that reference freely, it won't affect the actual object.
+ * A heap-owning reference into a mutable region. We can move that freely, it's in a mutable region.
+ * An inline owning reference into a mutable region. We can move that freely, it's in a mutable region.
+
+However, we can't call this if T is:
+
+ * An inline owning reference in an immutable region.
+
+If we do, the `set self.contents` might be moving an object that's in an immutable region.
+
+
+We solve this by requiring `!` for any generic parameter that we'll be moving.
+
+
+Note the `T!` in `func add<list' rw, T!>(`, that's an example of this.
+
+
+With this, the function can refuse any immutable region's inline object for T.
+
+
+*When is this possible?* It might be possible if we have a HashMap<K, V> that's in its own iso, and the V's are in another iso. Then we open the hash map's iso mutably, and the V's iso immutably.
+
+
+
+
+
+## Milano Case
+
+
+
+
+if we have:
+impl Milano<X, Y, Z, ZZ> for IShip<X, Y, Z>
+then if we upcast it, we'll get an IShip<X, Y, Z> + ZZ.
+
+of course, if ZZ is in the same region as the Milano itself, or X or Y or Z, then it just becomes a regular IShip<X, Y, Z> because it elides itself away.
+
+when we call into a virtual func... i think it then just thinks its a separate region... i think that works.
+
+
+
