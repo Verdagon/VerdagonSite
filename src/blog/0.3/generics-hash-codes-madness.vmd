@@ -1,0 +1,256 @@
+---
+title: Hash Codes, Non-Determinism, and Other Eldritch Horrors
+author: Evan Ovadia
+date: Nov 6, 2022
+realm: blog
+path: blog/generics-hash-codes-madness
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+Until recent events, I've firmly believed the most terrifying thing known to mankind is *the kraken.*
+
+The kraken is a colossal eldritch sea horror which resembles a giant squid. It's known to crush entire ships.
+
+They say that 60% of all ships lost at sea fell victim to krakens, probably. [# I probably didn't make this up.]
+
+<center><img src="/images/kraken.jpg" width="100%" style="max-width: 400px"/></center>
+
+If someone says they aren't scared of krakens, they've obviously never met one.
+
+
+However, something else has started appearing in my kraken nightmares: hash codes. Not all hash codes, but a specific kind of hash code that's more insidious than colossal eldritch sea horrors.
+
+
+This is my tale, where I discovered a terrifying truth underlying our world, and the reason why krakens and hash codes would appear in the same nightmare.
+
+
+
+# A Worthy Goal
+
+
+For the last several months, I've been working on Vale's support for [regions](blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing), which involves adding a sort of "opt-in borrow checker" to the language. Since it's opt-in and not [upwardly infectious](https://www.reddit.com/r/ProgrammingLanguages/comments/vofiyv/thoughts_on_infectious_systems_asyncawait_and_pure/), it should pair well with our [generational references](https://verdagon.dev/blog/generational-references) to give us speed and safety while still keeping the language easy to use. As someone who grew up with C++ and Rust, this makes me _very_ excited.
+
+
+This meant adding more functionality to our type system and function resolution, and transitioning from [templates](https://www.tutorialspoint.com/cplusplus/cpp_templates.htm) to full [generics](https://learn.microsoft.com/en-us/dotnet/csharp/programming-guide/generics/differences-between-cpp-templates-and-csharp-generics). [# This is because part of regions involves monomorphizing any read-only region into both an immutable and mutable region.]
+
+
+A couple weeks before finishing the generics transition, I encountered something unusual. I had fixed one of our tests, code-named _Delirious Blue_, but then after I fixed another test, _Delirious Blue_ started failing again.
+
+
+I ran it again, with the debugger running, and it passed.
+
+
+_Oh no._
+
+
+I ran it again, and it failed. Then passed. Then passed. Failed. Passed, failed, failed, passed, failed, failed.
+
+
+_No!_
+
+
+I knew, in that moment, that *non-determinism* had crept into the compiler somehow.
+
+
+# Non-Determinism
+
+
+Every time you run a program, it's supposed to do the same thing. Programs are predictable.  If you run `echo hello` five times in a row, it's supposed to be *deterministic*; it's supposed to show the same thing every time. 
+
+
+For example, imagine if `echo` just decided to act differently every once in a while: [# It's almost as scary as `echo` printing "is he gone yet oh shoot uh hello". Even scarier than that time I saw a 2 in a binary file.]
+
+
+```
+$ echo hello
+hello
+$ echo hello
+hello
+$ echo hello
+hello
+$ echo hello
+hello
+$ echo hello
+howdy
+```
+
+
+
+When a program isn't predictable, debugging becomes difficult, birds fall from the sky, and our most precious illusions fade away and leave us in an uncertain, lovecraftian world filled with terrors.
+
+
+This is *non-determinism*. It's when a function or program gives unexpectedly different results even when we give it the same inputs.
+
+
+# The Investigation
+
+
+Every time I ran the compiler, I got a different result. It's like it would randomly decide which data to process first, so I couldn't reliably reproduce the problem I was trying to solve. I spent _hours_ on this, with no luck.
+
+
+"Something's non-deterministic! It's driving me insane!" I said to the server.
+
+
+"But how? Isn't the frontend written in Scala? The JVM is deterministic." someone said.
+
+
+"It should be deterministic," I said, "it's garbage collected after all..."
+
+
+Then I remembered the winter of '19. It was the [7 Day Roguelike Challenge](https://7drl.com/), when developers worldwide spend 7 days each making a roguelike game. It was day five, we'd already lost half of our comrades to bugs, and everyone was in their final days.
+
+
+I had fired up my program for the fifteenth time that day, but things were suddenly acting weird: when I ran the same program with the same inputs, I got different behavior every time. This was a problem, because it was a game where the user could save, reload, and [travel back in time](https://verdagon.itch.io/incendian-falls), expecting things to behave the same way as they did last time. Mastering these techniques was very important for defeating the final boss, a Kraken.
+
+
+After spending most of the day diving and debugging, I'd figured out that it was because I was using strings in a new place, and C#'s `string.GetHashCode()` returns [something different every run](https://andrewlock.net/why-is-string-gethashcode-different-each-time-i-run-my-program-in-net-core/).
+
+
+Needless to say, non-determinism and I have _a history._
+
+
+"But that can't happen in Scala..." I mused to myself, "it always provides a pretty sane default hashCode implementation."
+
+
+"I think there's a couple classes that just return the object's address." someone said.
+
+
+"That's impossible!" I said. "The JVM can't return an address because it literally _moves_ objects around during compaction!"
+
+
+# The Culprit
+
+
+It turns out, they were right. Whereas Scala's `Vector`, `List`, etc. will all calculate their hash codes based on their elements, Scala's `Array` doesn't. It inherits the `hashCode` function from `java.util.Object` which **just returns the address of the object.**
+
+
+And then, to make sure it returns the same hash code for the entire duration of the program, the JVM literally [remembers the object's original address](https://stackoverflow.com/questions/16445094/is-javas-hashcode-deterministic). How crazy is that?
+
+
+So I had four options, in order of preference:
+
+ 1. Make sure to never observe the ordering of a hash map's elements, such as by calling `HashMap.head` or `HashMap.iterator`.
+ 1. Stop using `Array` altogether, and use Scala's `Vector` instead.
+
+
+I have some religious objections to the first option, so I went with the second for now.
+
+
+Suddenly, the compiler was deterministic again. I breathed a sigh of relief. Bullet dodged!
+
+
+# Retrospect
+
+
+I believe that non-determinism is the *bane of humanity.* It's nearly impossible to determine where a program's non-determinism comes from. One little bit of non-determinism can snake through your entire codebase, like the tentacles of some eldritch sea-horror.
+
+
+I was extremely lucky that I'd faced this problem before, and that someone in my server knew that you could actually observe an object's address in the JVM.
+
+
+Luckily, there's hope on the horizon. At some point, we'll be able to rewrite the Vale compiler in Vale itself, and Vale's [perfect replayability](https://verdagon.dev/blog/perfect-replayability-prototyped) feature guarantees that we can perfectly reproduce any bug we find.
+
+
+I hope you enjoyed this tale!
+
+
+In the next post, I'll talk about implementing regions to make a sort of "opt-in borrow checker" for Vale, so keep an eye out on our [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), [discord server](https://discord.gg/SNB8yGH), or [subreddit](https://reddit.com/r/vale)!
+
+
+
+If you're impressed with our [track record](https://vale.dev/roadmap#recent-additions) and believe in the [direction we're heading](https://vale.dev/roadmap), please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>
+
+With your support, we can slay non-determinism and other eldritch sea horrors across the world!
+
+
+See you next time!
+
+- Evan Ovadia
+
+
+<slice new-color="afterword"/>
+
+# Vale's Vision
+
+Vale aims to bring a new way of programming into the world that offers *speed*, *safety*, and *ease of use.*
+
+
+*The world needs something like this!* Currently, most programming language work is in:
+
+ * High-overhead languages involving reference counting and tracing garbage collection.
+ * Complex languages (Ada/Spark, Coq, Rust, Haskell, etc.) which impose higher complexity burden and mental overhead on the programmer.
+
+These are useful, but there is a *vast field of possibilities* in between, waiting to be explored!
+
+
+Our aim is to explore that space, discover what it has to offer, and make *speed and safety easier than ever before.*
+
+
+In this quest, we've discovered and implemented a lot of new techniques:
+
+ * [Generational Memory](/blog/generational-references), for a language to ensure an object still exists at the time of dereferencing.
+ * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
+ * [Fearless FFI](/blog/fearless-ffi), which allows us to call into C without risk of accidentally corrupting Vale objects.
+ * [Perfect Replayability](/blog/perfect-replayability-prototyped), to record all inputs and replay execution, and completely solve heisenbugs and race bugs.
+
+
+These techniques have also opened up some new emergent possibilities, which we hope to implement:
+
+ * [Region Borrow Checking](/blog/zero-cost-refs-regions), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
+ * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
+ * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
+
+
+We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
+
+ * We can mix an `unsafe` block with Fearless FFI to make a much safer systems programming language!
+ * We can mix Erlang's isolation benefits with functional reactive programming to make much more resilient programs!
+ * We can mix region borrow checking with Pony's `iso` to support shared mutability.
+
+...plus a lot more interesting ideas to explore!
+
+
+The Vale programming language is a novel combination of ideas from the research world and original innovations. Our goal is to publish our techniques, even the ones that couldn't fit in Vale, so that the world as a whole can benefit from our work here, not just those who use Vale.
+
+
+Our medium-term goals:
+
+ * Finish the Region Borrow Checker, to show the world that shared mutability can work with borrow checking!
+ * Prototype Hybrid-Generational Memory in Vale, to see how fast and easy we can make single ownership.
+ * Publish the Language Simplicity Manifesto, a collection of principles to keep programming languages' learning curves down.
+ * Publish the Memory Safety Grimoire, a collection of "memory safety building blocks" that languages can potentially use to make new memory models, just like Vale combined generational references and scope tethering.
+
+
+We aim to publish articles biweekly on all of these topics, and create and inspire the next generation of fast, safe, and easy programming languages.
+
+
+If you want to support our work, please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+With enough sponsorship, we can:
+
+ * Work on this full-time.
+ * Turn the Vale Language Project into a 501(c)(3) non-profit organization.
+ * Make Vale into a production-ready language, and push it into the mainstream!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>
+
+
