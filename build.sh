@@ -83,10 +83,20 @@ if [ $TARGET == "when-to-use-memory-safe-part-1" ] || [ $TARGET == "all" ] ; the
   fi
 fi
 
-if [ $TARGET == "generics-hash-codes-madness" ] || [ $TARGET == "all" ] ; then
-  echo "Doing generics-hash-codes-madness"
-  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/generics-hash-codes-madness src/blog/0.3/generics-hash-codes-madness.vmd
-  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/generics-hash-codes-madness src/blog/0.3/generics-hash-codes-madness.vmd
+if [ $TARGET == "when-to-use-memory-safe-part-2" ] || [ $TARGET == "all" ] ; then
+  echo "Doing when-to-use-memory-safe-part-2"
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/when-to-use-memory-safe-part-2 src/blog/memory-safe-languages/when-to-use-memory-safe-part-2.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/when-to-use-memory-safe-part-2 src/blog/memory-safe-languages/when-to-use-memory-safe-part-2.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
+if [ $TARGET == "generics-hash-codes-horrors" ] || [ $TARGET == "all" ] ; then
+  echo "Doing generics-hash-codes-horrors"
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/generics-hash-codes-horrors src/blog/0.3/generics-hash-codes-horrors.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/generics-hash-codes-horrors src/blog/0.3/generics-hash-codes-horrors.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -324,6 +334,17 @@ if [ $TARGET == "version-0.2-released" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
+
+if [ $TARGET == "regions-overview" ] || [ $TARGET == "all" ] ; then
+  echo "Doing regions-overview"
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-overview src/blog/vision/regions-overview.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-overview src/blog/vision/regions-overview.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
 if [ $TARGET == "regions-1-immutable-borrowing" ] || [ $TARGET == "all" ] ; then
   echo "Doing regions-1-immutable-borrowing"
   echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing src/blog/vision/regions-1-immutable-borrowing.vmd
@@ -374,10 +395,10 @@ if [ $TARGET == "regions-5-region-scoped-data" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
-if [ $TARGET == "making-regions-part-1-coord" ] || [ $TARGET == "all" ] ; then
-  echo "Doing making-regions-part-1-coord"
-  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-1-coord src/blog/making-regions/making-regions-part-1-coord.vmd
-  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-1-coord src/blog/making-regions/making-regions-part-1-coord.vmd
+if [ $TARGET == "making-regions-part-1-human-factor" ] || [ $TARGET == "all" ] ; then
+  echo "Doing making-regions-part-1-human-factor"
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-1-human-factor src/blog/making-regions/making-regions-part-1-human-factor.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-1-human-factor src/blog/making-regions/making-regions-part-1-human-factor.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1

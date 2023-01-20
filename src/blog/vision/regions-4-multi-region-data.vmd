@@ -1,14 +1,17 @@
 ---
-title: Draft Preview: Zero-Cost Memory Safety with Vale Regions, Part 4: Multi-Region Data
+title: Zero-Cost Memory Safety with Vale Regions, Part 4: Multi-Region Data (Preview, Draft)
 subtitle: Watch how we split our memory into regions, for more performance!
 author: Evan Ovadia
-date: Draft, Preview
+date: Preview, Draft
 realm: blog
 path: blog/zero-cost-memory-safety-regions-part-4-multi-region-data
 layout: annotated
 namespace: c-blog m-annotated
 sponsor: us
 ---
+
+
+! Note: Regions are still a work-in-progress. *This is only a preview* describing how we expect them to work in practice, to show where we're headed and what we're aiming for. They could surpass our wildest expectations, or they could shatter and implode into a glorious fireball, who knows! Follow along as we [implement all this](/blog/making-regions-part-1-human-factor), and reach out if anything isn't clear! [# If anything isn't clear, feel free to reach out via [discord](https://discord.gg/SNB8yGH), [twitter](https://twitter.com/vale_pl), or the [subreddit](https://reddit.com/r/vale)! We love answering questions, and it helps us know how to improve our explanations.] [# We're aiming to complete regions by early 2024, check out the [roadmap](https://vale.dev/roadmap) for more details.]
 
 
 Vale has an ambitious goal: to be fast, memory safe, and most importantly, _easy_. There are a lot of stellar languages that have two, and we suspect it's possible to really maximize all three.
@@ -119,7 +122,7 @@ Yes we can!
 
 
 <<<<
-Here are those same structs, but now `ShipListNode` has some region annotations:
+Here are those same structs, but now `ShipListNode` has some region markers:
 
 
 Note the `ship a'Ship`. The `a'` here means that this data, even though it's inline, is still part of another region.
@@ -210,7 +213,7 @@ struct ListNode<T> {
 >>>>
 
 
-It looks like an ordinary generic struct; there's not even any region annotations.
+It looks like an ordinary generic struct; there's not even any region markers.
 
 
 That's because in Vale, `T` actually includes three things:
@@ -248,7 +251,7 @@ Between pure functions, isolates, and multi-region objects, we can eliminate the
 The best thing about all of these mechanisms is that they are *opt-in*:
 
  * A programmer can write a complete Vale program without ever learning about regions or multi-region-objects.
- * A programmer can ignore any region annotations and still understand the code; regions don't affect a program's semantics.
+ * A programmer can ignore any region markers and still understand the code; regions don't affect a program's semantics.
 
 This is consistent with Vale's philosophy of [avoiding forced complexity](https://www.nngroup.com/articles/progressive-disclosure/).
 
@@ -277,18 +280,8 @@ See you next time!
 
 - Evan Ovadia
 
-[#note0] [#note1] [#note2] [#note3] [# talk about how this lets us truly have an opt-in borrow checker thats much more usable, flexible, and intuitive. it fits the natural structure of our programs much better. the iso is what truly makes it an opt-in borrow checker.]
 
-
-<slice new-color="afterword">
-#note0: Draft TODO: mention somewhere that with channels, we can send isolated messages that point outside to mutable data.
-
-#note1: What happens when we have `MyStruct<T>` impl `MyInterface`, but then try to upcast `MyStruct<a'Bork>`? Does it become a a'MyInterface? but it itself isn't in region `a'`. Perhaps we need something like `MyInterface + a'`? Maybe we can get around it with a &''Something?
-
-#note2: Seamless concurrency threads use this under the hood. I think even regular threads might be able to as well.
-
-#note3: Possible workaround: They can have an interface, and we can give them something that has an &''MyThing. Theyll call into the interface, and we'll lock the cell from there and open it up for reading and/or writing. The best part about all of this is that all of their stuff can be captured in their own iso. our stuff is iso, their stuff is iso, everyone's having a grand ol time. We need to figure out how much of this is really doable though. We might need to constrain the third party thing to our own region so it doesnt escape? `TheirThing : myregion'`.
-</slice>
+<slice new-color="afterword"/>
 
 
 # Vale's Vision
@@ -317,7 +310,7 @@ In this quest, we've discovered and implemented a lot of new techniques:
 
 These techniques have also opened up some new emergent possibilities, which we hope to implement:
 
- * [Region Borrow Checking](/blog/zero-cost-refs-regions), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Region Borrow Checking](/blog/zero-cost-memory-safety-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
  * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
  * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
  * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.

@@ -3,8 +3,22 @@
 Benefits are, of course, extreme speed and good memory safety! The drawbacks are subtle and pervasive, though.
 
 
-rust isn't perfect.
-http://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=rust
+malloc failure is another case where moving checks to compile time is possible but quite hellish and with a lot of costs. we should not move this check to compile time.
+
+
+doing this more restrictive form of programming starts out as a good thing. it becomes bad when it causes nasty surprises, such as an infectious type slamming into a load-bearing interface. its the same problem async has.
+
+
+
+
+one might think that its better to use indices and IDs for everything. however, there are downsides too:
+- its less ergonomic
+- it forces some runtime overhead. it probably has a hashing function.
+- it can sometimes become impossible to feed in the reference to the mapping structure. or, require extensive refactoring. its generally hostile to polymorphism, even via enums. especially problematic when we slam into load-bearing interfaces such as Future.
+"My experience with Rust data structures is the opposite. To satisfy lifetime analysis inherent in pointer-based data structures, users tend to introduce additional indirection. For example, mapping keys to indexes, and then indexes to array elements, instead of simply mapping keys to values." https://news.ycombinator.com/item?id=34227734
+
+
+rust isn't perfect. http://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=rust
 
 
 - not very resilient to needed changes

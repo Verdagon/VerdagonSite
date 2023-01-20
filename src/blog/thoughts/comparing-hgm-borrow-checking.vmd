@@ -60,7 +60,7 @@ Hybrid-generational memory doesn't rely on expanding arrays. However, the genera
 
 ## Immutability, Arenas, Pools
 
-Rust has its borrow checker and Vale has its [region borrow checker](/blog/zero-cost-refs-regions). Both allow the language to know when something's immutable, to optimize away redundant loads. Additionally, Vale lets us specify structs and interfaces as deeply immutable, which does the same thing without any borrow checking.
+Rust has its borrow checker and Vale has its [region borrow checker](/blog/zero-cost-memory-safety-regions-overview). Both allow the language to know when something's immutable, to optimize away redundant loads. Additionally, Vale lets us specify structs and interfaces as deeply immutable, which does the same thing without any borrow checking.
 
 Rust's borrow checker often forces us to use `Vec`s, and Vale's regions allow us to use pool or arena allocation. Both enable incredibly fast allocation. Vale's regions can apply it to any type, whereas in Rust we need to specifically add and keep track of every `Vec`, and some Rust allocations can't be put into `Vec`s. [# For example, `Rc`d objects are put on the heap.]
 

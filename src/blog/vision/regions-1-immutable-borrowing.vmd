@@ -1,8 +1,8 @@
 ---
-title: Preview: Zero-Cost Memory Safety with Vale Regions, Part 1: Immutable Region Borrowing
+title: Zero-Cost Memory Safety with Vale Regions, Part 1: Immutable Region Borrowing (Preview)
 subtitle: Watch regions eliminate memory safety overhead!
 author: Evan Ovadia
-date: Draft, Preview
+date: Preview
 realm: blog
 path: blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing
 layout: annotated
@@ -11,26 +11,13 @@ sponsor: us
 ---
 
 
-! Note: This article is only a preview, describing how we think regions will work out in practice. Once we finish regions and benchmark it to determine how much overhead this eliminates, we'll publish it for real.
+! Note: Regions are still a work-in-progress. *This is only a preview* describing how we expect them to work in practice, to show where we're headed and what we're aiming for. They could surpass our wildest expectations, or they could shatter and implode into a glorious fireball, who knows! Follow along as we [implement all this](/blog/making-regions-part-1-human-factor), and reach out if anything isn't clear! [# If anything isn't clear, feel free to reach out via [discord](https://discord.gg/SNB8yGH), [twitter](https://twitter.com/vale_pl), or the [subreddit](https://reddit.com/r/vale)! We love answering questions, and it helps us know how to improve our explanations.] [# We're aiming to complete regions by early 2024, check out the [roadmap](https://vale.dev/roadmap) for more details.]
 
 
-Vale has an ambitious goal: to be fast, safe, _and_ easy. There are a lot of stellar languages that have two, and we suspect it's possible to really maximize all three.
+Vale has an ambitious goal: to be fast, safe, _and_ easy. There are a lot of stellar languages that have two, and we suspect it's possible to really maximize all three using a new approach for zero-cost memory safety called *regions*.
 
 
-This isn't quite possible with today's more well-known approaches. Languages with borrow checking have stellar run-time speed, and languages with garbage collection tend to have better flexibility, simplicity, and development velocity, and we haven't yet seen a way to get all these benefits at once.
-
-
-However, there are two more approaches which are making the memory safety landscape a lot more interesting, and we suspect we can blend them into something that gives us the best of all worlds.
-
-
-
-One such approach is called [generational references](/blog/generational-references), which is memory-safe, easy, and [pretty dang fast](https://verdagon.dev/blog/generational-references#speed). [# It also enables some fascinating features like [Higher RAII](https://verdagon.dev/blog/higher-raii-7drl)!]
-
-
-We can make it _even faster_ by blending it with the other new approach, *regions*. If we play our cards right, the only remaining memory safety overhead would be on par with the bounds checking we see in Rust programs, while remaining simple and flexible.
-
-
-! Generational references are complete but *the rest of these mechanisms are works in progress.* We'll be implementing these features over the next two years, per the [roadmap](https://vale.dev/roadmap).
+If you're unfamiliar, check out our [high-level overview of regions](/blog/zero-cost-memory-safety-regions-overview). This article specifically covers the first core concept, called *immutable region borrowing*.
 
 
 # Immutable Region Borrowing
@@ -62,7 +49,7 @@ In this article, we'll show you how it's all possible!
 <slice/>
 
 
-# Immutable Borrowing Example: Pure Function [# Draft TODO: Add a diagram showing the incoming region becoming immutable.]
+# Immutable Borrowing Example: Pure Function
 
 Regions can eliminate memory safety overhead for impure functions [# Most functions are impure. A function is only pure if it doesn't modify any data that existed before the call.] and for groups of data marked `iso`, but let's start with the simplest example, a pure function.
 
@@ -79,6 +66,8 @@ pure func printShipNames(tenShips &List<Ship>) {
 
 But when regions are added to the language, that *drops to zero.*
 
+
+<slice/>
 
 # What just happened?
 
@@ -99,6 +88,8 @@ These operations are called "generation checks", and they make our program memor
 
 What are they, and how do regions eliminate them?
 
+
+<slice/>
 
 # Generation Checks
 
@@ -153,13 +144,13 @@ Vale knows that we don't have to do these generation checks. Before we dive in, 
  1. At the call-site, the compiler *automatically predetermines* whether the `List<Ship>` is alive when we call the function. [# This can either be determined by seeing the still-alive owning reference, or by doing a single generation check before the function.]
  1. The compiler sees that *the function itself is pure*, and knows no pre-existing data will change within the function.
  1. The compiler *tracks what region data comes from*; it knows `ship` and therefore `name` both refer to something in the pre-existing memory "region".
- 1. It concludes that if the `List<Ship>` is still alive, *its indirectly owned objects are still alive.* It owns the contained `Ship`s, so they are still alive. [# The `List<Ship>` is a list of owning references. Nobody can destroy a `Ship` while the `List<Ship>` still has its owning reference.]
+ 1. It concludes that if the `List<Ship>` is still alive, *its indirectly owned objects are still alive.* It owns the contained `Ship`s, so they are still alive. [# The `List<Ship>` is a list of owning references. Nobody can destroy a `Ship` while the `List<Ship>` still has its owning reference.] Therefore, it doesn't need to do the generation checks.
 
 
-It can sometimes be difficult to learn two concepts at once, so if it helps, feel free to imagine we're applying regions to a reference-counted language. You can also read [this post](/blog/zero-cost-refs-regions), which describes regions from a reference counting perspective. [# Though, #2 only works if threads are isolated from each other (as they are in e.g. Vale, Rust, and Lobster).]
+The above is very high-level. Let's dive in and clarify!
 
 
-The above is very high-level. Let's dive in and clarify it all!
+<slice/>
 
 
 ## How a caller passes a known-live object
@@ -207,6 +198,8 @@ To reiterate, `printShipNames` *takes a raw reference* for its `tenShips` parame
 
 The user never has to know about the difference between raw references and generational references. This lets us keep the language simple, and decouple optimization from logic concerns.
 
+
+<slice/>
 
 ## How a caller passes a non-owning reference
 
@@ -273,6 +266,8 @@ Summarizing how a non-pure function calls a pure function:
  * If the compiler isn't sure, it does a generation pre-check, and pass the raw reference.
 
 
+<slice/>
+
 ## Tracking Immutable Data
 
 Recall that `printShipNames` was *pure*.
@@ -309,15 +304,15 @@ Above, it knew that `tenShips` points to an immutable region, so therefore `tenS
 
 
 <<<<
-The user doesn't have to annotate which regions data came from, but it can be helpful for clarity. The following example shows the `printShipNames` with the optional explicit region annotations.
+The user doesn't have to annotate which regions data came from, but it can be helpful for clarity. The following example shows the `printShipNames` with the optional explicit region markers.
 
  * The `<r'>` names a region. Named regions are immutable by default.
- * `tenShips &r'List<Ship>` declares that this argument is coming from the immutable region `r'`.
+ * `tenShips &r'List<r'Ship>` says this argument is coming from the immutable region `r'`. [#also1]
  * The function has its own private mutable region named `my'`.
 ////
 ```
 pure func printShipNames<r'>(
-  tenShips &r'List<r'Ship>)
+  tenShips &r'List<r'Ship>) «also2»
 my'{
   foreach i in 0..tenShips.len() {
     ship &r'Ship = tenShips[i];
@@ -339,7 +334,7 @@ Here's the same example, with the foreach loop expanded, to illustrate that `i` 
 In other words, a pure function can change anything except the memory that came before the call.
 
 
-Keep in mind, these region annotations are often inferred by the compiler, and usually not seen in Vale code.
+Keep in mind, these region markers are often inferred by the compiler, and usually not seen in Vale code.
 ////
 ```
 // Same function as before
@@ -366,6 +361,12 @@ This tracking is called *region tracking,* because it tracks the region each pie
 
 
 
+<slice>
+#also1: We could also write `&r'List<Ship>` instead, the `r'` applies deeply.
+
+#also2: We could also write `&r'List<Ship>` instead, the `r'` applies deeply.
+</slice>
+
 # Looks Familiar?
 
 
@@ -373,10 +374,8 @@ On first glance, immutable region borrowing looks similar to traditional borrow 
 
  * There's nothing like the borrow checker's aliasability-xor-mutability restrictions; objects can be aliased freely.
  * Our code can use fast approaches that the borrow checker can't reason about, such as [intrusive data structures](https://lwn.net/Articles/907876/) and [graphs](https://news.ycombinator.com/item?id=24996001), plus useful patterns like [observers](https://www.reddit.com/r/rust/comments/pwqju6/is_there_an_underlying_reason_that_idiomatic_rust/), [back-references](https://users.rust-lang.org/t/back-reference-to-the-parent-struct/7413/2), [dependency references](https://en.wikipedia.org/wiki/Dependency_injection), [callbacks](https://news.ycombinator.com/item?id=12029238), [delegates](https://medium.com/@nimjea/delegation-pattern-in-swift-4-2-f6aca61f4bf5) and many forms of RAII [# RAII is about automatically affecting the world outside our object. To affect the outside world, the borrow checker often requires us to take a `&mut` parameter or return a value, but we can't change `drop`'s signature. To see this in action, try to make a handle that automatically removes something from a central collection. Under the hood we usually use `unsafe` mechanisms, including FFI.] and [higher RAII](https://verdagon.dev/blog/higher-raii-7drl).
- * Region-annotated code can be called by non-region-annotated code, making our code more composable and reusable.
+ * Region-markered code can be called by non-region-markered code, making our code more composable and reusable.
  * Regions are optional and opt-in; one only explicitly uses them where it makes sense. Though, one still gets most of their benefits even if not using them explicitly.
-
-More details can be found [here](/blog/comparing-regions-to-borrow-checking), for those curious.
 
 
 Regions are more similar to mechanisms like:
@@ -394,6 +393,8 @@ Vale's contribution to the broader regions endeavor is in showing how:
 
 And with luck, we can bring all of this goodness into mainstream programming!
 
+
+<slice/>
 
 # Conclusion
 
@@ -417,7 +418,7 @@ Regions don't just help performance, they also enable some *novel features:*
 
 There are some surprising details which aren't covered in this article:
 
- * Pure functions can call impure functions; pure is not a viral function color. [# All globals are contained in mutexes. When we lock a mutex, we first assert that we're not inside any pure function calls. That assert is only one load and compare instruction, so a negligible cost.]
+ * Pure functions can call impure functions; pure is not a viral function color. [# This is because in Vale, `pure` doesn't actually mean we can't access globals, it more means "freeze this thread's memory".]
  * We can have a function that take some parameters from an immutable region, and some parameters from a mutable region.
  * We can have a function that take parameters from a "read-only" region, which can be either mutable or immutable. This function is then monomorphized into both variants.
  * When we return data from a pure function, it may need to be "re-generationed", turned from a raw pointer back into a generational reference. [# This is a pretty light operation on likely cache-hot memory, so it's not too bad. It can also be avoided by returning data in an `iso`.]
@@ -444,9 +445,6 @@ With your support, we can bring regions to programmers worldwide.
 See you next time!
 
 - Evan Ovadia
-
-
-[# somewhere talk about how its kind of an automatic form of rust, since readonly lowers to both immutable and mutable. we kind of found a way to parameterize mutability, really]
 
 
 <slice new-color="afterword"/>
@@ -477,7 +475,7 @@ In this quest, we've discovered and implemented a lot of new techniques:
 
 These techniques have also opened up some new emergent possibilities, which we hope to implement:
 
- * [Region Borrow Checking](/blog/zero-cost-refs-regions), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Region Borrow Checking](/blog/zero-cost-memory-safety-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
  * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
  * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
  * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.

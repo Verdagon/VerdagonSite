@@ -26,6 +26,47 @@
 
 
 
+
+      <item>
+         <title>How Memory Safety Approaches Speed Up and Slow Down Development Velocity</title>
+         <guid>https://verdagon.dev/blog/when-to-use-memory-safe-part-2</guid>
+         <link>https://verdagon.dev/blog/when-to-use-memory-safe-part-2</link>
+         <pubDate>Mon, 16 Jan 2023 10:15:00 -0400</pubDate>
+         <category>Programming Languages</category>
+         <author>noreply@verdagon.dev (Evan Ovadia)</author>
+      </item>
+
+      <item>
+         <title>Implementing a New Memory Safety Approach, Part 1</title>
+         <guid>https://verdagon.dev/blog/making-regions-part-1-human-factor</guid>
+         <link>https://verdagon.dev/blog/making-regions-part-1-human-factor</link>
+         <pubDate>Wed, 22 Nov 2022 10:15:00 -0400</pubDate>
+         <category>Programming Languages</category>
+         <category>Vale Programming Language</category>
+         <author>noreply@verdagon.dev (Evan Ovadia)</author>
+      </item>
+
+      <item>
+         <title>Zero-Cost Memory Safety with Vale Regions (Preview)</title>
+         <guid>https://verdagon.dev/blog/zero-cost-memory-safety-regions-overview</guid>
+         <link>https://verdagon.dev/blog/zero-cost-memory-safety-regions-overview</link>
+         <pubDate>Wed, 16 Nov 2022 10:15:00 -0400</pubDate>
+         <category>Programming Languages</category>
+         <category>Vale Programming Language</category>
+         <author>noreply@verdagon.dev (Evan Ovadia)</author>
+      </item>
+
+
+      <item>
+         <title>Hash Codes, Non-Determinism, and Other Eldritch Horrors</title>
+         <guid>https://verdagon.dev/blog/generics-hash-codes-horrors</guid>
+         <link>https://verdagon.dev/blog/generics-hash-codes-horrors</link>
+         <pubDate>Wed, 9 Nov 2022 10:15:00 -0400</pubDate>
+         <category>Programming Languages</category>
+         <category>Vale Programming Language</category>
+         <author>noreply@verdagon.dev (Evan Ovadia)</author>
+      </item>
+
       <item>
          <guid>https://verdagon.dev/blog/when-to-use-memory-safe-part-1</guid>
          <link>https://verdagon.dev/blog/when-to-use-memory-safe-part-1</link>

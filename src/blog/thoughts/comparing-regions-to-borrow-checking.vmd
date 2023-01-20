@@ -40,7 +40,7 @@ In traditional borrow checking, the viral restrictions mean that we need to deal
 
 In Vale, because functions are more composable and reusable, region borrowing is entirely *optional and opt-in*. One can write an entire program without thinking about regions, and they'll even get the benefits.
 
-In BenchmarkRL, even when using no region annotations, the system still eliminates the vast majority [# Draft TODO: This number should be 96% per manual counting, but replace this with an actual number once we have actual measurements.] of generation checks, [# Draft TODO: Put actual performance numbers here too, so we can speak in more real terms.]. This is because the standard library itself uses regions, and the compiler automatically uses region-based optimizations for certain patterns like iteration and pure blocks.
+In BenchmarkRL, even when using no region markers, the system still eliminates the vast majority [# Draft TODO: This number should be 96% per manual counting, but replace this with an actual number once we have actual measurements.] of generation checks, [# Draft TODO: Put actual performance numbers here too, so we can speak in more real terms.]. This is because the standard library itself uses regions, and the compiler automatically uses region-based optimizations for certain patterns like iteration and pure blocks.
 
 This also means we can *iterate and prototype faster.* Later, if we want that extra few percentage points [# Draft TODO: Replace with actual percentage one we have it.] we can add regions in the specific paths of our code that would benefit from it.
 

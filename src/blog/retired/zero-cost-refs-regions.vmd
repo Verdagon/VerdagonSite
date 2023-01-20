@@ -125,12 +125,12 @@ Programs often have "pure" functions, where a function...
 
 In Vale, we can annotate a function with the *pure* keyword to make the compiler enforce this. This is a common design pattern, and leads to much more maintainable and testable code.
 
-If we add *region annotations* to our *pure* function, Vale will *implicitly lock* all existing memory, thus making references to any existing memory *completely free;* we don't have to increment or decrement anything because:
+If we add *region markers* to our *pure* function, Vale will *implicitly lock* all existing memory, thus making references to any existing memory *completely free;* we don't have to increment or decrement anything because:
 
  * None of the objects they point to can change because they're immutable.
  * All these references are temporary, and will go away before we unlock again.
 
-Below, we use region annotations to tell the compiler which references point to the outside world.
+Below, we use region markers to tell the compiler which references point to the outside world.
 
 Let's see it in action! Let's say we have a turn-based game, which runs in Unity. Whenever the player unit acts, each of the enemy units uses the below code to act too.
 
@@ -241,9 +241,9 @@ struct ChaseDesire<'i rw, 'r imm> 'i {
 
 `getDesire` is a heavy, read-only operation. It doesn't change anything about the unit or the world, but it does breadth-first searches, A* pathfinding, and a bunch of other algorithms, which make (and then let go of) a lot of references into the World.
 
-Without the region annotations, every time we make (or let go of) a reference into the unit or anything else in the world, we increment and decrement a ref-count. Worse, the World would be cold, because Unity has probably rendered a few hundred frames since the last turn, and has long since wiped our World from the cache.
+Without the region markers, every time we make (or let go of) a reference into the unit or anything else in the world, we increment and decrement a ref-count. Worse, the World would be cold, because Unity has probably rendered a few hundred frames since the last turn, and has long since wiped our World from the cache.
 
-With the region annotations, the compiler knows that only the things inside the `'i` region can change, and nothing in the `'r` region will change, making references into `'r` completely free. *All of our references to this cold data, which would have incurred RC costs, are now free.*
+With the region markers, the compiler knows that only the things inside the `'i` region can change, and nothing in the `'r` region will change, making references into `'r` completely free. *All of our references to this cold data, which would have incurred RC costs, are now free.*
 
 *There is a caveat:* When we return a reference from the implicitly locked call, it increments the ref-count in the object it's pointing to. In the example, `ChaseDesire.victim` will increment the Unit it's pointing at, as it's returned. [# One could say that we're only doing the reference counting we need to, for the result of the function.] [# There are some potential SIMD opportunities to parallelize these increments.] One can often use explicit locking to avoid this kind of overhead.
 
@@ -270,7 +270,7 @@ We give both the `outAst` and a function from the `inAst` to translateFunction, 
 
 At the end of `templar`, the locks are dropped, automatically closing the mutexes, and we return the now-closed `outAstMutex`.
 
-With our `Mutexes` and region annotations, the compiler can give us free, zero-cost access to everything in the `inAst`.
+With our `Mutexes` and region markers, the compiler can give us free, zero-cost access to everything in the `inAst`.
 ////
 ```vale
 func templar(

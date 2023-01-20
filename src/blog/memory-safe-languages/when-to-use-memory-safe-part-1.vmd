@@ -156,7 +156,7 @@ These are technically logic bugs, better than undefined behavior, but our work i
 
 ## The safer way to use MMM languages
 
-There are ways to drastically reduce the risk of memory safety problems, even when the language doesn't give you any protections itself.
+There are ways to drastically reduce the risk of memory safety problems, even when the language doesn't give you any protections itself. It has no official name, so I refer to it as *Architected MMM*.
 
 
 There are some basic guidelines to follow:

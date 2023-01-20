@@ -70,7 +70,7 @@ In the 7DRL challenge, Vale [found a bug in one of my caches at compile time](ht
 There's a certain joy from using a new language that nobody else has ever used before. I felt like an Indiana Jones, exploring a tomb that no modern eyes have beheld.
 
 
-There's a freedom one feels when not slowed down by garbage collection or reference counting, and not constrained by a borrow checker. [# I have a particular wariness for the borrow checker, after learning it that it's incompatible with observers, most dependency injection, [most RAII](/blog/higher-raii-7drl), and it can sometimes influence one into more complicated architecture [with no performance benefit](https://www.reddit.com/r/roguelikedev/comments/i3xekn/ec_vs_ecs_for_roguelikes/)). This is why I made the [Region Borrow Checker](/blog/zero-cost-refs-regions), which should handle shared mutability a bit better.] I'm free to implement what I want, and know that the language will help me do it safely. It's like I've been driving a Honda Civic in city traffic, and now I'm in a BMW cruising down the highway.
+There's a freedom one feels when not slowed down by garbage collection or reference counting, and not constrained by a borrow checker. [# I have a particular wariness for the borrow checker, after learning it that it's incompatible with observers, most dependency injection, [most RAII](/blog/higher-raii-7drl), and it can sometimes influence one into more complicated architecture [with no performance benefit](https://www.reddit.com/r/roguelikedev/comments/i3xekn/ec_vs_ecs_for_roguelikes/)). This is why I made the [Region Borrow Checker](/blog/zero-cost-memory-safety-regions-overview), which should handle shared mutability a bit better.] I'm free to implement what I want, and know that the language will help me do it safely. It's like I've been driving a Honda Civic in city traffic, and now I'm in a BMW cruising down the highway.
 
 
 <<<<
@@ -126,7 +126,7 @@ PatternMap<bool> {
 #concurrency: If we add `parallel` in front of this loop, it can perform these iterations in parallel on multiple threads, using [seamless structured concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency).
 
 
-#immaccess: Because we're accessing data that was a parameter to a pure function, it doesn't have to check that the data is still alive or increment any reference counters, see [Zero-Cost References with Regions](/blog/zero-cost-refs-regions).
+#immaccess: Because we're accessing data that was a parameter to a pure function, it doesn't have to check that the data is still alive or increment any reference counters, see [Zero-Cost Memory Safety with Vale Regions](/blog/zero-cost-memory-safety-regions-overview).
 
 
 #hgm: [Hybrid-Generational Memory](https://verdagon.dev/blog/hybrid-generational-memory) would notice that we're iterating over a piece of data we own, so it wouldn't have to keep checking it still exists.
@@ -215,7 +215,7 @@ In this quest, we've discovered and implemented a lot of new techniques:
 
 These techniques have also opened up some new emergent possibilities, which we hope to implement:
 
- * [Region Borrow Checking](/blog/zero-cost-refs-regions), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Region Borrow Checking](/blog/zero-cost-memory-safety-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
  * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
  * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
  * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.

@@ -507,7 +507,7 @@ Key takeaways:
 <slice>
 #whatsvale: [Vale](https://vale.dev/) is a language we're making to explore techniques for easy, fast, and safe code.
 
-We actually discovered this "seamless, fearless, structured concurrency" while playing around with Vale's [region borrow checker](https://vale.dev/blog/zero-cost-refs-regions), which blends mutable aliasing with Rust's borrow checker.
+We actually discovered this "seamless, fearless, structured concurrency" while playing around with Vale's [region borrow checker](/blog/zero-cost-memory-safety-regions-overview), which blends mutable aliasing with Rust's borrow checker.
 
 #executor: The `parallel` block has a default executor, but can be overloaded with `parallel(num_threads)` or `parallel(an_executor)`.
 
@@ -629,7 +629,7 @@ Perhaps the biggest difference is that Vale has no aliasing restrictions.
 Because of these design decisions, Vale's regions are largely "opt-in":
 
  * One can write an entire Vale program, without ever adding a region annotation or knowing about regions at all. [# This is because Vale gets its memory safety from [Generational References](https://vale.dev/blog/generational-references), and soon possibly [Hybrid-Generational Memory](https://vale.dev/blog/hybrid-generational-memory)].
- * A new user can look at an existing program, ignore all region annotations, `parallel`, and `pure`, and the program will still make sense. All of these features are designed to improve a program's performance without affecting its semantics.
+ * A new user can look at an existing program, ignore all region markers, `parallel`, and `pure`, and the program will still make sense. All of these features are designed to improve a program's performance without affecting its semantics.
 
 
 We hope that these things will give Vale a gradual learning curve, and make life easy for newcomers.

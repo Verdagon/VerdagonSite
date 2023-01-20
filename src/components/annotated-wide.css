@@ -42,6 +42,8 @@
   left: 0;
   right: 0;
   box-sizing: border-box;
+  /* Start out with 0 opacity, turn it to 1 when we're done laying out */
+  opacity: 0;
 }
 .page.m-annotated.jsmargined label .m-annotated.when-expanded {
   display: none;

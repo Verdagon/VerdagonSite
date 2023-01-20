@@ -171,11 +171,11 @@ annotate a function with the **pure** keyword to make the compiler
 enforce this. This is a common design pattern, and leads to much more
 maintainable and testable code.
 
-If we add **region annotations** to our pure function, Vale will
+If we add **region markers** to our pure function, Vale will
 **implicitly lock** all existing memory, thus making references to any
 existing memory **completely free;** we don\'t have to increment or
 decrement anything because all these references are temporary
-anyway**.** Below, we use region annotations (highlighted) to tell the
+anyway**.** Below, we use region markers (highlighted) to tell the
 compiler which references point to the outside world.
 
 Let\'s see it in action! Let\'s say we have a turn-based game, which
@@ -267,13 +267,13 @@ but it does breadth-first searches, A\* pathfinding, and a bunch of
 other algorithms, which make (and then let go of) a lot of references
 into the World.
 
-Without the region annotations, every time we make (or let go of) a
+Without the region markers, every time we make (or let go of) a
 reference into the unit or anything else in the world, we increment and
 decrement a ref-count. Worse, the World would be cold, because Unity\'s
 rendering process has probably rendered a few hundred frames since the
 last turn, and has long since wiped our World from the cache.
 
-With the region annotations, the compiler knows that only the things
+With the region markers, the compiler knows that only the things
 inside the \'i region can change, and nothing in the \'r region will
 change, making references into \'r completely free. **All of our
 references to this cold data, which would have incurred RC costs, are

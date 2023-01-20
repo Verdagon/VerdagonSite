@@ -232,7 +232,7 @@ We suddenly started discovering certain recurring patterns, like nuggets of gold
 
 
 <slice>
-#rorc: There are amazing recent advances in optimized ref-counting, such as in [Lobster's Algorithm](https://aardappel.github.io/lobster/memory_management.html) which optimizes away 95% of ref-counts. Vale also has [read-only regions](https://vale.dev/guide/regions) and [bump regions](https://vale.dev/guide/regions), where ref-counting overhead is reduced to zero.
+#rorc: There are amazing recent advances in optimized ref-counting, such as in [Lobster's Algorithm](https://aardappel.github.io/lobster/memory_management.html) which optimizes away 95% of ref-counts. Vale also has [read-only regions](/blog/zero-cost-memory-safety-regions-overview) and [bump regions](https://vale.dev/guide/regions), where ref-counting overhead is reduced to zero.
 
 #nocycles: Constraint references also solve the cycle problem for ref-counting, by enforcing that there are no other references to an object when we let go of its owning reference.
 </slice>

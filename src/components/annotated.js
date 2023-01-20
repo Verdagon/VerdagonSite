@@ -61,6 +61,9 @@ function relayoutNotes() {
     const actualY = Math.max(anchorPageY, nextFreeY);
     note.style.top = (actualY - sliceNotesElementY) + "px";
 
+    // Make it visible again
+    note.style.opacity = "100%";
+
     nextFreeY = actualY + note.getBoundingClientRect().height;
     lastNote = note;
     lastSliceNotesElement = sliceNotesElement;

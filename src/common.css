@@ -43,9 +43,10 @@ b {
 }*/
 
 .anecdote {
+  color: #008000;
   text-decoration: underline;
-  margin-left: 2px;
-  margin-right: 2px;
+  margin-left: 1px;
+  margin-right: 1px;
 }
 
 .external-link {

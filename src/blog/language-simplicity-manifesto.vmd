@@ -3,7 +3,7 @@ title: Language Complexity: What it is, When it's Good, and How to Do it Right
 author: Evan Ovadia
 date: Feb 15, 2022
 realm: blog
-path: blog/seamless-fearless-structured-concurrency
+path: blog/language-simplicity
 layout: annotated
 namespace: c-blog m-annotated
 sponsor: me
