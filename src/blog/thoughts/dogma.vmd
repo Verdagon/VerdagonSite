@@ -1,0 +1,21 @@
+Programming Beliefs and Dogma that I've Outgrown
+
+
+
+# Tech debt isn't always bad
+
+Always have integration tests. they dont really have downsides.
+
+
+
+
+# Hungarian notation isn't always bad.
+
+(talk about how it works in the vale compiler)
+
+
+# OO isn't all bad
+
+It really excels with encapsulation, polymorphism, and modularity, which helps you get things done faster and get software out to the user sooner.
+
+link out to MSE velocity

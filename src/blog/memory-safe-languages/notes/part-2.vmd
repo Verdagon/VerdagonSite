@@ -1,0 +1,73 @@
+
+
+These weaknesses are can be subtle, and often don't appear in small projects when it's still easy to change a program's architecture. They start to reveal themselves more in larger projects, as a project starts scaling across multiple developers. As [one user says,](https://news.ycombinator.com/item?id=27458058 .anecdote) "Six weeks into the whole thing and people spend more time un-breaking builds than writing code."
+
+The borrow checker can be [slower](https://news.ycombinator.com/item?id=31063493 .anecdote) to [prototype](https://news.ycombinator.com/item?id=32579944) [with](https://news.ycombinator.com/item?id=26419670 .anecdote) when one really just wants to [solve](https://news.ycombinator.com/item?id=28804477 .anecdote) [the problem](https://news.ycombinator.com/item?id=23744577 .anecdote) rather than being [distracted by the language](https://blogs.dust3d.org/2019/03/13/why-i-rewrote-the-mesh-generator-of-dust3d-from-rust-to-cplusplus/ .anecdote), even for [more](https://lobste.rs/s/veinkw/comparison_rust_zig#c_nmf8jz .anecdote) [experienced](https://news.ycombinator.com/item?id=31568497 .anecdote) [rustaceans](https://www.reddit.com/r/rust/comments/iwij5i/blog_post_why_not_rust/g627nwx/ .anecdote).
+
+
+https://www.reddit.com/r/programming/comments/z2i2wn/using_rust_at_a_startup_a_cautionary_tale/ixh7nwo/
+"do a thoroughly grounded analysis before picking rust, else you can get burned"
+
+
+
+When i was new to rust and thought it was the best thing since sliced bread, i often ignored the occasional opinion highlighting a weakness in rust, and just chalked it up to them being unfamiliar with the language. I learned a few lessons since then:
+
+ * An old noveling adage: if a reader says something is confusing, they are always right.
+ * Steelman others' views. It's the only way to broaden your perspective.
+ * Remember what it was like to be a beginner, and realize that not everyone had the same advantages (time, passion, mentors) that you did.
+
+It was only after a lot of experience, and exposing myself to a much broader range of opinions, that i really started recognizing the downsides of what I'd been taught to do in rust.
+
+To save you the same journey, I'll share an overview with many links out to those whose opinions are more coherent than mine would be.
+
+
+
+https://news.ycombinator.com/item?id=33748740:
+
+> I haven't quite given up (mainly out of stubbornness and having some time on my hands), and plan to take up the 2nd phase of my one Rust app. But anyone who finds Rust to be tractable by just 'investing some time to learn it' is living in a different world from mine. 
+
+
+If we slowed down development velocity by half, then we'd still be in 1995. starcraft 1, N64. we wouldnt have things like IDEA, etc, etc, etc
+
+
+
+
+
+# When garbage collection is and isn't the answer
+
+i dont like this angle. it makes it anti-GC.
+
+
+are we talking about memory safety or memory management? yeah mostly memory safety. raii has little to do with it, except that GC precludes it. and linear typing.
+
+
+
+It's widely believed that garbage collection is the best for development velocity, because it will free memory for us at run-time.
+
+
+However, there are some interesting tools that garbage collection doesn't have:
+
+ * Constraint references, an error detection technique usable with reference counting.
+ * Linear typing, which enforce that we "don't forget to call this method". [# Except for LiquidHaskell, which is bringing in linear types.]
+ * RAII (such as in C++, Vale, and Rust), which associate certain data with the lifetime of an object.
+ * Lifetime faults, which prevent the "zombie object" problem with garbage collection.
+
+
+
+
+
+
+MMM has zero artificial complexity. but it doesnt solve or surface any inherent complexity.
+
+
+
+
+
+
+https://mdwdotla.medium.com/using-rust-at-a-startup-a-cautionary-tale-42ab823d9454:
+
+> I don’t think it’s the right tradeoff in all cases, especially not in startups where velocity is crucial. I am a pragmatist. I would much rather have my team sink time into debugging the occasional memory leak or type error for code written in, say, Python or Go, than have everyone on the team suffer a 4x productivity hit for using a language designed to avoid these problems entirely.
+
+
+
+[# Verona might the capacity for arenas one day too, judging from [this issue](https://github.com/microsoft/verona/issues/10).]

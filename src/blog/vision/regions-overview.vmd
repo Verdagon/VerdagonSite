@@ -1,0 +1,487 @@
+---
+title: Zero-Cost Memory Safety with Vale Regions (Preview)
+subtitle: Watch regions eliminate memory safety overhead!
+author: Evan Ovadia
+date: Nov 14, 2022
+realm: blog
+path: blog/zero-cost-memory-safety-regions-overview
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: us
+---
+
+
+! Note: Regions are still a work-in-progress. *This is only a preview* describing how we expect them to work in practice, to show where we're headed and what we're aiming for. They could surpass our wildest expectations, or they could shatter and implode into a glorious fireball, who knows! Follow along as we [implement all this](/blog/making-regions-part-1-human-factor), and reach out if anything isn't clear! [# If anything isn't clear, feel free to reach out via [discord](https://discord.gg/SNB8yGH), [twitter](https://twitter.com/vale_pl), or the [subreddit](https://reddit.com/r/vale)! We love answering questions, and it helps us know how to improve our explanations.] [# We're aiming to complete regions by early 2024, check out the [roadmap](https://vale.dev/roadmap) for more details.]
+
+
+Vale has an ambitious goal: to be fast, safe, _and_ easy. There are a lot of stellar languages that have two, and we suspect it's possible to really have all three.
+
+
+This isn't quite possible with today's more well-known approaches. Languages with borrow checking have great run-time speed, and languages with garbage collection have better flexibility, simplicity, and development velocity, but we haven't yet seen a way to get all these benefits at once.
+
+
+However, by blending two new techniques, we can make something with the best of all worlds: fast and safe, while keeping the language simple and flexible. [# If we're lucky, the blend could have as little memory overhead as borrow checking in practice: zero-cost temporarily immutable references, with the occasional generation check for non-temporary references (which, in borrow checking, usually become indexes or IDs which incur bounds checking or hashing costs on use).]
+
+
+The first technique is called [generational references](/blog/generational-references), which is memory-safe, easy, and [pretty dang fast](https://verdagon.dev/blog/generational-references#speed). [# It also enables some fascinating features like [Higher RAII](https://verdagon.dev/blog/higher-raii-7drl)!]
+
+
+We can make it even faster by combining it with a new technique called *regions*. [# Regions also power Vale's more interesting features like [Seamless, Fearless, Structured Concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), [Fearless FFI](/blog/next-fearless-ffi), allocators, and [hybrid-generational memory](https://verdagon.dev/blog/hybrid-generational-memory).]
+
+
+This article is a summary of the [five-part series](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing) explaining regions, check that out if you want more details!
+
+
+<slice />
+
+
+# A Mile High View
+
+
+Vale's memory safety comes from [generational references](/blog/generational-references) which are pretty fast: they only incur between 2% and 10.84% speed overhead in our benchmarked program, a [terrain generator](/blog/generational-references). This alone is fast enough for most programs, while still being easy to use. [# Note that there's only one benchmark program so far, and we're comparing Vale without generational references (zero overhead, equivalent to C) to Vale with generational references. We'll be able to compare more directly to other languages once we support inline data, hopefully in [mid-2023](https://vale.dev/roadmap). Still, these results are particularly promising, considering Java's 89% speed overhead, Go's 183%, and Swift's 320% measured in [this article](https://thenewstack.io/which-programming-languages-use-the-least-electricity/).]
+
+
+One should generally keep a program loose and flexible, and then profile it to find the small sections of their code that would benefit from optimization.
+
+
+That's where regions enter the picture.
+
+
+A region is a *grouping of data that we can freeze and unfreeze* as one, to make it either "mutable" or "immutable".
+
+
+While a region is immutable it's *much faster to read from,* because the compiler no longer needs to insert any [generation checks](/blog/generational-references) to ensure that a generational reference still points to a valid object.
+
+
+We have three tools to put data into regions:
+
+ * *Pure functions* temporarily put all incoming data into an immutable region.
+ * *Isolates* are regions of data where nothing inside can point out, and nothing outside can point in, except for the owning reference.
+ * *Cells* are like more flexible isolates, with some restrictions moved to run-time.
+
+These are explained more throughout the rest of the article.
+
+
+Regions are opt-in; one can write their entire program without knowing about regions at all.
+
+
+<slice />
+
+
+# The easiest way to use regions
+
+
+In any program, many functions just read data from the world and calculate something new.
+
+
+We call these functions "pure".
+
+
+<<<<
+A Vale programmer [# ...or even static analysis tools, in theory!] can find these and annotate them with the `pure` keyword, like in this function.
+
+
+Simply adding `pure` will inform the compiler that the `List`, all of its `Ship`s, plus `ship`, all have immutable data.
+////
+```vale
+pure func printShipNames(
+  tenShips &List<Ship>)
+void {
+  foreach i in 0..tenShips.len() {
+    ship = tenShips[i];
+    name = ship.name;
+    println(name);
+  }
+}
+```
+>>>>
+
+
+Adding the `pure` keyword *eliminates every single generation check* in this function, making its memory safety zero-cost. [# This happens surprisingly often, a lot of functions can use regions to eliminate every single generation check. It isn't a universal phenomenon though, any non-trivial stateful program is guaranteed to have some memory safety overhead, no matter what language or paradigm you use.]
+
+
+How does this work?
+
+
+`pure` functions see their parameters as all inside an *immutable region*, separate from its own internal region. [# `pure` functions have a hidden feature: they can temporarily see multiple regions as one combined immutable region. This makes them much more flexible and reusable!]
+
+
+<<<<
+Here's that snippet again, where everything from the immutable region is bolded.
+
+
+`printShipNames`'s own data (such as `i`) is in its own private _mutable_ region.
+////
+<div>
+<style>
+.ships-snippet b {
+  color: #00FFFF;
+}
+</style>
+<div class="c-snippet root">
+<div class="c-snippet code ships-snippet">pure func printShipNames(
+  <b>tenShips &List&lt;Ship&gt;</b>)
+void {
+  foreach i in 0..<b>tenShips.len()</b> {
+    <b>ship = tenShips[i];</b>
+    <b>name = ship.name;</b>
+    println(<b>name</b>);
+  }
+}</div>
+</div>
+</div>
+>>>>
+
+
+This is only a high-level taste, check out [Immutable Region Borrowing](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing) for more on how this works!
+
+
+It's pretty easy to do this for any function that only _reads_ from its parameters. And in practice, functions can often be adjusted to be read-only, so that they can add the `pure` keyword too.
+
+
+There is a restriction, however. We can only hand immutable data (like the above `List` and `Ship`s) to functions that are also `pure` or have *region markers* as shown in the next section.
+
+
+<slice />
+
+
+# Region Markers
+
+
+Pure functions, like the above, automatically know which data was in an immutable region.
+
+
+However, if we want to hand this immutable data to another (non-pure) function, we sometimes need to add *region markers* to it. [# We can also hand immutable data to generic functions, such as `List<T>`'s `contains`, without adding any region markers. This is because the compiler makes no assumptions about what region that `T` might be in; it's prepared for `T` to be in a separate region, so there's no need to add region markers. One could say that `T` comes with its own implicit region markers.]
+
+
+Region markers are fairly simple to use, and don't come with any complicated concepts or aliasing restrictions. [#aliasing]
+
+
+<<<<
+Here, we just add `<r'>` (or any other letter) after the function's name, and in front of any type that's from the immutable region.
+////
+```
+func copyShip<r'>(
+  from &r'Ship,
+  to &Ship)
+void {
+  set to.fuel = from.fuel;
+}
+```
+>>>>
+
+
+The compiler uses these region markers to make sure that:
+
+ 1. We don't modify data in a read-only region (such as the `r'` above).
+ 1. A reference into a region doesn't outlive the region itself.
+
+
+For more on this, check out [Immutable Region Borrowing](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing).
+
+
+Before we talk about the other ways to put data into regions, let's talk about the *motivating principles* behind regions!
+
+
+<slice>
+#aliasing: In Vale, we can freely alias regions.
+
+For example, `x'` and `y'` could refer to the same mutable region, even if there's a read-only region `r'` referring to it. We can even use a pure function to then temporarily flip all those to immutable.
+
+This all works because any function that receives a read-only region will automatically be monomorphized into two functions in the final binary: one that receives a mutable region (and does generation checks), and a faster one that receives an immutable region.
+</slice>
+
+
+# Progressive Disclosure, Avoiding Forced Restrictions, and Ignorable Complexity
+
+
+Many situations fit regions' restrictions easily and seamlessly, such as:
+
+ * Read-only calculations that can be phrased as pure functions.
+ * Temporary data that we only ever read, after it was created.
+ * Objects with "private" data, that nobody outside knows about.
+
+
+Theoretically, with enough effort, any code can be phrased in terms of regions. However, when a language forces the user into a certain paradigm, it tends to have a steeper learning curve and a lot more complexity.
+
+
+Instead, Vale has a core principle of *avoiding forced restrictions*, so that it can stay simple, flexible, and easy to learn.
+
+
+For this reason, Vale's regions are opt-in. In fact, *one can write an entire Vale program without knowing about regions.* [# This is very important, not only because it makes Vale easier to learn, but because most code in practice should optimize for simplicity and flexibility, not speed. On top of that, most programs don't need to optimize away generation checks because they're pretty fast already. One should optimize away quadratic algorithms first, and they might even find that their program is fast enough at that point.]
+
+
+These programs still benefit from regions, of course: the standard library (and many other libraries) use regions under the hood, and the compiler will automatically use regions for iteration and other situations where part of the data is read-only.
+
+
+Since regions are opt-in, one only needs to know about regions for the parts of their code they want to make even faster, usually after their profiler identifies the specific sections of their code that would benefit from optimization.
+
+
+This is also consistent with another Vale core principle, *progressive disclosure*, where things are simple by default. The user can progressively discover the more complex features as they need them, rather than needing to know them all at once. [# This is a principle I hope more languages pick up. C# does this well with its `struct` keyword; you can completely ignore the feature until you want it.]
+
+
+The last principle behind regions is *ignorable complexity*. If a user sees any `pure` or `'`, they can ignore them and still understand the code, because *regions don't change the semantics of the program.* In a way, they're just an optimization hint that can be safely ignored. [# In fact, our test interpreter does ignore them!]
+
+
+We need languages that are simple, safe, readable, and fast by default, with any extra restrictions being opt-in and ignorable. These principles are what originally motivated Vale. [# In general, we should focus on making programming _better for humans._ Balancing that with performance is a fascinating design challenge!]
+
+
+<slice />
+
+
+# Isolates are separate regions of data
+
+
+Often, the vast majority of a program's generation checks can be eliminated with pure functions. If we want to go even further, we can use *isolates*.
+
+
+An isolate is just a hierarchy of data where nothing inside points out, and nothing outside points in except for the owning reference. [# We actually can have references inside pointing out, as shown in the next section.]
+
+
+An isolate forms a region that is mutable by default, and can be frozen and unfrozen independently of the rest of the program. [#enable]
+
+
+We use `'` to specify something is an isolate, and `.imm` to temporarily access that data to read it immutably.
+
+
+<<<<
+In this example, we isolate the cannon by putting a `'` in front of the `Cannon` call.
+
+
+Then, to immutably borrow the data, we use `cannon.imm`.
+////
+```
+exported func main() {
+  cannon = 'Cannon(12, ...);
+  ship = Ship(100);
+  fire(cannon.imm, &ship);
+  println("Ship's new hp: {ship.hp}");
+}
+```
+>>>>
+
+
+We can also use `.open` to open it for read-write access. The compiler makes sure that we don't use `.open` and `.imm` at the same time on the same region.
+
+
+Lastly, we can use `.read`, which gives us read-only access while allowing it to be `.open`ed at the same time, though it doesn't have the performance benefits of `.imm`. [# One would usually use `.read` in non-performance-critical code or when they aren't sure whether someone else is `.open`ing it at the same time.]
+
+
+Note that isolates are a little more restricted when inside structs. We can avoid those restrictions by using a *cell*, like `''Cannon`, which moves the `.imm`-versus-`.open` check to run-time.
+
+
+Check out [Isolates](/blog/zero-cost-memory-safety-regions-part-2-isolates) for more!
+
+
+<slice>
+#enable: Someone once described this as "a borrow checker you can precisely enable and disable," which is a pretty apt description, though regions don't impose the same aliasability-xor-mutability restrictions as borrow checking.
+
+And since Vale data has no aliasing restrictions, it can do all the useful patterns like intrusive data structures, graphs, observers, back-references, dependency references, callbacks, delegates, and more kinds of RAII plus [Higher RAII](https://verdagon.dev/blog/higher-raii-7drl)!
+</slice>
+
+
+# Isolates can have references to objects outside themselves
+
+
+Most isolates have two rules:
+
+ * No objects outside the isolate point in (except for the owning reference).
+ * No objects inside the isolate point out.
+
+
+That second rule is optional, an isolate can contain references that point outward.
+
+
+<<<<
+One way to do this is for a struct to have a region parameter.
+
+
+This `Ship` can still be in an isolate, even though it contains a reference to a `Dock` in a different region.
+////
+```
+struct Ship<x'> {
+  ...
+  dock &x'Dock;
+}
+```
+>>>>
+
+
+In practice, this lets us put a lot more data into isolates. Many structs can put all of their private data into an isolate.
+
+
+We also get this for free if we use generics. The compiler assumes that the `T` in `List<T>` is in a different region, as if it had an implicit region parameter.
+
+
+
+Check out [One-way Isolation](/blog/zero-cost-memory-safety-regions-part-3-one-way-isolation) for more on this!
+
+
+<slice />
+
+
+# And so much more!
+
+
+There are a lot of interesting aspects in the [five-part series](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing) that aren't covered here, such as:
+
+ * Every mutex contains an isolate! [# Plus, every global is in a mutex, so every global has a isolate.]
+ * We saw non-owning references to other regions, but a struct can actually _contain_ another region's data. [# Collections do this. For example, we can have a `List<x'Ship>`, where each List node literally contains and owns some data from region `x'`.] [Multi-Region Data](/blog/zero-cost-memory-safety-regions-part-4-multi-region-data) explains more on this.
+ * Regions help enable [Seamless, Fearless, Structured Concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency).
+ * Structs can immutably borrow from isolates. This is how Vale achieves zero-cost iteration, and makes entire architectures like [entity-component-system](https://en.wikipedia.org/wiki/Entity_component_system) zero-cost. [Scoped Data](/blog/zero-cost-memory-safety-regions-part-5-region-scoped-data) has more on this!
+ * [Fearless FFI](/blog/next-fearless-ffi) uses regions under the hood, to give us memory safety even when interacting with non-memory-safe languages.
+ * We can attach an allocator to an isolate, such as `BumpAllocator^'Fleet`. [# Actual syntax TBD.]
+ * We can completely contain a third-party library's code inside an isolate if we wanted to; isolates are very composable.
+
+
+<slice />
+
+
+# Tying it all together
+
+
+We saw three ways to put data in regions, to specify which data can be temporarily immutable:
+
+ * `pure` which makes a function see all of its parameters as from an immutable region.
+ * "isolates" like `'Ship` which we can access with `.imm`, `.open`, or `.read`.
+ * "cells" like `''Ship` which move the `.imm`-versus-`.open` check to run-time.
+
+
+Regions have some particular strengths:
+
+ * They can make our program faster in the specific areas that need it.
+ * They are *opt-in*, which keeps the language simple.
+ * Their restrictions don't spread to callers, which keeps our programs flexible.
+
+
+To compare, today's existing approaches are fairly good, but they either:
+
+ * Have more pervasive restrictions which can spread to the rest of the program. [#fprust]
+ * Have no immutability, and must rely on slower techniques for run-time memory safety. [# This is referring to approaches like reference counting and tracing garbage collection.]
+
+
+Blending regions with generational references is simple, safe, and fast by default, and also lets us eliminate the last bit of memory safety overhead where it's needed.
+
+
+! Note: Keep in mind *this is only a preview* describing how we expect regions to work in practice. Follow along as we [implement all this](/blog/making-regions-part-1-human-factor), and reach out with any questions! [# If anything isn't clear, feel free to reach out via [discord](https://discord.gg/SNB8yGH), [twitter](https://twitter.com/vale_pl), or the [subreddit](https://reddit.com/r/vale)!]
+
+
+<slice>
+#fprust: For example, in functional programming, everything is immutable by default, and we often emulate mutability with tools like the state monad, which tends to spread to any callers, and all their callers, and so on.
+
+Borrow checking has this weakness too: aliasing restrictions often bleed through API boundaries and cause extra refactoring throughout the codebase, and we can only partially trade those restrictions for others in certain cases.
+
+Both paradigms are great in a lot of situations, and can often result in unnecessary complexity in areas that don't benefit from those restrictions.
+</slice>
+
+
+# Conclusion
+
+
+As we saw, regions let us temporarily freeze specific data in our program, to let us immutably access it to make our code faster.
+
+
+If you want to learn more, check out the more in-depth series:
+
+ * [Part 1: Immutable Region Borrowing](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing) shows how we can use pure functions to temporarily freeze and get zero-cost access to all pre-existing memory.
+ * [Part 2: Isolates](/blog/zero-cost-memory-safety-regions-part-2-isolates) covers how we can freeze data even without pure functions.
+ * [Part 3: One-way Isolation](/blog/zero-cost-memory-safety-regions-part-3-one-way-isolation) shows how isolates can have references outside themselves, which is great for optimizing objects' private data.
+ * [Part 4: Multi-Region Data](/blog/zero-cost-memory-safety-regions-part-4-multi-region-data) shows how an object or array can contain other regions' objects inline.
+ * [Part 5: Scoped Data](/blog/zero-cost-memory-safety-regions-part-5-region-scoped-data) shows how regions make iteration zero-cost, such as in [entity-component-system](https://en.wikipedia.org/wiki/Entity_component_system) architectures.
+
+
+*That's all for now!* We hope you enjoyed this article. If you want more, then subscribe to our [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), [discord server](https://discord.gg/SNB8yGH), or [subreddit](https://reddit.com/r/vale)!
+
+
+If you're impressed with our [track record](https://vale.dev/roadmap#recent-additions) and believe in the [direction we're heading](https://vale.dev/roadmap), please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>
+
+With your support, we can bring regions to programmers worldwide!
+
+
+See you next time,
+
+- Evan Ovadia
+
+
+<slice new-color="afterword"/>
+
+# Vale's Vision
+
+Vale aims to bring a new way of programming into the world that offers *speed*, *safety*, and *ease of use.*
+
+
+*The world needs something like this!* Currently, most programming language work is in:
+
+ * High-overhead languages involving reference counting and tracing garbage collection.
+ * Complex languages (Ada/Spark, Coq, Rust, Haskell, etc.) which impose higher complexity burden and mental overhead on the programmer.
+
+These are useful, but there is a *vast field of possibilities* in between, waiting to be explored!
+
+
+Our aim is to explore that space, discover what it has to offer, and make *speed and safety easier than ever before.*
+
+
+In this quest, we've discovered and implemented a lot of new techniques:
+
+ * [Generational Memory](/blog/generational-references), for a language to ensure an object still exists at the time of dereferencing.
+ * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
+ * [Fearless FFI](/blog/fearless-ffi), which allows us to call into C without risk of accidentally corrupting Vale objects.
+ * [Perfect Replayability](/blog/perfect-replayability-prototyped), to record all inputs and replay execution, and completely solve heisenbugs and race bugs.
+
+
+These techniques have also opened up some new emergent possibilities, which we hope to implement:
+
+ * [Region Borrow Checking](/blog/zero-cost-memory-safety-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
+ * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
+ * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
+
+
+We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
+
+ * We can mix an `unsafe` block with Fearless FFI to make a much safer systems programming language!
+ * We can mix Erlang's isolation benefits with functional reactive programming to make much more resilient programs!
+ * We can mix region borrow checking with Pony's `iso` to support shared mutability.
+
+...plus a lot more interesting ideas to explore!
+
+
+The Vale programming language is a novel combination of ideas from the research world and original innovations. Our goal is to publish our techniques, even the ones that couldn't fit in Vale, so that the world as a whole can benefit from our work here, not just those who use Vale.
+
+
+Our medium-term goals:
+
+ * Finish the Region Borrow Checker, to show the world that shared mutability can work with borrow checking!
+ * Prototype Hybrid-Generational Memory in Vale, to see how fast and easy we can make single ownership.
+ * Publish the Language Simplicity Manifesto, a collection of principles to keep programming languages' learning curves down.
+ * Publish the Memory Safety Grimoire, a collection of "memory safety building blocks" that languages can potentially use to make new memory models, just like Vale combined generational references and scope tethering.
+
+
+We aim to publish articles biweekly on all of these topics, and create and inspire the next generation of fast, safe, and easy programming languages.
+
+
+If you want to support our work, please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+With enough sponsorship, we can:
+
+ * Work on this full-time.
+ * Turn the Vale Language Project into a 501(c)(3) non-profit organization.
+ * Make Vale into a production-ready language, and push it into the mainstream!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>

@@ -1,0 +1,264 @@
+---
+title: Implementing a New Memory Safety Approach, Part 1
+subtitle: A new paradigm, for easy and flexible speed and safety!
+author: Evan Ovadia
+date: Nov 20, 2022
+realm: blog
+path: blog/making-regions-part-1-human-factor
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: us
+---
+
+
+A few years ago, I was lying in bed at 2am listening to my [favorite fanfiction podcast](https://www.hpmor.com/) for the 47th time, drifting in and out of sleep, brain spinning on various features and bugs I'd programmed that day. [# [Harry Potter and the Methods of Rationality](https://www.hpmor.com/)! The series really is that good, [give it a listen](https://hpmorpodcast.com/)!]
+
+
+Suddenly, my eyes flew open as a realization hit me.
+
+
+That realization sparked a chain reaction of events that spanned years, and led to discovering an entire new memory safety approach.
+
+
+This is the first post (of hopefully many!) about the journey of creating, designing, and implementing *[regions](/blog/zero-cost-memory-safety-regions-overview)*, a static analysis technique that lets us make *efficient, memory-safe code without garbage collection, reference counting, or a borrow checker.*
+
+
+This post in particular talks about what originally led to the idea, and the first bits of implementation. If you instead want to learn about regions themselves, head over to [the regions overview](/blog/zero-cost-memory-safety-regions-overview)! [# If you like this post, consider submitting it to Hacker News, Reddit, or your favorite link aggregator! It helps me out a lot, and helps spread these ideas more widely.]
+
+
+# Regions and the Chronobase
+
+<img width="100%" src="/images/incendian2.png" />
+
+
+The idea originally came from [a game](https://verdagon.itch.io/incendian-falls) I made for the [7-Day Roguelike Challenge](https://7drl.com/). In this game, you could *time travel and team up with your past self* to defeat hordes of enemies.
+
+
+The time-traveling system involved a lot of repetitive boilerplate code, so I made a tiny language and compiler to generate the code for me. [#tinylang] [#timetravel] I could then write a tiny bit of code in this language to add a new item, enemy, tile, or component, and it would instantly generate the game state code.
+
+
+In the end, it was a sort of "time-traveling database", so I called it the *chronobase*.
+
+
+The 7-day challenge started, and the chronobase worked wonderfully. By the end of the week, I had so many kinds of items, enemies, tiles, and components in the game that the resulting generated code was over [150,000 lines](https://github.com/Verdagon/IncendianFalls/tree/master/Atharia/Atharia/Core).
+
+
+After the challenge, I wanted to write functions in the chronobase language, not just data. These functions would behave kind of like regular databases' [stored procedures](https://en.wikipedia.org/wiki/Stored_procedure). [#perfrep]
+
+
+For various reasons, I decided that the outside objects (the ones given as inputs to these functions) would be immutable. An outside Goblin would be `r'Goblin` and immutable, while a Goblin already in the database would be `db'Goblin` and mutable.
+
+
+And at 2am, that fateful night, it occurred to me that *we can skip reference counting and generation checks* for any of these inputs (like `r'Goblin`) because they're *temporarily immutable* while we're inside the function. [# This idea eventually evolved into [immutable borrowing](https://verdagon.dev/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing), the core concept that enables regions.]
+
+
+If you're curious about why this works, check out [the explanation](/blog/zero-cost-memory-safety-regions-overview), but for now I'll continue the tale!
+
+
+<slice>
+#timetravel: Time traveling is _hard_ to do efficiently; one cannot simply copy the entire game state for every turn. Instead, I used [journaling](https://en.wikipedia.org/wiki/Journaling_file_system) and [persistent hash maps](https://en.wikipedia.org/wiki/Persistent_data_structure) to be able to reconstruct the game state from any point in time.
+
+#tinylang: It was a [domain specific language](https://en.wikipedia.org/wiki/Domain-specific_language) named [VSS](https://github.com/Verdagon/IncendianFalls/tree/master/ChronobaseCS/resources), with a [tiny Scala-based compiler](https://github.com/Verdagon/IncendianFalls/tree/master/ChronobaseCS) to generate the chronobase code.
+
+#perfrep: In fact, if we added stored procedures and made the tiny language deterministic, we could have it record all of its inputs and be able to perfectly replay and reproduce any bugs we encountered, so I added that in. This later inspired Vale's [Perfect Replayability](https://verdagon.dev/blog/perfect-replayability-prototyped) feature.
+</slice>
+
+# An Alien Concept
+
+
+I feverishly scribbled it in a notebook for hours. When I woke up, I discovered this notebook, and read the page.
+
+
+"...what the hell am I looking at?"
+
+
+This was a common occurrence, honestly. "Notes from Night Evan" is an ongoing joke in my circle, about the weirdest things I'd written to myself. And this was definitely up there.
+
+
+"Huh."
+
+
+It _kind of_ made sense.
+
+
+And then I noticed a triple-underlined statement: *"can skip run-time safety overhead!"*.
+
+
+"Holy hells!" I said to myself and sprang out of bed. It all came rushing back, and I finally remembered all the details. [# At the time, Vale was based on a single-ownership form of reference counting called [constraint references](https://verdagon.dev/blog/raii-next-steps), and Night Evan had realized that references into immutable regions could [completely skip the reference counting overhead](/blog/zero-cost-refs-regions). Nowadays, Vale is based on [generational references](/blog/generational-references), but regions have the [same optimizing effect](/blog/zero-cost-memory-safety-regions-overview) for them too.]
+
+
+With this technique, it might be possible to skip almost all memory-safety overhead in a program, and it didn't even require aliasing restrictions! [# It's generally impossible to skip _all_ memory safety overhead in a program. One will always need at least bounds checking.] [# This is referring to the borrow checker's restrictions, which enforce that nobody else can have a reference to anything that might be modified.]
+
+
+I knew I had to bring it into Vale.
+
+
+<slice />
+
+# More Alien Concepts
+
+
+I posted the designs, and people started reaching out to me about other designs in the space. I had a call with [Forty2](http://forty2.is/)'s Marco Servetti and we talked about our different takes on regions, and someone shared [Milano, Turcotti, and Myers](https://www.cs.cornell.edu/andru/papers/gallifrey-types/gallifrey-types.pdf)'s work on concurrency models.
+
+
+I'm told that regions look like some sort of unified generalized form of affine typing (one of the concepts underlying Rust's borrow checker), Pony's [iso permission](https://tutorial.ponylang.io/reference-capabilities/reference-capabilities.html#isolated-data-is-safe), and a few other languages' mechanisms, all combined into one.
+
+
+I hammered on this design in my head for a long time while I built out Vale's foundations. [# I haven't stopped hammering on it in my mind, even now. People still find me randomly staring at walls, thinking about regions. It's only mildly concerning.] [# The biggest revelation came when I was lying on the floor in a random Georgia AirBnB named "Little Mexico" when I realized that we could make "one-way isolation". Check out [One-way Isolation](/blog/zero-cost-memory-safety-regions-part-3-one-way-isolation) for more on this, it's pretty trippy.] Eventually, generational references and regions combined to form something that looked suspiciously like an entire new paradigm. [# One person in our server described it as a "higher-level, more precise, opt-in Rust".]
+
+
+<slice />
+
+# The First Pieces
+
+
+Implementing something like this is no easy task. It took _years_ to implement Rust's borrow checker, and I don't have an entire team behind me.
+
+
+Large projects like these require more than coding. They require patience, introspection, planning, a high [yak tolerance](https://verdagon.dev/blog/yak-shave-language-engine-game), and a bit of insanity. [# After all, what kind of sane person would spend years working on a language?]
+
+
+The most important technique in planning something like this is to *break up large tasks, even if it slows you down*. Don't embark on monumental rewrite-the-world odysseys, and don't implement large features all at once.
+
+
+There are a few reasons for this [#otherreasons] but the biggest one is that we humans need *timely reward* for our emotional investment, to avoid burnout. A good sub-project is one that someone can work on for a month or two at most, then release it and feel the satisfaction of it being done, and see the users' delight in using it. [# The reward can come in other ways, of course. Sometimes, the reward can even come from doing the work itself, if the problem is particularly fascinating. Most projects are mostly made up of tedious tasks, so the reward needs to come from elsewhere.] [# There are ways to mitigate it (demos, congratulations, etc.) but if the sub-project continues too long unchecked, we find ourselves continuing only because of our momentum and force of will.]
+
+
+A few years ago, I worked on a large refactor to add internal namespacing [# Internal namespacing means that all locals, generic arguments, generic variables, lambdas, etc. all have absolute names. `x` becomes `myFunc.lambda3.x`. We also add disambiguating information to support overloads, such as parameters, since multiple functions can have the same name. Two functions named `myFunc` will include their parameter types in their name to become `myFunc(int)` and `myFunc(bool)` so they have unique names.] to the Vale compiler. After too many months of working on it, I burned out _hard_. I had to take a break from Vale for two months before my motivation returned. I didn't want that to happen again with regions.
+
+
+To avoid that kind of situation, we plan *intermediate, useful, cohesive goals*.
+
+
+One possibility jumped out immediately. I had a post-regions plan to make it so we could _safely_ call into code written in other languages that don't have as strong safety guarantees, such as C, Zig, or Rust. To do this, the backend needed to be aware of multiple regions, and properly handle data between them.
+
+
+After five weeks of adding partial backend region support and three weeks of FFI code, *we released [Fearless FFI](https://verdagon.dev/blog/fearless-ffi).*
+
+
+That was three weeks of not working on regions, but at the end I had a complete new feature which we could release and talk about.
+
+
+The friendly folks in our [discord server](https://discord.gg/SNB8yGH) gave me hearty congratulations, and we also got a couple new sponsors! One even told me how much he believed in what I was doing for the software world, and hopes that I can succeed in making systems programming much more accessible to the every day programmer.
+
+
+Words cannot express how much words like that mean to me, and how much they keep me going when things get rough. [# Especially when people ask me why I'm working on a language when the perfect language already exists. It helps to know that others see the value of making programming easier and more accessible to more programmers!]
+
+
+<slice>
+#otherreasons: Some more reasons:
+
+ * It helps stave off the boredom from working on one thing for too long.
+ * Your stakeholders (investors, managers, users) like to see active updates, which indirectly helps keep the project alive.
+ * It helps avoid merge problems (unless continuously merging behind a feature flag, which is often the best approach in my opinion.)
+ * Combined with other measures, it helps new engineers resolve their impostor syndrome.
+</slice>
+
+
+# Uncomfortably Exciting
+
+
+At my last job, we often used the phrase "uncomfortably exciting" to describe when you're a bit scared of your own idea. That definitely captures how it feels to work on regions!
+
+
+In the next post, I'll talk about the massive yak that reared up when when trying to add regions to the frontend. [# Spoiler alert: it's generics. It's always generics.]
+
+
+*That's all for now!* I hope you enjoyed this article. Keep an eye out for the next one on our [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), [discord server](https://discord.gg/SNB8yGH), or [subreddit](https://reddit.com/r/vale)!
+
+
+
+If you're impressed with our [track record](https://vale.dev/roadmap#recent-additions) and believe in the [direction we're heading](https://vale.dev/roadmap), please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>
+
+With your support, we can bring regions to programmers worldwide.
+
+
+See you next time!
+
+- Evan Ovadia
+
+
+<slice new-color="afterword"/>
+
+# Vale's Vision
+
+Vale aims to bring a new way of programming into the world that offers *speed*, *safety*, and *ease of use.*
+
+
+*The world needs something like this!* Currently, most programming language work is in:
+
+ * High-overhead languages involving reference counting and tracing garbage collection.
+ * Complex languages (Ada/Spark, Coq, Rust, Haskell, etc.) which impose higher complexity burden and mental overhead on the programmer.
+
+These are useful, but there is a *vast field of possibilities* in between, waiting to be explored!
+
+
+Our aim is to explore that space, discover what it has to offer, and make *speed and safety easier than ever before.*
+
+
+In this quest, we've discovered and implemented a lot of new techniques:
+
+ * [Generational Memory](/blog/generational-references), for a language to ensure an object still exists at the time of dereferencing.
+ * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
+ * [Fearless FFI](/blog/fearless-ffi), which allows us to call into C without risk of accidentally corrupting Vale objects.
+ * [Perfect Replayability](/blog/perfect-replayability-prototyped), to record all inputs and replay execution, and completely solve heisenbugs and race bugs.
+
+
+These techniques have also opened up some new emergent possibilities, which we hope to implement:
+
+ * [Region Borrow Checking](/blog/zero-cost-memory-safety-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
+ * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
+ * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
+
+
+We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
+
+ * We can mix an `unsafe` block with Fearless FFI to make a much safer systems programming language!
+ * We can mix Erlang's isolation benefits with functional reactive programming to make much more resilient programs!
+ * We can mix region borrow checking with Pony's `iso` to support shared mutability.
+
+...plus a lot more interesting ideas to explore!
+
+
+The Vale programming language is a novel combination of ideas from the research world and original innovations. Our goal is to publish our techniques, even the ones that couldn't fit in Vale, so that the world as a whole can benefit from our work here, not just those who use Vale.
+
+
+Our medium-term goals:
+
+ * Finish the Region Borrow Checker, to show the world that shared mutability can work with borrow checking!
+ * Prototype Hybrid-Generational Memory in Vale, to see how fast and easy we can make single ownership.
+ * Publish the Language Simplicity Manifesto, a collection of principles to keep programming languages' learning curves down.
+ * Publish the Memory Safety Grimoire, a collection of "memory safety building blocks" that languages can potentially use to make new memory models, just like Vale combined generational references and scope tethering.
+
+
+We aim to publish articles biweekly on all of these topics, and create and inspire the next generation of fast, safe, and easy programming languages.
+
+
+If you want to support our work, please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+With enough sponsorship, we can:
+
+ * Work on this full-time.
+ * Turn the Vale Language Project into a 501(c)(3) non-profit organization.
+ * Make Vale into a production-ready language, and push it into the mainstream!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>
+
+

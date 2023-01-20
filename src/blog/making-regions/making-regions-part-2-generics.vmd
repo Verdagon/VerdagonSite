@@ -1,0 +1,190 @@
+---
+title: Implementing a New Memory Safety Approach, Part 2: An Unexpected Quest
+subtitle: Generics help us avoid explosions!
+author: Evan Ovadia
+date: Nov 20, 2022
+realm: blog
+path: blog/making-regions-part-2-generics
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: us
+---
+
+
+A few years ago, a [2am realization](/blog/making-regions-part-1-human-factor) changed the course of my life forever, and eventually turned me into a nomadic hermit [# Or rather a "digital nomad" as it's said these days! The details of how Vale turned me purposefully homeless is a ridiculous story worthy of another entire blog post.] and language designer.
+
+
+The realization was that we could use [regions](/blog/zero-cost-memory-safety-regions-overview) to eliminate memory safety overhead when we access data. It's something weird and new, like borrow checking without the reference restrictions, or perhaps more like if C++'s `const` and D's `pure` had a demonic hellspawn lovechild. [# My editor told me to take this line out, but all my beta readers told me to keep it in.]
+
+
+[Last time](/blog/making-regions-part-1-human-factor), I talked about how the first step towards implementing regions was to make the compiler's backend [# The "backend" is the part that takes Vale's representation of the code, and converts it into a form that LLVM is able to turn into binary code. I suppose one could be said LLVM is the _real_ backend, but I consider LLVM to be more the back-back-end, I suppose.] aware of multiple regions. After that, it was just another three weeks to make the first feature that used regions under the hood: [Fearless FFI](https://verdagon.dev/blog/fearless-ffi).
+
+
+Then the real battle began.
+
+
+# Adding Regions to the Frontend
+
+Regions are pretty simple to use. For example, a function that doesn't modify any arguments can just add the `pure` keyword for a massive speedup.
+
+
+```vale
+pure func SumList(list &List<int>) int {
+  sum = 0;
+  i = 0;
+  while i < list.size() { «foreach»
+    sum += list.get(i);
+  }
+  return sum;
+}
+```
+
+
+Under the hood though, some pretty complex things have to happen. The compiler needs to transform the above function into something like this:
+
+```vale
+func SumList<r' imm, x' rw>(list &r'List<r'int>) 'int { «iso»
+  sum x'int = 0;
+  i x'int = 0;
+  while i < list.size() {
+    sum += list.get(i);
+  }
+  return iso(sum); «isoint»
+}
+```
+
+
+If you're curious, here's what just happened:
+
+ * The `<r' imm, x' rw>` declares two regions:
+    * An immutable region `r'` for any arguments _given_ to the pure function. [#likerust]
+    * A read-write region `x'` for anything _created inside_ the function.
+ * It notes that all parameters came from the immutable region `r'`.
+ * It notes that all data created inside the function is in the read-write region `x'`.
+
+
+In other words, it *assigns a region* to every type. `List<int>` becomes `r'List<r'int>`, to know that the list and its contents both came into the pure function. Check out [Immutable Region Borrowing](https://verdagon.dev/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing) for more on this! [#tricky]
+
+
+Vale's compiler isn't at that point yet, of course. It currently acts like every other language, where all data in a function is in the same region.
+
+
+The first step to get from here to there is to make the compiler _aware_ that everything is in the same region.
+
+
+This function:
+
+```vale
+func thrice(a int) int {
+  result = a + a + a;
+  return result;
+}
+
+needs to become this:
+
+```vale
+func thrice<x' rw>(a x'int) x'int {
+  result x'int = a + a + a;
+  return result;
+}
+```
+
+
+
+Simple, right?
+
+I thought so too!
+
+
+
+# The Unexpected Quest
+
+I thought that we only ever create one region, inside `main`, because that's the only "exported" function, in other words, function that's callable from C.
+
+
+Let's refer to that region as `m'`.
+
+
+Then, if `main` calls the above `thrice`, it would really be calling `thrice<m'>`. Indirectly, all functions in the program would be called with `<m'>`.
+
+
+Except for one problem. `main` isn't the only function that creates a region. *Any exported function* (in other words, any function callable from C) might create a region.
+
+
+
+
+At the start of this, Vale didn't have full generics (like Java), it had *templates* (like C++).
+
+
+Let's say we have this function in C++:
+
+```
+T sum<T>(T a, T b) {
+  return a + b;
+}
+```
+
+If we call `sum<int>`, the compiler does these two steps:
+
+ * Copy the function, with all `T`s replaced with `int`.
+ * Type-check the function.
+
+
+That same function in Java, however, would do things in the reverse order:
+
+ * Type-check the function.
+ * Copy the function, with all `T`s replaced with `int`.
+
+
+
+
+
+Before we can get there, the first step is to just make a temporary *single, global region*, and have all data in that region.
+
+
+
+
+
+
+
+The most challenging language features and libraries are the ones that take a lot of inherent complexity, and surface an API that is as simple and flexible as possible. 
+
+
+The best language features are the kind that abstract away inherent complexity without introducing much accidental complexity.
+
+
+Regions are simple 
+
+
+
+<slice>
+#tricky: This is already looking tricky, and we aren't even at the more advanced region features like [custom isolates](/blog/zero-cost-memory-safety-regions-part-2-isolates), [one-way isolation](/blog/zero-cost-memory-safety-regions-part-3-one-way-isolation), [multi-region data](/blog/zero-cost-memory-safety-regions-part-4-multi-region-data), or [region-scoped data](/blog/zero-cost-memory-safety-regions-part-5-region-scoped-data). I try not to think about that too much.
+
+#foreach: One would normally use a `foreach` here, but we're showing a more primitive function so the upcoming transform is a little clearer.
+
+#iso: `'T` means an "isolated" `T`. It means nothing points at the `T`, nothing inside the `T` points out, and nothing outside the `T` points in. See [this explanation](/blog/zero-cost-memory-safety-regions-part-2-isolates) for more. Anything returned from a pure function is automatically isolated. In this case, `'int` is later simplified to just `int` since it's a value type.
+
+#isoint: Value automatically "isolates" anything that a pure function returns, so that it can be merged into the caller's region. This `iso` function can sometimes have a run-time cost for more complex data structures, but that can be avoided if the user manually assembles an isolate instead.
+
+
+#likerust: So far, this is similar to the borrow checking rules found in Rust, Cyclone, and [Cone](https://cone.jondgoodwin.com/)'s designs. However, Vale applies those rules to entire regions, not just individual pieces of data.
+</slice>
+
+
+
+
+
+
+ aware
+
+
+Finally, in July, I was able to start adding regions to the frontend. Or so I thought!
+
+
+We need regions, plus the default region, to be generic params so that we can solve foo' = main' when main calls foo. But if theyre generic params, then they get monomorphized like crazy; anything indirectly called by main has a main' variant. Anything indirectly called by any other exported function has a variant for that function too. This is an explosion.
+
+Doing generics helps with that. Monomorphizer can be pretty smart about it.
+
+it also helps with other things (perhaps link to that article).
+
+

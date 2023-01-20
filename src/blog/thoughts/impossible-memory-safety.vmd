@@ -1,0 +1,344 @@
+---
+title: The Myth of Zero-Cost Memory Safety
+author: Evan Ovadia
+date: Dec 20, 2039
+realm: blog
+path: blog/impossible-memory-safety
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: me
+---
+
+
+I've been asked a few times why all new languages don't use borrow checking.
+
+
+"Why does only Rust use borrow checking? Am I missing something?"
+
+
+It's a question which has confounded the Rust community for a long time.
+
+
+There are some compelling reasons for this, ranging from long-term complexity to architectural downsides, but one of the more subtle ones is that *borrow checking doesn't actually eliminate all memory-safety overhead, it moves it somewhere else.*
+
+
+
+# Borrow Checking Moves Overhead Elsewhere
+
+Let's do a quick exploration of how we might design a simple game in Rust.
+
+
+<<<<
+Let's say our old C game had structs for `Cannon`s which could shoot `Missile`s.
+
+Each `Missile` has a pointer to the `Cannon` it came from.
+////
+```
+struct Cannon {
+  ...
+};
+
+struct Missile {
+  Cannon* originCannon;
+  ...
+};
+```
+>>>>
+
+
+Now let's bring these concepts into Rust!
+
+
+Since Rust doesn't have pointers, and there can be multiple `Missile`s pointing at a Cannon, we might first try to make that `Cannon*` into a `&Cannon`. However, this means that nobody could ever modify the `Cannon`.
+
+
+And if our `Cannon`s are in a Vec, then we also couldn't modify that containing `Vec`; we wouldn't be able to add any new `Cannon`s.
+
+
+
+So let's talk about the myriad of tools that Rust gives us to achieve zero-cost memory safety!
+
+
+
+#### Cell
+
+Perhaps we could wrap every one of `Cannon`s fields in a `Cell`, so that all of the `Missile`s' `&Cannon`s don't freeze it.
+
+Alas, we still can't add or remove from the `Vec<Cannon>`, because we have references to data inside it. Back to the drawing board.
+
+
+#### Reference Counting
+
+We could, of course, use reference counting. For example, our `Cannon`s would be in a `Vec<Rc<RefCell<Cannon>>>`. But that's not zero-cost; we actually incur reference counting costs, plus the costs of RefCell.
+
+Time to get creative!
+
+
+#### Cloning
+
+Sometimes, we can get around the borrow checker with some strategic uses of `.clone()`. This can be a great solution in some cases.
+
+
+In other cases, not so much. Cloning a `Vec`, `Box`, or even a `String` in it will cause an extra `malloc` under the hood, and eventually an extra `free`, and both are quite expensive.
+
+
+We often can't use the `.clone()` approach anyway. Here, if every `Missile` keeps a cloned `Cannon` inside it, it won't be able to read any up-to-date values from the `Cannon`, only old values.
+
+
+#### Hashing
+
+<<<<
+Perhaps we could put the `Cannon`s in a hash map, like `HashMap<i64, Cannon>`. Every Missile would then hold onto its origin cannon's key.
+////
+```
+struct Cannon {
+  id: i64
+}
+struct Missile {
+  origin_cannon_id: i64
+}
+```
+>>>>
+
+
+Unfortunately, hash maps _always_ come with overhead. They're never as fast as dereferencing a raw pointer or reference. Looking up something in a hash table always involves detecting collisions, looping, branching, and some extra cache misses.
+
+
+#### Arrays
+
+<<<<
+We could keep our `Cannon`s in a `Vec<Cannon>`, each `Missile` would have the cannon's _index_ in the Vec.
+////
+```
+struct Cannon {
+  ...
+}
+struct Missile {
+  origin_cannon_index: i64
+}
+```
+>>>>
+
+
+This approach comes with some risks, but it's probably the fastest.
+
+
+However, we're not quite zero-cost yet! Every time we access that `Vec`, we incur a bounds check to make sure that the index is still in bounds. It's likely a small amount of overhead, but it can sometimes add up. From [Manuel Cerón](https://ceronman.com/2021/07/22/my-experience-crafting-an-interpreter-with-rust/):
+
+> Using vector indices is slower than a regular pointer dereference. An arithmetic operation is needed to get the address of the element, but more importantly, Rust will always check if the index is out of bounds. For the vast majority of use cases, these extra steps are completely negligible, however when you have a VM that processes ~350 million instructions per second, and then you have to do three or four dereferences per instruction, then it shows.
+
+
+
+# Inherent Shared Mutability is Unavoidable
+
+Why is this happening? Why is it that no matter where we turn, memory safety has a cost?
+
+
+It's because our requirements have *inherent shared mutability*: a piece of data that might change, and multiple pieces that need to _refer_ to it in some way. This is even true in functional languages, though it often manifests as IO and State monads in those.
+
+
+Every real-world program will have inherent shared mutability. Even if we "refer" to the data via an index, or an ID, or anything else, there will always be some overhead to maintain memory safety.
+
+
+
+# So why don't languages use borrow checkers?
+
+
+
+
+
+
+
+
+
+
+As we just saw, when we translate another language's pointer or reference to Rust, all of the available options have some overhead.
+
+
+Indeed, the borrow checker just pushes memory safety overhead away from itself, but doesn't completely eliminate it.
+
+
+If we zoom out, this is because we need multiple `Missile`s to refer to the same `Cannon` in some way, even if we can't use a borrow reference. This is "inherent shared mutability", because it's unavoidably part of the program's requirements.
+
+
+The borrow checker can't reason about inherent shared mutability, so we're forced into workarounds with overhead, because there's no known way to do this with zero ocost.
+
+
+
+# Zero-Cost Memory Safety is a Myth, and That's Fine
+
+Our programs will always have _some_ memory-safety overhead. This doesn't mean we should give up. We still want to make our programs as fast as possible.
+
+
+What this does mean
+
+
+
+
+
+Nobody actually needs zero-cost memory safety.
+
+
+
+
+
+#### Honorable Mention: Generational Indices
+
+
+This approach comes with some risks, but it's probably the fastest. [# The risk with this approach is that if conceptually destroy a `Cannon` and then reuse its slot in the `Vec<Cannon>`, a Missile with the old `Cannon`'s index will now accidentally be pointing at the new `Cannon` in that slot. This can lead to [privacy problems](https://news.ycombinator.com/item?id=32239025#32240161), and is sometimes called [highly non-idiomatic](https://news.ycombinator.com/item?id=32240570) and [error-prone](https://news.ycombinator.com/item?id=32240711).]
+
+
+Even though using indices into arrays is completely memory-safe, one should probably avoid it and use things like [generational_arena](https://docs.rs/generational-arena/latest/generational_arena/) instead, which adds a "generation" next to the index, which it uses in an extra run-time check to detect the mismatch. Combined with the borrow checker, this is a stellar approach.
+
+ one should probably not do the above approach.
+
+
+So, we've seen there's no way to get zero-cost memory safety. Once we acknowledge that we will have _some_ memory safety overhead, we can weigh the alternatives with a clear mind.
+
+
+We mentioned the risks of the above `Vec<Cannon>` approach. `Vec<Cannon>` is only memory-safe, but not totally safe on other dimensions yet.
+
+
+Luckily, crates like 
+
+
+
+
+
+
+[Vale](https://vale.dev/) uses the same combination, but from the other direction: it uses generational references by default under the hood, combined with static analysis, [immutability](https://verdagon.dev/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing), and [regions](https://verdagon.dev/blog/zero-cost-memory-safety-regions-overview) for something that's surprisingly similar to the combination of generational indices and borrow checking, without the borrow checker's restrictions.
+
+
+
+
+
+
+
+What about Cell?
+
+Cell doesn't work here, because it would freeze the containing Vec. We wouldn't be able to add or remove any more `Cannon`s
+
+
+
+Multiple `Cannon`s can point to a single base.
+
+
+
+
+MMM++ might work here.
+
+Also, what about GhostCell? It doesn't help because we might need to remove instances. GhostCell is a specialized tool that only works if you're fine accessing old data after it's been released.
+
+
+
+
+
+ but let's start with the less obvious one: borrow checking doesn't _eliminate_ memory safety overhead. It _moves_ it.
+
+
+For example, let's say we have 
+
+
+
+
+
+
+
+
+"But you shouldn't use pointers anyway! There might be memory safety problems."
+
+
+Indeed, there could be. Specifically, if we stored our `Cannon`s in a `Vec<Cannon>`, and tried to add something, it might move the entire underlying array to somewhere else in memory, invalidating all existing pointers. Dereferencing one would cause undefined behavior, with all of its eldritch horrors.
+
+
+
+
+
+
+
+Nothing can be further from the truth! 
+
+
+[# after regions, and cite this from the MSE speed part]
+
+people ask me if i can add a borrow checker to vale all the time, so it can have zero-cost memory safety.
+
+people ask the Lobster lead the same thing all the time. the answer is the same:
+
+*there is no such thing.* and pursuing it too far can lead you past the point of diminishing returns and actually hurt the usability of your language.
+
+There's an obvious reason, and also two more subtle reasons. Let's talk about the subtle one first.
+
+
+# It moves the cost elsewhere
+
+Let's say you have a Missile that can target a Spaceship.
+
+The borrow checker won't let you store a reference to it, because that would prevent anyone else from ever modifying the Spaceship.
+
+So, you instead store an index.
+
+Now you incur a bounds check every time you want to get a reference to that target Spaceship.
+
+
+In Java, we wouldn't have had to do any of this. The missile would have had a reference to the Spaceship.
+
+
+Sure, borrow checking meant that we didn't have to do any tracing garbage collection. But we still do that bounds check every time we use that index.
+
+
+What if we store an ID, like an integer?
+
+Then you're storing it in a hash map, and you incur hashing costs. Modulus is actually really expensive. Youll also have looping and branching.
+
+
+The other option is to clone. However, cloning is often the most expensive thing we can do, depending on what we're cloning. Cloning a String will cause a heap allocation. Cloning a Vec will cause a heap allocation and a potentially large memcpy. Cloning an entire Thing so you can access one or two fields of it will often incur more cache misses than just handing around a pointer.
+
+
+This is the fundamental illusion of borrow checking. It moves the cost elsewhere.
+
+The big benefit of all this, however, is that it's still a lot faster than reference counting, especially atomic reference counting. [# Fun fact, this is also the reason that generational references are so fast.]
+
+
+[# You'll also usually need to check if it's still alive and the same ship, perhaps with slotmap or generational arena. In Java, this would probably be an isAlive boolean.]
+
+
+# You can't eliminate bounds checking
+
+Memory safety is how we prevent memory access bugs like dangling pointers and buffer overflows. [# From [Wikipedia](https://en.wikipedia.org/wiki/Memory_safety).]
+
+Borrow checking solves use-after-free, but it doesn't solve buffer overflow. [# It can sometimes reduce it. Lots of languages will freeze a collection during iteration, which combines with loop unrolling to avoid a lot of bounds checking.]
+
+The only way to escape this cost is to abandon memory safety for a little bit. The wiser choice, however, is to just leave it in, because nobody cares if we use an extra few cycles to guarantee memory safety.
+
+
+# Possible Solutions to the Impossible Problem
+
+Talk about the theoretical Va language.
+
+Talk about neverfree, like what's being used in the cone compiler.
+
+if you know the number of allocations ahead of time, then you can statically allocate those arrays. in fact, this is how a lot of embedded programs are made.
+
+Some people are experimenting with this in libraries like GhostCell, which is pretty cool. [# and in some cases where you know ahead of time the maximum number of references, StaticRc can help too]
+
+the one downside is that you can't release memory back to the OS, except for temporary arenas.
+
+but maybe we'll solve that too one day.
+
+
+# Conclusion
+
+Language designers know these, which is why not many new languages are using borrow checking, unless they're seamlessly integrated with other memory management strategies like Cone.
+
+
+
+
+
+
+[# I use the phrase "zero-cost" to mean "no speed overhead" in this article, though the phrase originally comes from the phrase "zero-cost abstraction" which means something else entirely.]
+
+There are twelve ways to achieve memory safety, and none of them are actually zero-cost in practice. [# The twelve ways: GC, RC, borrow checking, generational references, regions, mutable value semantics, interaction nets, stack arenas, capabilities, neverfree, MMM++, and SPARK.]
+
+
+This is no surprise to those who work on languages, but it's often news to others, so here's an article explaining why!

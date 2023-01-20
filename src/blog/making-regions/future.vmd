@@ -1,0 +1,59 @@
+
+
+# Should Region be in the Coord?
+
+
+When designing a large system like a language, one gets a sense for what open questions are central to a design, and what open questions are peripheral. Peripheral concerns can be left for later, to preserve limited mental bandwidth and sanity.
+
+
+I hit one such open question almost immediately: *Is the region part of the reference, or part of the type?*
+
+
+Let's unpack that question, and see what it's really asking.
+
+
+To the user, we can have a `r'Spaceship`; that `r'` is something independent of the type (`Spaceship`) and the type doesn't need to know that it's in one region or the other. The `r'` isn't part of the type, it's part of the _reference_.
+
+
+However, we don't have to represent it that way under the hood. We _could_ make it so:
+
+ * The parser transforms that `r'Spaceship` to `Spaceship<r'>`. Now, `r'` is part of the _type_.
+ * Have a rule that every type implicitly has at least one region parameter.
+ * Consider any type to be "in" its last region parameter.
+
+This can simplify some of the implementation, for arcane reasons I shouldn't go into here.
+
+
+A similar design question comes up in other languages:
+
+ * In C#, a `class Spaceship { ... }` can instead be a `struct Spaceship { ... }`. We only ever have references to a class. We can never have a reference to a struct, we only have copies of it and hold them directly. C does the other approach, and leaves it up to the user to say `Spaceship` vs `Spaceship*`. The C approach is slightly more flexible.
+ * In Rust, whether a function is async depends on the function definition. In Zig, a function can be async or not [depending on how it's used](https://kristoff.it/blog/zig-colorblind-async-await/). Rust later backtracked, and is trying to achieve the same thing with [keyword generics](https://blog.rust-lang.org/inside-rust/2022/07/27/keyword-generics.html).
+
+
+There are a few interesting factors:
+
+ * There's no such thing as a `str<r'>`... yet we want to distinguish one region's strings from another region's.
+ * It's not just strings: there may be other non-struct types that we want to associate with a particular region. For example, we might want an opaque handle to some "native memory region" or something.
+ * A function's region is implicitly a generic parameter; `func foo(x &Ship) { ... }` is actually `func foo<f'>(x &f'Ship)`. Perhaps structs should be consistent with that.
+
+
+These factors seem to point both ways.
+
+
+So, I'm going to go with a surprise third option: *have it in both,* at least for structs.
+
+
+In other words, if it's a struct, then `r'Spaceship` will actually be lowered to `r'Spaceship<r'>`. This should give us some of the implementation simplifications, and it also leaves open the door to take out one or the other later on. [# Redundancies like this can be dangerous sometimes, if they can become out of sync. However, as long as we have assertions that upholds this redundancy, there's no problems.]
+
+
+
+
+# 
+
+
+2021 and most of 2022 were spent laying the foundations we would need for regions:
+
+ * Instead of C++-style templates, I transitioned the Vale compiler to full generics, to avoid a "monomorphization explosion" problem that would happens with region generic parameters.
+ * I refactored the backend to decouple the memory management strategy from the code itself, and added two "regions" to start out: raw and generational references. [# I later even used this to benchmark generational references!]
+ * I rounded out the rest of the compiler's unfinished in-progress features, such as [Higher RAII](https://verdagon.dev/blog/higher-raii-7drl), [Perfect Replayability](https://verdagon.dev/blog/perfect-replayability-prototyped), internal namespacing, and a faster generics solver. Regions is a massive endeavor that will break _everything_ that's not already finished and well-tested, so I spent some time to finish and add tests for these features.
+
