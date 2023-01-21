@@ -1,8 +1,8 @@
 ---
 title: Implementing a New Memory Safety Approach, Part 2: An Unexpected Quest
-subtitle: Generics help us avoid explosions!
+subtitle: Generics help us avoid code size explosions!
 author: Evan Ovadia
-date: Nov 20, 2022
+date: Jan 20, 2022
 realm: blog
 path: blog/making-regions-part-2-generics
 layout: annotated
@@ -21,6 +21,9 @@ The realization was that we could use [regions](/blog/zero-cost-memory-safety-re
 
 
 Then the real battle began.
+
+
+<slice />
 
 
 # Adding Regions to the Frontend
@@ -97,66 +100,6 @@ I thought so too!
 
 
 
-# The Unexpected Quest
-
-I thought that we only ever create one region, inside `main`, because that's the only "exported" function, in other words, function that's callable from C.
-
-
-Let's refer to that region as `m'`.
-
-
-Then, if `main` calls the above `thrice`, it would really be calling `thrice<m'>`. Indirectly, all functions in the program would be called with `<m'>`.
-
-
-Except for one problem. `main` isn't the only function that creates a region. *Any exported function* (in other words, any function callable from C) might create a region.
-
-
-
-
-At the start of this, Vale didn't have full generics (like Java), it had *templates* (like C++).
-
-
-Let's say we have this function in C++:
-
-```
-T sum<T>(T a, T b) {
-  return a + b;
-}
-```
-
-If we call `sum<int>`, the compiler does these two steps:
-
- * Copy the function, with all `T`s replaced with `int`.
- * Type-check the function.
-
-
-That same function in Java, however, would do things in the reverse order:
-
- * Type-check the function.
- * Copy the function, with all `T`s replaced with `int`.
-
-
-
-
-
-Before we can get there, the first step is to just make a temporary *single, global region*, and have all data in that region.
-
-
-
-
-
-
-
-The most challenging language features and libraries are the ones that take a lot of inherent complexity, and surface an API that is as simple and flexible as possible. 
-
-
-The best language features are the kind that abstract away inherent complexity without introducing much accidental complexity.
-
-
-Regions are simple 
-
-
-
 <slice>
 #tricky: This is already looking tricky, and we aren't even at the more advanced region features like [custom isolates](/blog/zero-cost-memory-safety-regions-part-2-isolates), [one-way isolation](/blog/zero-cost-memory-safety-regions-part-3-one-way-isolation), [multi-region data](/blog/zero-cost-memory-safety-regions-part-4-multi-region-data), or [region-scoped data](/blog/zero-cost-memory-safety-regions-part-5-region-scoped-data). I try not to think about that too much.
 
@@ -172,19 +115,256 @@ Regions are simple
 
 
 
+# The Unexpected Quest
+
+I thought that we only ever create one region, inside `main`, because that's the only "exported" function, in other words, function that's callable from C. Let's refer to that region as `main'` (note the apostrophe).
 
 
-
- aware
-
-
-Finally, in July, I was able to start adding regions to the frontend. Or so I thought!
+If `main` calls the above `thrice`, the compiler creates a version of it called `thrice<main'>`. If `main` calls another function `fice`, a `fice<main'>` would be created. [# "Fice" means to multiply something by five, I promise.] There would be a `<main'>` version of every function in the codebase, which is weird, but fine.
 
 
-We need regions, plus the default region, to be generic params so that we can solve foo' = main' when main calls foo. But if theyre generic params, then they get monomorphized like crazy; anything indirectly called by main has a main' variant. Anything indirectly called by any other exported function has a variant for that function too. This is an explosion.
-
-Doing generics helps with that. Monomorphizer can be pretty smart about it.
-
-it also helps with other things (perhaps link to that article).
+Except there's one problem with what I wrote above. `main` isn't the only exported function! Plenty of functions are exported.
 
 
+If I have another exported function `spork`, and it calls `thrice` and `fice`, then there's also a `thrice<spork'>` and `fice<spork'>`.
+
+
+If we have ten exported functions, we might have ten versions of `thrice` and `fice` created. *Our executable file could be up to ten times as large as it needs to be!*
+
+
+It's especially ironic, because `thrice<main'>`, `thrice<spork'>` and all these other versions of `thrice` are *exactly the same*. [# And I don't think LLVM is able to notice that and merge these functions back together. Even if it does, it would use up a _lot_ of compile time, which is a big detriment to development velocity.]
+
+
+<slice />
+
+
+## How do we solve this?
+
+
+One solution was to make one global region (perhaps called `g'`) that every type was in. This would technically work, but it wouldn't get us any closer to the eventual goal of using multiple regions at once, like in the original `SumList` function.
+
+
+The other solution was something I've been putting off for a long time: *full generics*.
+
+<slice />
+
+
+## Templates vs Generics
+
+At the start of this, Vale didn't have full generics (like Java), it had *templates* (like C++).
+
+
+Let's say we have this template function in Vale:
+
+```
+func sum<T>(a T, b T) T {
+  return a + b;
+}
+```
+
+Vale doesn't type-check that function up-front.
+
+
+Instead, it waits for other functions to call it, like so:
+
+```vale
+func bork() int {
+  return sum<int>(4, 5);
+}
+```
+
+Now, Vale can *instantiate* the `sum` function, to generate a version of it with `int` instead of `T`, like this:
+
+```
+func sum<int>(a int, b int) int {
+  return a + b;
+}
+```
+
+Then it type-checks it, including making sure that there's a `int + int` operation available. [# Or more specifically, it makes sure that there's a `func +(int, int)` available.]
+
+This identical to how C++ works, under the hood. Or if you've used C, it's similar to how preprocessor macros work. Specifically, it does *substitutions first*, then *type-checks after*.
+
+
+That's how a templating system works. Generics are a bit different.
+
+
+When a compiler uses generics under the hood, it does it in the reverse order: it type-checks the function first, _before_ it knows what `T` really is. Then later, after the entire program has been type-checked, it instantiates the different versions of the functions.
+
+
+<slice />
+
+## How would generics help?
+
+
+If the compiler uses generics, then we can do some region-related things after type-checking the functions, but before instantiating the functions.
+
+
+Specifically, the compiler would:
+
+ 1. Type-check all functions.
+ 2. Region-check all functions; make sure that the user doesn't mix up data from two regions.
+ 3. Remove all traces of regions. For example:
+    * It would turn `func thrice<x' rw>(...)` into `func thrice(...)`.
+    * Instead of requesting a `thrice<main'>` and a `thrice<spork'>`, callers would only request a simple `thrice`.
+ 4. Instantiate the functions.
+
+
+By removing all traces of regions, step 4 won't instantiate a different `thrice<main'>` and a `thrice<spork'>`. Only a single `thrice` will be generated, solving our problem.
+
+
+This is sometimes called "erasure". By "erasing" the differences in the earlier stages, we can get smaller executables in the end. Java does this with some of its generics too, calling it "type erasure".
+
+
+## Generics are a Nightmare [# I actually called it a [gorram](https://screenrant.com/firefly-swear-word-guide-gorram/) nightmare but I promised myself that in 2023 I wouldn't put any more Firefly references into my articles.]
+
+
+Generics are _way_ harder than templates.
+
+
+I thought it would only take a few weeks at most. By the end, it had taken 81 days and [23,588 lines](https://github.com/ValeLang/Vale/commit/93eb8e140bbbda3a8f47099b3215c5eb700c90f6) of intense coding.
+
+
+When I'm coding something particularly challenging, I have to get out my pencil and paper [# Elegant weapons, for a more civilized age.] and just start scribbling notes and thoughts until something starts to make sense. Usually this happens once or twice per feature... _thirty pages_ of my notebook are about generics. It was _brutal_.
+
+
+The internet often makes fun of Go for taking ten years to add their generics. Honestly, after this endeavor, _I don't blame them one bit._ I kind of want to find the folks on the Go team that implemented its generics, and comisserate together over some Delirious Blue. [# We also named of one of our test cases after this drink.] Anyone who looked over would see two grown engineers crying over their drinks, saying weird words like "polymorphism" and "interface bounds" over and over.
+
+
+The problem is that I'm just an engineer with some skills in data structures and architecture. I'm not a type theoretician, and this more mathematical abstract thinking doesn't come naturally to me. With generics, we're taking abstract thinking to a whole new level: we're type-checking functions that don't exist yet, conjuring "placeholder" types, and putting bounds information in places that I didn't even know existed.
+
+
+If you want to hear more about how crazy generics are, check out [How Summoning Golems Helps Us Understand Generics](/blog/summoning-golems-generics] and [When a Language Should Have Generics, Templates, or Both](/blog/templates-generics-blend.vmd). I can't promise they'll make sense, but I _can_ promise that it felt _very_ good to rant about generics in them.
+
+
+I also want to give a shout-out to the amazing people in my server who helped me get through the journey. Huge thanks to Jon Goodwin (of [Cone](cone.jondgoodwin.com/)), Arthur Weagel, Ivo Balbaert, RazzBerry, zikzak323, Zodey, keeslinp, mikey, IsaacPaul, kurtkuehnert, DestyNova, librarianmage, devast8a, and cristian.vasile! I'm not sure I could have finished without their support and positive energy. You all are awesome!
+
+
+<slice />
+
+
+## Next Steps
+
+
+Now that generics is finally finished, I can resume progress with regions.
+
+
+The next step is to make it so every function is aware that everything is in the same region.
+
+
+Once we make this function:
+
+```vale
+func thrice(a int) int {
+  result = a + a + a;
+  return result;
+}
+
+...into this function:
+
+```vale
+func thrice<x' rw>(a x'int) x'int {
+  result x'int = a + a + a;
+  return result;
+}
+```
+
+
+...then the compiler will be "region-aware". After that, we can start playing with multi-region functions and the real fun can begin!
+
+
+*That's all for now!* I hope you enjoyed this article. Keep an eye out for the next one on our [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), [discord server](https://discord.gg/SNB8yGH), or [subreddit](https://reddit.com/r/vale)!
+
+
+If you're impressed with our [track record](https://vale.dev/roadmap#recent-additions) and believe in the [direction we're heading](https://vale.dev/roadmap), please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>
+
+With your support, we can bring regions to programmers worldwide.
+
+
+See you next time!
+
+- Evan Ovadia
+
+
+<slice new-color="afterword"/>
+
+# Vale's Vision
+
+Vale aims to bring a new way of programming into the world that offers *speed*, *safety*, and *ease of use.*
+
+
+*The world needs something like this!* Currently, most programming language work is in:
+
+ * High-overhead languages involving reference counting and tracing garbage collection.
+ * Complex languages (Ada/Spark, Coq, Rust, Haskell, etc.) which impose higher complexity burden and mental overhead on the programmer.
+
+These are useful, but there is a *vast field of possibilities* in between, waiting to be explored!
+
+
+Our aim is to explore that space, discover what it has to offer, and make *speed and safety easier than ever before.*
+
+
+In this quest, we've discovered and implemented a lot of new techniques:
+
+ * [Generational Memory](/blog/generational-references), for a language to ensure an object still exists at the time of dereferencing.
+ * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
+ * [Fearless FFI](/blog/fearless-ffi), which allows us to call into C without risk of accidentally corrupting Vale objects.
+ * [Perfect Replayability](/blog/perfect-replayability-prototyped), to record all inputs and replay execution, and completely solve heisenbugs and race bugs.
+
+
+These techniques have also opened up some new emergent possibilities, which we hope to implement:
+
+ * [Region Borrow Checking](/blog/zero-cost-memory-safety-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
+ * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
+ * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
+
+
+We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
+
+ * We can mix an `unsafe` block with Fearless FFI to make a much safer systems programming language!
+ * We can mix Erlang's isolation benefits with functional reactive programming to make much more resilient programs!
+ * We can mix region borrow checking with Pony's `iso` to support shared mutability.
+
+...plus a lot more interesting ideas to explore!
+
+
+The Vale programming language is a novel combination of ideas from the research world and original innovations. Our goal is to publish our techniques, even the ones that couldn't fit in Vale, so that the world as a whole can benefit from our work here, not just those who use Vale.
+
+
+Our medium-term goals:
+
+ * Finish the Region Borrow Checker, to show the world that shared mutability can work with borrow checking!
+ * Prototype Hybrid-Generational Memory in Vale, to see how fast and easy we can make single ownership.
+ * Publish the Language Simplicity Manifesto, a collection of principles to keep programming languages' learning curves down.
+ * Publish the Memory Safety Grimoire, a collection of "memory safety building blocks" that languages can potentially use to make new memory models, just like Vale combined generational references and scope tethering.
+
+
+We aim to publish articles biweekly on all of these topics, and create and inspire the next generation of fast, safe, and easy programming languages.
+
+
+If you want to support our work, please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+With enough sponsorship, we can:
+
+ * Work on this full-time.
+ * Turn the Vale Language Project into a 501(c)(3) non-profit organization.
+ * Make Vale into a production-ready language, and push it into the mainstream!
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub!
+  </a>
+</center>

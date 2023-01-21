@@ -415,6 +415,16 @@ if [ $TARGET == "next-gen-languages-gpu" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
+if [ $TARGET == "making-regions-part-1-generics" ] || [ $TARGET == "all" ] ; then
+  echo "Doing making-regions-part-1-generics"
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-1-generics src/blog/making-regions/making-regions-part-1-generics.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-1-generics src/blog/making-regions/making-regions-part-1-generics.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
 
 
 if [ $MODE == "build" ] ; then

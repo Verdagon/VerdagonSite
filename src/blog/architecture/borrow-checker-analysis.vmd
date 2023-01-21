@@ -3,22 +3,23 @@
 Benefits are, of course, extreme speed and good memory safety! The drawbacks are subtle and pervasive, though.
 
 
-malloc failure is another case where moving checks to compile time is possible but quite hellish and with a lot of costs. we should not move this check to compile time.
+-malloc failure is another case where moving checks to compile time is possible but quite hellish and with a lot of costs. we should not move this check to compile time.
+-
+-
+-doing this more restrictive form of programming starts out as a good thing. it becomes bad when it causes nasty surprises, such as an infectious type slamming into a load-bearing interface. its the same problem async has.
+-
+-
+-
+-
+-one might think that its better to use indices and IDs for everything. however, there are downsides too:
+-- its less ergonomic
+-- it forces some runtime overhead. it probably has a hashing function.
+-- it can sometimes become impossible to feed in the reference to the mapping structure. or, require extensive refactoring. its generally hostile to polymorphism, even via enums. especially problematic when we slam into load-bearing interfaces such as Future.
+-"My experience with Rust data structures is the opposite. To satisfy lifetime analysis inherent in pointer-based data structures, users tend to introduce additional indirection. For example, mapping keys to indexes, and then indexes to array elements, instead of simply mapping keys to values." https://news.ycombinator.com/item?id=34227734
 
 
-doing this more restrictive form of programming starts out as a good thing. it becomes bad when it causes nasty surprises, such as an infectious type slamming into a load-bearing interface. its the same problem async has.
-
-
-
-
-one might think that its better to use indices and IDs for everything. however, there are downsides too:
-- its less ergonomic
-- it forces some runtime overhead. it probably has a hashing function.
-- it can sometimes become impossible to feed in the reference to the mapping structure. or, require extensive refactoring. its generally hostile to polymorphism, even via enums. especially problematic when we slam into load-bearing interfaces such as Future.
-"My experience with Rust data structures is the opposite. To satisfy lifetime analysis inherent in pointer-based data structures, users tend to introduce additional indirection. For example, mapping keys to indexes, and then indexes to array elements, instead of simply mapping keys to values." https://news.ycombinator.com/item?id=34227734
-
-
-rust isn't perfect. http://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=rust
+rust isn't perfect.
+http://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=rust
 
 
 - not very resilient to needed changes
@@ -34,7 +35,21 @@ https://www.silasreinagel.com/blog/2019/09/03/compose-your-software/
 
 https://www.reddit.com/r/rust/comments/2581s5/comment/cheq9fu/?utm_source=reddit&utm_medium=web2x&context=3
 > &mut appears to be a very leaky abstraction
-(this doesnt seem to really get at what we're talkin about)
+
+
+
+faster to iterate with (statically typed) python than rust:
+https://news.ycombinator.com/item?id=31063493
+
+
+
+1. AxM is worked around too often, it only fits in some cases
+
+2. we can get these same benefits from region borrow checking, which doesnt require an object be AxM
+
+3. we can translate a program to C and it will be just as memory safe. it's a technique, not a groundbreaking new technology.
+
+3. real world rust programs have overhead
 
 
 
@@ -46,6 +61,38 @@ https://www.reddit.com/r/rust/comments/2581s5/comment/cheq9fu/?utm_source=reddit
 3. we can translate a program to C and it will be just as memory safe. it's a technique, not a groundbreaking new technology.
 
 3. real world rust programs have overhead
+
+
+
+"If you're in lifetime hell, then you probably have references in structs." https://users.rust-lang.org/t/rust-is-too-hard-to-learn/54637/7
+
+
+
+
+There are many patterns in Rust that don't require unsafe. Looping, matching, etc. Is RAII one of them? Does the borrow checker allow RAII?
+
+Most cases of RAII (aside from trivial examples that just assert a contained boolean) affect the outside world. Examples:
+- Via FFI; call fclose() on a file, println! to print, free() to deallocate.
+- Via RefCell, such as here: https://aloso.github.io/2021/03/18/raii-guards.html
+- Via other kinds of unsafe, such as how Rc mutates a counter that lives outside of it.
+
+It seems that these all require some form of escaping the borrow checker. Why is that?
+
+It's because the normal way we accomplish shared mutability within the borrow checker is to hold a "handle", such as an index, and use it to index into a &mut parameter. Here, it might look like:
+
+// Decrements a spaceship's fuel on drop()
+struct FuelDecrementer {
+  myIndex: usize,
+}
+fn drop(&mut self, ships: &mut Vec<Spaceship>) {
+  ships[self.myIndex].fuel -= 1;
+}
+
+However, it's impossible, because drop() can't take additional parameters. So, we're forced into other mechanisms, such as unsafe or RefCell.
+
+Conclusion: the borrow checker doesn't allow RAII; we have to work around the borrow checker to accomplish RAII.
+
+
 
 
 
@@ -151,6 +198,10 @@ When a bunch of stuff is in central arrays, accessing them will always incur a b
 
 Or worse if we are referring to things by ids we would have to do a hash and perhaps a modulus.
 
+https://ceronman.com/2021/07/22/my-experience-crafting-an-interpreter-with-rust/
+
+"Using vector indices is slower than a regular pointer dereference. An arithmetic operation is needed to get the address of the element, but more importantly, Rust will always check if the index is out of bounds."
+
 
 
 # Shared Mutability Isn't Unsafe
@@ -174,6 +225,16 @@ Indexes!
 This thread is full of talking about it: https://www.reddit.com/r/rust/comments/9fqget/jonathan_blow_entity_systems_and_the_rust_borrow/
 
 
+# Bad for Prototyping
+
+Bad for prototyping:
+
+ * https://news.ycombinator.com/item?id=26419670
+ * https://www.reddit.com/r/rust/comments/iwij5i/blog_post_why_not_rust/g627nwx/ (and refactoring)
+ * Distracted by details:
+    * https://news.ycombinator.com/item?id=23744577
+    * As the compiler will stop you from borrow checking or something unsafe again and again, you are being distracted constantly by focusing on the language itself instead of the problem you are solving. - https://blogs.dust3d.org/2019/03/13/why-i-rewrote-the-mesh-generator-of-dust3d-from-rust-to-cplusplus/
+
 
 # Bad Architecture
 
@@ -185,12 +246,44 @@ This thread is full of talking about it: https://www.reddit.com/r/rust/comments/
 
 # Ossified Architecture
 
+Once youre done prototyping, it's difficult to change.
+
+https://www.reddit.com/r/rust/comments/iwij5i/blog_post_why_not_rust/g62ytxa/?utm_source=share&utm_medium=web2x&context=3
+
+https://news.ycombinator.com/item?id=27458058
+
+https://news.ycombinator.com/item?id=27249237
+
+"In general I find refactoring to be a far more excruciating process in Rust than in other languages. It is also far more satisfying." - https://kevinhoffman.medium.com/to-box-or-not-to-box-my-first-real-rust-refactor-db467119c4c7
+
+"Refactoring is a massive pain" - https://lobste.rs/s/jgcvev/why_not_rust
+
+
+"One of three things in my experience:
+1) Refactor into an unrecognizable mess
+2) Add a lot of RwLock or RefCell
+3) Abandon the project in rust
+...
+The issue is that to maintain the same interface, it gets to be so hacky that maintence becomes borderline impossible"
+- https://discord.com/channels/273534239310479360/818964227783262209/917808318184054784
+
+"Changing it is a nightmare" - https://lobste.rs/s/x22ulj/why_developers_who_use_rust_love_it_so_much#c_yd7dmv
+
 Heard this from a guy I interviewed too.
 
 - our architectures ossify, needing more refactors but being harder to refactor
 
 
 # Difficult to Learn
+
+https://news.ycombinator.com/item?id=27959122
+
+https://news.ycombinator.com/item?id=26794281
+
+No gradual complexity:
+
+ * https://www.reddit.com/r/rust/comments/i9sor7/frustrated_its_not_you_its_rust/g1ilbv0/
+ * I totally agree. One of the issues is that there are so many complex and novel topics that you will run into in your first week of working on a real project, and you have to wrap your head around all of them to some degree to be able to progress. If there is an obvious and clear progression path, I did not discover it. - https://news.ycombinator.com/item?id=26794916
 
 "Yeah, I could have tried restructuring my code to try to avoid compiler issues. But this would have been even more time spent working around issues with Rust. Go was better than Rust by pretty much every metric that mattered for me, so I went with Go instead." https://news.ycombinator.com/item?id=22336284
 
@@ -200,10 +293,15 @@ this leads to convenient and frustrating ignoring:
 https://www.reddit.com/r/rust/comments/i9sor7/comment/g1ilbv0/?utm_source=reddit&utm_medium=web2x&context=3
 
 
-xxxxx
+It's like a puzzle:
+
+ * https://news.ycombinator.com/item?id=26938245
+ * https://zserge.com/posts/better-c-benchmark/
 
 
+That dopamine hit!
 
+like heroin: https://news.ycombinator.com/item?id=25799704
 
 " I think it brings out the OCD in all of us, because we're apt to believe that the 'hard correctness' is somehow a thing of value. We climbed the mountain and believe that's what 'makes it better' but it may very well be irrelevant. As you say, Java is so often actually 'better' in the big picture." - page 2 of https://news.ycombinator.com/item?id=25799704
 
@@ -284,148 +382,152 @@ as soon as you point out that rust's teachings might be wrong, they turn pretty 
 if you use Rc/RefCell, you get around AxM, but you *also* lose single ownership! uh oh
 
 
-moving checks to compile time is bad for api simplicity: https://blog.burntsushi.net/unwrap/
-
-
-rust borrow checker can lead to privacy problems: https://news.ycombinator.com/item?id=32240161
-
-
-async is a nightmare: https://lobste.rs/s/ksj3ii/rust_is_hard_yes_does_it_matter#c_pmrbny
-
-
-https://news.ycombinator.com/item?id=31794617 great args against rust
-
-Lies we tell ourselves to keep using Golang - https://news.ycombinator.com/item?id=31205072 great points against rust in the comments
-
-discussion of zig v rust: https://lobste.rs/s/veinkw/comparison_rust_zig#c_nmf8jz
-
-read https://news.ycombinator.com/item?id=16659410 and its article https://brandur.org/fragments/rust-brick-walls
-
-
-
-
-weaknesses of rust:
-https://lobste.rs/s/jgcvev/why_not_rust
-
-study saying maybe rust isnt safe: https://2020.icse-conferences.org/details/icse-2020-papers/68/Is-Rust-Used-Safely-by-Software-Developers- 75% cannot be completely statically analyzed because of unsafe somewhere in their call chain
-
-not solving problems in the right way, https://news.ycombinator.com/item?id=23437711
-
-
-https://news.ycombinator.com/item?id=12029238 cant use callback based code
-
-Many who approach the language with optimism [aren't finding the tradeoff worth it](https://news.ycombinator.com/item?id=16659631).
-
-indexes instead: https://www.reddit.com/r/rust/comments/9fqget/jonathan_blow_entity_systems_and_the_rust_borrow/
-
-
-[called by a public API or a third-party library.](https://news.ycombinator.com/item?id=27249237). [# TODO: unclear, clarify connection] 
-
-
-
-So why not make all invariants compile-time invariants? In some cases, it can’t be done. We’ll cover that in the next section. In other cases, it can be done, but one chooses not to for some reason. One such reason is API complexity. https://blog.burntsushi.net/unwrap/
-
-The best approach here is something like HashMap, SlotMap, reference counting, or garbage collection. [Just putting things into a Vec is dangerous](https://news.ycombinator.com/item?id=32240161) and not recommended.
-
-bleed problems, possible in rust, or any language really: https://news.ycombinator.com/item?id=31856436.
-
-
-
-is not without some performance costs. The borrow checker's single-ownership nature often encourages us to more often put objects in centralized collections which only grow over time, collections which sometimes have [overhead from bounds-checking](https://ceronman.com/2021/07/22/my-experience-crafting-an-interpreter-with-rust/) and hashing, where in other languages we'd just dereference a reference. Luckily, the time and space overhead for borrow checking is generally _much_ smaller than garbage collection or reference counting.
-
-
-"it's deeply problematic for a language aiming for wide use in 2022 to not be memory safe" https://news.ycombinator.com/item?id=32782656
-
-"there actually is PL consensus that all new \[general purpose\] languages should be memory-safe" - pcwalton https://news.ycombinator.com/item?id=32783244
-
-"it's completely irresponsible to push a language without a memory safety story, in 2022" - refulgentis, https://news.ycombinator.com/item?id=32777636
-
-
-rust is not perfect, it has `unsafe`. 75% of all rust crates have `unsafe` somewhere in their dependencies, and anyone who has used `unsafe` knows how hard it can be to prove they are safe.
-
-need integration tests anyway because logic bugs
-
-
-
-x I used to believe that garbage collection was always bad, because it had pauses. However, I've learned that ease-of-use and developer velocity are important, and a few of the games I've played wouldn't exist if we couldn't use C# to write games.
-
-x I used to believe that product managers were the enemy, just trying to get us developers to write code faster. Then I worked with some amazing product managers who I could trust to make the right tradeoffs.
-
-
-privacy moldavi https://news.ycombinator.com/item?id=32240161
-
-
-
-
-In my experience, knowing _how_ to make one's code work within the borrow checker can take a couple months, but knowing _when_ to do it is an art that can take much longer.
-
-. 
-
-
-Compare this to more flexible languages where you are free to use the best pattern for the situation.
-
-
-are these good enough for security and privacy? no. are they good enough for finding bugs? Google Earth says yes.
-
-
-
-other benefits:
- * compile times
-
-is the rc thing cultural? perhaps. id say it's because the borrow checker is incomplete
-
-
-i normally talk about vale but will take a break till talk about
-
-premature optimization
-
-static allocation is easier
-
-we should be pushing the world toward memory safety. we should jump on the first system that proves absolute correctness without cost. the system im referring to, of course, is coq.
-
-
-
-
-
-
-[Another user says](https://news.ycombinator.com/item?id=31937387), "Too much (compile-time checking) and code becomes so complicated, it's very hard to work with -- you're falling into a [Turing Tarpit](https://en.wikipedia.org/wiki/Turing_tarpit). It becomes easier to just write simple code without bugs, without using all that type system wizardry. But a judicious use of this pattern, where it's appropriate, may be very beneficial."
-note this is talking more about static analysis higher than borrow checking
-
-
-[One user says](https://blog.burntsushi.net/unwrap/), "So why not make all invariants compile-time invariants? In some cases, it can’t be done. ... In other cases, it can be done, but one chooses not to for some reason. One such reason is API complexity."
-
-
- * perhaps mention the pass-the-world tendency
-
-
-intrusive lists: https://news.ycombinator.com/item?id=32907898
-
-
-
-
-
-
-
-Every language chasing both memory safety and speed will need to become more complex as time goes on, because there are always specialized tricks that one can use to get safety and speed in certain specific situations. We invent them all the time. This is why we see such an explosion of techniques in Rust like slotmap and generational indices, GhostCell+QCell, static RC, and so on.
-
-Complexity is inevitable, when one is pursuing memory safety and speed. The real trick in that space is knowing how to do it without sacrificing simplicity. I think the main way to do that is via something I call opt-in complexity, or progressive disclosure. There are three tenets of this:
-- Keep the core language simple. You should be able to learn the core tools, and be able to express any program with just those.
-- You can opt-in to any of the more complex features. C# does this well with its struct keyword.
-- As a bonus: make it so that you can read a program, ignore those syntactical adjustments, and still know what's going on in the program. For example, the register keyword in C from decades ago: if you ignore it, you can still understand what the function does.
-
-
-
-
-
-https://news.ycombinator.com/item?id=32878477 - "a fully unsafe language in 2022 is dumb"
-https://news.ycombinator.com/item?id=32823085 - evangelizing
-https://news.ycombinator.com/item?id=32822786 - evangelizing
-https://news.ycombinator.com/item?id=32809925 - evangelizing
-
-
-
-
-pinning and intrusive sucks: 
-https://lwn.net/SubscriberLink/907876/ac0afc756df0ec71/
-
-> Object initialization in Rust tends to happen on the stack, but objects that need to live indefinitely will need to move to the heap before being pinned. That movement will break a self-referential object, but pinning before initialization will break Rust's memory-safety rules. 
+negative about rust: https://news.ycombinator.com/item?id=29606523
+
+
+
+
+
+-moving checks to compile time is bad for api simplicity: https://blog.burntsushi.net/unwrap/
+-
+-
+-rust borrow checker can lead to privacy problems: https://news.ycombinator.com/item?id=32240161
+-
+-
+-async is a nightmare: https://lobste.rs/s/ksj3ii/rust_is_hard_yes_does_it_matter#c_pmrbny
+-
+-
+-https://news.ycombinator.com/item?id=31794617 great args against rust
+-
+-Lies we tell ourselves to keep using Golang - https://news.ycombinator.com/item?id=31205072 great points against rust in the comments
+-
+-discussion of zig v rust: https://lobste.rs/s/veinkw/comparison_rust_zig#c_nmf8jz
+-
+-read https://news.ycombinator.com/item?id=16659410 and its article https://brandur.org/fragments/rust-brick-walls
+-
+-
+-
+-
+-weaknesses of rust:
+-https://lobste.rs/s/jgcvev/why_not_rust
+-
+-study saying maybe rust isnt safe: https://2020.icse-conferences.org/details/icse-2020-papers/68/Is-Rust-Used-Safely-by-Software-Developers- 75% cannot be completely statically analyzed because of unsafe somewhere in their call chain
+-
+-not solving problems in the right way, https://news.ycombinator.com/item?id=23437711
+-
+-
+-https://news.ycombinator.com/item?id=12029238 cant use callback based code
+-
+-Many who approach the language with optimism [aren't finding the tradeoff worth it](https://news.ycombinator.com/item?id=16659631).
+-
+-indexes instead: https://www.reddit.com/r/rust/comments/9fqget/jonathan_blow_entity_systems_and_the_rust_borrow/
+-
+-
+-[called by a public API or a third-party library.](https://news.ycombinator.com/item?id=27249237). [# TODO: unclear, clarify connection] 
+-
+-
+-
+-So why not make all invariants compile-time invariants? In some cases, it can’t be done. We’ll cover that in the next section. In other cases, it can be done, but one chooses not to for some reason. One such reason is API complexity. https://blog.burntsushi.net/unwrap/
+-
+-The best approach here is something like HashMap, SlotMap, reference counting, or garbage collection. [Just putting things into a Vec is dangerous](https://news.ycombinator.com/item?id=32240161) and not recommended.
+-
+-bleed problems, possible in rust, or any language really: https://news.ycombinator.com/item?id=31856436.
+-
+-
+-
+-is not without some performance costs. The borrow checker's single-ownership nature often encourages us to more often put objects in centralized collections which only grow over time, collections which sometimes have [overhead from bounds-checking](https://ceronman.com/2021/07/22/my-experience-crafting-an-interpreter-with-rust/) and hashing, where in other languages we'd just dereference a reference. Luckily, the time and space overhead for borrow checking is generally _much_ smaller than garbage collection or reference counting.
+-
+-
+-"it's deeply problematic for a language aiming for wide use in 2022 to not be memory safe" https://news.ycombinator.com/item?id=32782656
+-
+-"there actually is PL consensus that all new \[general purpose\] languages should be memory-safe" - pcwalton https://news.ycombinator.com/item?id=32783244
+-
+-"it's completely irresponsible to push a language without a memory safety story, in 2022" - refulgentis, https://news.ycombinator.com/item?id=32777636
+-
+-
+-rust is not perfect, it has `unsafe`. 75% of all rust crates have `unsafe` somewhere in their dependencies, and anyone who has used `unsafe` knows how hard it can be to prove they are safe.
+-
+-need integration tests anyway because logic bugs
+-
+-
+-
+-x I used to believe that garbage collection was always bad, because it had pauses. However, I've learned that ease-of-use and developer velocity are important, and a few of the games I've played wouldn't exist if we couldn't use C# to write games.
+-
+-x I used to believe that product managers were the enemy, just trying to get us developers to write code faster. Then I worked with some amazing product managers who I could trust to make the right tradeoffs.
+-
+-
+-privacy moldavi https://news.ycombinator.com/item?id=32240161
+-
+-
+-
+-
+-In my experience, knowing _how_ to make one's code work within the borrow checker can take a couple months, but knowing _when_ to do it is an art that can take much longer.
+-
+-. 
+-
+-
+-Compare this to more flexible languages where you are free to use the best pattern for the situation.
+-
+-
+-are these good enough for security and privacy? no. are they good enough for finding bugs? Google Earth says yes.
+-
+-
+-
+-other benefits:
+- * compile times
+-
+-is the rc thing cultural? perhaps. id say it's because the borrow checker is incomplete
+-
+-
+-i normally talk about vale but will take a break till talk about
+-
+-premature optimization
+-
+-static allocation is easier
+-
+-we should be pushing the world toward memory safety. we should jump on the first system that proves absolute correctness without cost. the system im referring to, of course, is coq.
+-
+-
+-
+-
+-
+-
+-[Another user says](https://news.ycombinator.com/item?id=31937387), "Too much (compile-time checking) and code becomes so complicated, it's very hard to work with -- you're falling into a [Turing Tarpit](https://en.wikipedia.org/wiki/Turing_tarpit). It becomes easier to just write simple code without bugs, without using all that type system wizardry. But a judicious use of this pattern, where it's appropriate, may be very beneficial."
+-note this is talking more about static analysis higher than borrow checking
+-
+-
+-[One user says](https://blog.burntsushi.net/unwrap/), "So why not make all invariants compile-time invariants? In some cases, it can’t be done. ... In other cases, it can be done, but one chooses not to for some reason. One such reason is API complexity."
+-
+-
+- * perhaps mention the pass-the-world tendency
+-
+-
+-intrusive lists: https://news.ycombinator.com/item?id=32907898
+-
+-
+-
+-
+-
+-
+-
+-Every language chasing both memory safety and speed will need to become more complex as time goes on, because there are always specialized tricks that one can use to get safety and speed in certain specific situations. We invent them all the time. This is why we see such an explosion of techniques in Rust like slotmap and generational indices, GhostCell+QCell, static RC, and so on.
+-
+-Complexity is inevitable, when one is pursuing memory safety and speed. The real trick in that space is knowing how to do it without sacrificing simplicity. I think the main way to do that is via something I call opt-in complexity, or progressive disclosure. There are three tenets of this:
+-- Keep the core language simple. You should be able to learn the core tools, and be able to express any program with just those.
+-- You can opt-in to any of the more complex features. C# does this well with its struct keyword.
+-- As a bonus: make it so that you can read a program, ignore those syntactical adjustments, and still know what's going on in the program. For example, the register keyword in C from decades ago: if you ignore it, you can still understand what the function does.
+-
+-
+-
+-
+-
+-https://news.ycombinator.com/item?id=32878477 - "a fully unsafe language in 2022 is dumb"
+-https://news.ycombinator.com/item?id=32823085 - evangelizing
+-https://news.ycombinator.com/item?id=32822786 - evangelizing
+-https://news.ycombinator.com/item?id=32809925 - evangelizing
+
+ 
+-pinning and intrusive sucks: 
+-https://lwn.net/SubscriberLink/907876/ac0afc756df0ec71/
+ 
+-> Object initialization in Rust tends to happen on the stack, but objects that need to live indefinitely will need to move to the heap before being pinned. That movement will break a self-referential object, but pinning before initialization will break Rust's memory-safety rules. 
