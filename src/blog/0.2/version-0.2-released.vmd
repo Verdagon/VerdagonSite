@@ -149,7 +149,7 @@ exported func main() {
 ...we can have one:
 
 ```vale
-struct Vec<N int, T> {
+struct Vec<N Int, T> {
   elements [#N]T;
 }
 exported func main() {
@@ -173,7 +173,7 @@ The 0.2 release removes the `let` and `let mut` keywords, making our syntax clea
 <<<<
 Before:
 
-```vale
+```
 func main() {
   let a = 3;
   let b = 3;

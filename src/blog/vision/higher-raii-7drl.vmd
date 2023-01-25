@@ -113,7 +113,7 @@ Now, the user must do *something* with the owning reference. Thats where `SetVal
 
 ```vale
 func main() {
-  promise Promise<int> = ...;
+  promise Promise<int> = …;
 
   SetValueAndDestroy(promise, 1337);
   // The above line moved the promise local variable into the

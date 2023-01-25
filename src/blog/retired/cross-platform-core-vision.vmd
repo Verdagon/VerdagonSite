@@ -188,7 +188,7 @@ Calling flyTo here will:
 ////
 ```vale
 func launch(
-  spaceship 'core &Spaceship,
+  spaceship &core'Spaceship,
   e ClickEvent,
   callback ICallback) // change to fn(bool)void
 'host {
@@ -211,14 +211,14 @@ This snippet is compiled to native assembly.
 func flyTo(
   ship &Spaceship,
   loc Loc,
-  callback 'platform ICallback) // change to fn(bool)void
+  callback platform'ICallback) // change to fn(bool)void
 'core {
   if (ship.fuel < ship.loc.distance(loc)) {
     callback(false);
   } else {
-    mut spaceship.target = loc;
-    mut spaceship.fuel = spaceship.fuel - 10; // change to mut spaceship.fuel -= 10;
-    mut spaceship.flyingCallback = callback;
+    set spaceship.target = loc;
+    set spaceship.fuel = spaceship.fuel - 10; // change to mut spaceship.fuel -= 10;
+    set spaceship.flyingCallback = callback;
   }
 }
 ```: notest
@@ -253,7 +253,7 @@ struct Spaceship 'core {
   fuel Int;
   loc! Loc;
   target! Loc;
-  callback 'platform ICallback; // change to fn(bool)void;
+  callback platform'ICallback; // change to fn(bool)void;
 }
 ```: notest
 >>>>

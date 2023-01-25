@@ -146,9 +146,9 @@ An `IDesire` describes what the unit could do, and how much it wants to do that.
 
 When we have all the `IDesire`s, we sort them to figure out what the strongest one is, and enact it.
 
-By adding the `'r` to `strongestDesire`'s `this &Unit`, we're telling the compiler that `this` will come from a region we call `'r`.
+By adding the `r'` to `strongestDesire`'s `this &Unit`, we're telling the compiler that `this` will come from a region we call `r'`.
 
-There's no specific region whose name is `'r` (rather, `'r` is how we refer to whatever region contains `this`, so it's a generic parameter, hence the `<'r ro>`). The `ro` specifies that it's a read-only region, making all references into `'r` free.
+There's no specific region whose name is `r'` (rather, `r'` is how we refer to whatever region contains `this`, so it's a generic parameter, hence the `<'r ro>`). The `ro` specifies that it's a read-only region, making all references into `r'` free.
 
 This function doesn't change anything about the unit or the world, it just reads them and does calculations.
 
@@ -167,9 +167,9 @@ func gameLoop(world &World) {
   }
 }
 
-pure func strongestDesire<'i rw, 'r imm>( «956»
-  this 'r &Unit)
-IDesire<'r, 'i> «111»
+pure func strongestDesire<i' rw, r' imm>( «956»
+  this &r'Unit)
+IDesire<r', i'> «111»
 'i { «504»
   desires =
     this.abilities*.getDesire(); «1136»
@@ -178,9 +178,9 @@ IDesire<'r, 'i> «111»
   return desires[0];
 }
 
-pure func getDesire<'i rw, 'r imm>(
-  self 'r &ChaseAbility)
-IDesire<'i, 'r>
+pure func getDesire<i' rw, r' imm>(
+  self &r'ChaseAbility)
+IDesire<i', r'>
 'i {
   unit = self.unit;
   world = unit.world;
@@ -194,11 +194,11 @@ IDesire<'i, 'r>
   return ChaseDesire(70, closest, path);
 }
 
-struct ChaseDesire<'i rw, 'r imm> 'i {
+struct ChaseDesire<i' rw, r' imm> i' {
   impl IDesire;
 
   strength Int;
-  victim 'r &Unit;
+  victim &r'Unit;
   path List<Location>;
 
   func strength(&self) «1134»
@@ -221,9 +221,9 @@ struct ChaseDesire<'i rw, 'r imm> 'i {
 
 #1134: impl is like @Override in java.
 
-#504: This `'i` here specifies the default region for our allocations and calls.
+#504: This `i'` here specifies the default region for our allocations and calls.
 
-#956: The `'r ro` and `'i` are *regions*. `'` means region, and `ro` means read-only.
+#956: The `'r ro` and `i'` are *regions*. `'` means region, and `ro` means read-only.
 
 #111: `IDesire<'r, 'i>` is defined below. It uses region arguments so it can point into multiple regions at once.
 
@@ -243,14 +243,14 @@ struct ChaseDesire<'i rw, 'r imm> 'i {
 
 Without the region markers, every time we make (or let go of) a reference into the unit or anything else in the world, we increment and decrement a ref-count. Worse, the World would be cold, because Unity has probably rendered a few hundred frames since the last turn, and has long since wiped our World from the cache.
 
-With the region markers, the compiler knows that only the things inside the `'i` region can change, and nothing in the `'r` region will change, making references into `'r` completely free. *All of our references to this cold data, which would have incurred RC costs, are now free.*
+With the region markers, the compiler knows that only the things inside the `i'` region can change, and nothing in the `r'` region will change, making references into `r'` completely free. *All of our references to this cold data, which would have incurred RC costs, are now free.*
 
 *There is a caveat:* When we return a reference from the implicitly locked call, it increments the ref-count in the object it's pointing to. In the example, `ChaseDesire.victim` will increment the Unit it's pointing at, as it's returned. [# One could say that we're only doing the reference counting we need to, for the result of the function.] [# There are some potential SIMD opportunities to parallelize these increments.] One can often use explicit locking to avoid this kind of overhead.
 
 
 ## Explicit Locking
 
-Implicit locking locked all existing memory, and made a small new region called `'i` which we could modify. There's a more precise way to manage regions: mutexes! [# They aint just for multi-threading anymore!]
+Implicit locking locked all existing memory, and made a small new region called `i'` which we could modify. There's a more precise way to manage regions: mutexes! [# They aint just for multi-threading anymore!]
 
 The Vale compiler itself has a great example of when we'd want explicit locking. Six transformation stages translate the source code into intermediate ASTs [# Stands for Abstract Syntax Tree, which is a simplified version of code, after we've parsed it from the original text.] and eventually into an executable binary. [# If you're curious, the six stages are named Scout, Seer, Astronomer, Templar, Hammer, and Midas.] Each stage takes in the previous AST, read-only, and constructs the next AST.
 
@@ -292,8 +292,8 @@ func templar(
 }
 
 func translateFunction<'a, 't>(
-  func 'a &InAstFunction,
-  outAst 't &OutAst)
+  func &r'InAstFunction,
+  outAst &t'OutAst)
 OutASTFunction {
   // Read func, add things to outAst.
   ...;
@@ -301,7 +301,7 @@ OutASTFunction {
 ```: notest
 >>>>
 
-We still increment and decrement the ref-counts of objects inside `'i`, but we just made those objects, so they'll likely be hot in the cache.
+We still increment and decrement the ref-counts of objects inside `i'`, but we just made those objects, so they'll likely be hot in the cache.
 
 We can take this even further: we can combine explicit locking and implicit locking, and even do implicit locks from within implicit locks. By layering these locking techniques, we can compound our benefits and speed up our program even more!
 
@@ -312,11 +312,11 @@ We can take this even further: we can combine explicit locking and implicit lock
 
 # Region Memory Strategy
 
-In our game example above, references into `'r` were completely free. And references into `'i` were probably hot in the cache, making its reference counting very fast.
+In our game example above, references into `r'` were completely free. And references into `i'` were probably hot in the cache, making its reference counting very fast.
 
 How much more can we do? *Much more.* This is where things get a bit crazy.
 
-Vale's *pool and arena allocation* can eliminate the ref-counting overhead in `'i` too, and *lets eliminate its malloc and free overhead as well, while we're at it.*
+Vale's *pool and arena allocation* can eliminate the ref-counting overhead in `i'` too, and *lets eliminate its malloc and free overhead as well, while we're at it.*
 
 The default memory management strategy for a region is to use the *heap*, which uses malloc and free under the hood.
 
@@ -347,20 +347,20 @@ Used well, a pool allocator can drastically speed up a region.
 <<<<
 For example, we could use pool allocation for this basic breadth-first-search algorithm, that checks for units at every nearby location.
 
-We use the keyword `pool` after the region declaration `'i`.
+We use the keyword `pool` after the region declaration `i'`.
 
-*We just made ref-counting free* for our findNearbyUnits function, and completely avoided malloc and free overhead. [# The only memory overhead we paid is when we copied `findNearbyUnits`'s `'i List<'r &Unit>` result from the pool region into the caller's region.]
+*We just made ref-counting free* for our findNearbyUnits function, and completely avoided malloc and free overhead. [# The only memory overhead we paid is when we copied `findNearbyUnits`'s `i'List<&r'Unit>` result from the pool region into the caller's region.]
 
- * References into the `'r` region are free because it's read-only.
- * References into the `'i` region are free because it uses pool allocation.
+ * References into the `r'` region are free because it's read-only.
+ * References into the `i'` region are free because it uses pool allocation.
 
 ////
 ```vale
-pure func findNearbyUnits<'r ro, 'i = pool>
-  (world 'r &World, origin Location)
-'i List<'r &Unit>
-'i {
-  result = List<'r &Unit>(); «1140»
+pure func findNearbyUnits<r' ro, i' = pool>
+  (world &r'World, origin Location)
+i'List<&r'Unit>
+i' {
+  result = List<&r'Unit>(); «1140»
   exploredSet = HashSet<Location>();
   unexploredQueue =
     Queue<Location>(origin); «510»

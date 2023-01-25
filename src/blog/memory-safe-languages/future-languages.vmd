@@ -1,0 +1,23 @@
+
+
+vale
+
+cone
+
+austral
+
+val
+
+lobster
+
+kind
+
+nim:
+
+- from https://nim-lang.github.io/Nim/mm.html: "The reference counting operations (= "RC ops") do not use atomic instructions and do not have to -- instead entire subgraphs are moved between threads." IOW, like lobster.
+- uses sink and lent to eliminate RC ops
+- uses static analysis like lobster to eliminate RC.
+- https://nim-lang.org/blog/2020/12/08/introducing-orc.html:
+  - "The Nim compiler analyses the involved types and only if it is potentially cyclic, code is produced that calls into the cycle collector. This type analysis can be helped out by annotating a type as acyclic."
+  - "ARC is Nim’s pure reference-counting GC, however, many reference count operations are optimized away: Thanks to move semantics, the construction of a data structure does not involve RC operations. And thanks to “cursor inference”, another innovation of Nim’s ARC implementation, common data structure traversals do not involve RC operations either! The performance of both ARC and ORC is independent of the size of the heap."
+- DM a draft to ShalokShalom, he said he'd be down to see if any of the features are reminiscent of past languages' features

@@ -1,0 +1,98 @@
+---
+title: Thoughts On Perfect Memory Safety
+author: Evan Ovadia
+date: Apr 29, 2022
+realm: blog
+path: blog/thoughts-on-perfect-memory-safety
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: me
+---
+
+
+> Regarding generational references' probabilistic behavior of collisions: what exactly is this doing and what are (were) the consequences of a collision that made it worthwhile to do that? [# Thank you Blake Anderson for the question! (paraphrased)]
+
+
+A good question!
+
+
+Recall that whenever we dereference a generational reference, it will do a check to make sure the "remembered generation" matches the "actual generation". [# See [Generational References](https://verdagon.dev/blog/generational-references) for more details.]
+
+
+Our first approach had "perfect memory safety"; it could be mathematically proven to be safe. When a generation hit `INT_MAX`, we would retire that chunk of memory forever, instead of overflowing to zero and allowing repeats.
+
+
+We later realized that if we *randomized* the generation instead, and allowed repeats, we could unlock some really powerful optimizations. Suddenly, we could put objects directly on the stack and inside other structs and arrays.
+
+
+## False Negatives
+
+
+The implication, of course, is that a "false negative" is possible. A false negative is when we destroy an object and later create a new object in its place which randomly has the same generation, and a use-after-free for the old object isn't detected because the generations match.
+
+
+Before we talk about how we address this, let's acknowledge that this *only affects erroneous code*. It doesn't mean a working program will randomly fail; it only affects the error detection mechanism.
+
+
+This isn't like a screwdriver that breaks after 1000 uses, this is more like a Brita filter that warns you long before there's an actual problem.
+
+
+## Why They Aren't a Problem
+
+
+These three aspects helps resolve any potential problems from false negatives:
+
+ * Generation check failures are very loud.
+ * Because of the sheer number of possible generations, we notice the potential problem long before it becomes an actual problem.
+ * Generations are not observable, which makes them more secure.
+
+
+
+## Let's talk numbers!
+
+
+In theory, there is currently a 1/2^64 chance, [1 in 18 billion billion](https://www.wolframalpha.com/input?i=1%2F2%5E64), 0.000000000000000005%, that a use-after-free goes undetected.
+
+
+Assuming 64-bit generations, we'll on average get a false negative after [12,786,300,000,000,000,000](https://www.wolframalpha.com/input?i=ln%28.5%29%2Fln%281-1%2F2%5E64%29) safely detected use-after-frees. And each detection is *very loud*: it halts the program and blasts it away completely. [# 
+An alternate language that allows the program to keep running after a check failure would be much more likely to trigger memory unsafety. Instead, Vale halts the program, which means you can't ignore it.] [# In the future, we could add a way to "catch" these halts and unwind, but only if we can uphold the same level of protection. A forced sleep for the thread, loud error message, and extra region-based protections are being explored.]
+
+
+If restarting a program takes a second, and we try really hard, then we'll probably see our first false negative after 
+[24 quadrillion](https://www.wolframalpha.com/input?i=%28ln%28.5%29%2Fln%281-1%2F2%5E64%29%29%2F60%2F24%2F365) years.
+
+
+That's pretty good. I've never seen a problem in production that didn't get resolved within 24 quadrillion years.
+
+
+In fact, one might even decide to go from 64-bit generations to 48 or even 32, if memory usage is more important than memory safety in a certain situation. [Arm Memory Tagging](https://community.arm.com/arm-community-blogs/b/architectures-and-processors-blog/posts/enhancing-memory-safety) is basically a 4-bit generation system, which is often enough for development and testing.
+
+
+## Non-observable Generations
+
+
+Generations are also randomized and not observable via code:
+
+ * Just like how no Java code can see an objects garbage collection metadata, there's no API or Vale code to see the generation of an object.
+ * There's no `unsafe` blocks or uninitialized memory through which they can escape. [# Vale might one day have `unsafe` blocks, but that will only give us unsafe access to a manually managed region which doesn't have generations. We can't even use FFI to get an object's generation in Vale. There is of course the caveat that if we run malicious code in the same process, it has free reign to do anything, but that's the case with all systems, and why we would use sandboxing.]
+ * A generation is never exposed to the network or any files. [# They are currently exposed via FFI, but that will soon change to an index into an internal reference table.]
+
+This makes it much more secure, and even if an attacker tried to brute-force it 5 billion times a second, it would still take an average of [81 years](https://www.wolframalpha.com/input?i=%28ln%28.5%29%2Fln%281-1%2F2%5E64%29%29%2F%285000000000%29%2F60%2F60%2F24%2F365) to get that first false negative.
+
+
+Of course, no known security mechanisms can protect against side-channel exploits like Spectre or any un-sandboxed untrusted code running in your same process, and the same is true for generational references.
+
+
+## Conclusion
+
+
+If it helps, one can think of a generation as like a password into a vault, and after one failed attempt, the entire vault shuts down and explodes very loudly. Our entire civilization is built upon such mechanisms, quite successfully.
+
+
+If one needs theoretical perfection, then one should probably not use Vale, C, Java, Go, Swift, Rust, or any language that has any unsafe or unsound corners. One also shouldn't deploy their code on consumer computers or phones, which have probabilistic RAM failure _even for working code._ [# Your average (2012) Dell computer with 4 GB DRAM will have [3 to 240 errors per month](https://youtu.be/aT7mnSstKGs?t=1103). DRAM failure is [25k-70k per billion device hours per mbit](http://www.cs.toronto.edu/~bianca/papers/sigmetrics09.pdf), and 8% of DIMMs fail per year. ECC could help with this, but it's generally not offered in consumer devices. This can be [mitigated](https://superuser.com/a/1635269) in safety-critical use cases like avionics.] One should use something like Ada/SPARK on specialized hardware.
+
+
+I hope this helped, and feel free to come by the [discord server](https://discord.gg/SNB8yGH) or [subreddit](https://reddit.com/r/vale) with any questions!
+
+
+<slice/>

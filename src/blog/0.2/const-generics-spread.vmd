@@ -41,7 +41,7 @@ It would be nice if we could pass that `2`, `3`, `4` in as a generic parameter l
 Enter *const generics*, which enables just that.
 
 ```vale
-struct Vec<N int, T> {
+struct Vec<N Int, T> {
   elements [#N]T;
 }
 ```

@@ -42,13 +42,13 @@ Normally, people use WebAssembly to run C code in a sandboxed environment. This 
 However, that's not the only way to use webassembly. Instead of interpreting it by running it in a VM, we can also compile _through_ webassembly code, back into native machine code. This is even faster than interpreting it.
 
 
-Recently, Bobby Holley published an article [WebAssembly and Back Again: Fine-Grained Sandboxing in Firefox 95](https://hacks.mozilla.org/2021/12/webassembly-and-back-again-fine-grained-sandboxing-in-firefox-95/) which uses wasm2c to translate the resulting .wasm output _back into C_. This brings the overhead down to 42% while maintaining portability, and even as low as 14% using some platform-specific techniques.
+Recently, Bobby Holley published an article [WebAssembly and Back Again: Fine-Grained Sandboxing in Firefox 95](https://hacks.mozilla.org/2021/12/webassembly-and-back-again-fine-grained-sandboxing-in-firefox-95/) which uses wasm2c to translate the resulting .wasm output _back into C_. This brings the overhead down to 42% while maintaining portability, and even as low as 14% using some platform-specific techniques. There are even new projects like [w2c2](https://github.com/turbolent/w2c2) which [bring that down to 7%](https://github.com/turbolent/w2c2#performance).
 
 
 This has some limitations:
 
  * We must have the C source.
- * It's slower than native code (14% or 42%, depending on portability).
+ * It's a bit slower than native code (7%).
  * WebAssembly has some [code portability limitations](https://emscripten.org/docs/porting/guidelines/index.html).
 
 If any of these are problems, then there's another option: subprocesses.

@@ -5,6 +5,7 @@ See those linking to me: [https://search.google.com/search-console/links?resourc
 
 We'll finish most of 0.2, then start posting all these fortnightly.
 
+remove "most memory safe", since we switched to probabilistic safety.
 
 Ready to go:
 

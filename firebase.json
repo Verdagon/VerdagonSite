@@ -36,6 +36,11 @@
         "source": "/blog/0.2/on-removing-let-let-mut",
         "destination": "/blog/on-removing-let-let-mut",
         "type": 302
+      },
+      {
+        "source": "/blog/probabilistic-memory-safety",
+        "destination": "/blog/thoughts-on-perfect-memory-safety",
+        "type": 302
       }
     ]
   }

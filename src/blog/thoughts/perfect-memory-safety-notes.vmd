@@ -1,0 +1,31 @@
+
+
+
+When all this is considered, a user might opt for even less protection. Assuming 32 bit generations, we get a false negative after 3 billion use-after-frees on average. On Earth, asan caught me doing a use-after-free about once a month, so average time to unsafety is about 250 million years. I'd probably have fixed the bug by then.
+
+
+ * Unsafe memory access can't really stay hidden in your code, because the first time they're run, there's a 1-(1/2^64) chance (99.9999999999999999%) that will be detected, and then likely fixed. It's not like C++ where an unsafe access will probably still work.
+
+
+In fact, these factors made it clear that 64 bits is probably too much, so we could even reduce it to 32 bits, which is more reasonable.
+
+
+
+
+
+There's two ways to look at this:
+
+ * Type 1 probability: A program can run for N months until it fails, it will eventually fail if you leave it running long enough. This is of course *not* how generational references work.
+ * Type 2 probability: Your airbags deploy when you run your car into a wall. A driver would have to crash on average 2 billion times on average before the airbags fail. Of course, we take their license away (fix the bug) long before that happens.
+
+Type 1 means that a correct program will eventually fail. That's not the case with type 2. Type 2 is an aggressive detection mechanism that will never affect correct operation.
+
+
+
+
+ * Assuming 32 bit generations, we get a false negative after 3 billion use-after-frees on average. On Earth, asan caught me doing a use-after-free about once a month, so average time to unsafety is about 250 million years. I'd probably have fixed the bug by then.
+ * Still, they're not comparable, as RAM failures are silent, and happen to correct code. Generation check failures are very loud, anda only happen in incorrect code.
+
+
+
+ or atomic reference counting which could overflow

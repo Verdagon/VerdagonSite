@@ -103,10 +103,10 @@ if [ $TARGET == "generics-hash-codes-horrors" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
-if [ $TARGET == "probabilistic-memory-safety" ] || [ $TARGET == "all" ] ; then
-  echo "Doing probabilistic-memory-safety"
-  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/probabilistic-memory-safety src/blog/thoughts/probabilistic-memory-safety.vmd
-  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/probabilistic-memory-safety src/blog/thoughts/probabilistic-memory-safety.vmd
+if [ $TARGET == "perfect-memory-safety" ] || [ $TARGET == "all" ] ; then
+  echo "Doing perfect-memory-safety"
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/thoughts-on-perfect-memory-safety src/blog/thoughts/perfect-memory-safety.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/thoughts-on-perfect-memory-safety src/blog/thoughts/perfect-memory-safety.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -415,10 +415,10 @@ if [ $TARGET == "next-gen-languages-gpu" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
-if [ $TARGET == "making-regions-part-1-generics" ] || [ $TARGET == "all" ] ; then
-  echo "Doing making-regions-part-1-generics"
-  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-1-generics src/blog/making-regions/making-regions-part-1-generics.vmd
-  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-1-generics src/blog/making-regions/making-regions-part-1-generics.vmd
+if [ $TARGET == "making-regions-part-2-generics" ] || [ $TARGET == "all" ] ; then
+  echo "Doing making-regions-part-2-generics"
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-2-generics src/blog/making-regions/making-regions-part-2-generics.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-2-generics src/blog/making-regions/making-regions-part-2-generics.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1

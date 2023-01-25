@@ -2,11 +2,11 @@
 
 # Region Memory Strategy
 
-In our game example above, references into `'r` were completely free. And references into `'i` were probably hot in the cache, making its reference counting very fast.
+In our game example above, references into `r'` were completely free. And references into `i'` were probably hot in the cache, making its reference counting very fast.
 
 How much more can we do? *Much more.* This is where things get a bit crazy.
 
-Vale's *pool and arena allocation* can eliminate the ref-counting overhead in `'i` too, and *lets eliminate its malloc and free overhead as well, while we're at it.*
+Vale's *pool and arena allocation* can eliminate the ref-counting overhead in `i'` too, and *lets eliminate its malloc and free overhead as well, while we're at it.*
 
 The default memory management strategy for a region is to use the *heap*, which uses malloc and free under the hood.
 
@@ -37,20 +37,20 @@ Used well, a pool allocator can drastically speed up a region.
 <<<<
 For example, we could use pool allocation for this basic breadth-first-search algorithm, that checks for units at every nearby location.
 
-We use the keyword `pool` after the region declaration `'i`.
+We use the keyword `pool` after the region declaration `i'`.
 
-*We just made ref-counting free* for our findNearbyUnits function, and completely avoided malloc and free overhead. [# The only memory overhead we paid is when we copied `findNearbyUnits`'s `'i List<'r &Unit>` result from the pool region into the caller's region.]
+*We just made ref-counting free* for our findNearbyUnits function, and completely avoided malloc and free overhead. [# The only memory overhead we paid is when we copied `findNearbyUnits`'s `i'List<&r'Unit>` result from the pool region into the caller's region.]
 
- * References into the `'r` region are free because it's read-only.
- * References into the `'i` region are free because it uses pool allocation.
+ * References into the `r'` region are free because it's read-only.
+ * References into the `i'` region are free because it uses pool allocation.
 
 ////
 ```vale
 pure func findNearbyUnits<'r ro, 'i = pool>
-  (world 'r &World, origin Location)
-'i List<'r &Unit>
-'i {
-  result = List<'r &Unit>(); «1140»
+  (world &r'World, origin Location)
+i'List<&r'Unit>
+i' {
+  result = List<&r'Unit>(); «1140»
   exploredSet = HashSet<Location>();
   unexploredQueue =
     Queue<Location>(origin); «510»

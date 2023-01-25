@@ -470,7 +470,7 @@ exported func main() {
 You can see how the compiler can enforce that we only modify things that came from inside the block.
 
 
-If we call a function, it needs to know what it can modify and what it can't. For that, we use `'r`. Note how in this snippet, `blur`'s first parameter's type is `'r &[][]int`. [# This is similar to Rust's lifetimes, more on that in the afterword.]
+If we call a function, it needs to know what it can modify and what it can't. For that, we use `r'`. Note how in this snippet, `blur`'s first parameter's type is `&r'[][]int`. [# This is similar to Rust's lifetimes, more on that in the afterword.]
 
 
 ```vale
@@ -488,14 +488,14 @@ exported func main() {
   println(results);
 }
 
-func blur(input 'r &[][]int, x int, y int) int {
+func blur(input &r'[][]int, x int, y int) int {
   ... // Loop over the 3x3 ints around x,y in input and return the average
 }
 ```
 
 
 
-That `'r` means we're pointing into a *read-only region*. More on that below!
+That `r'` means we're pointing into a *read-only region*. More on that below!
 
 
 Key takeaways:
@@ -530,7 +530,7 @@ When we have a reference to an object in a read-only region, we:
  * Can pass it to a function, if the function sees the region as read-only.
 
 
-We're using `'r` to specify that a reference is in a read-only region. For example, an `'r &[]int` is an non-owning reference to an array of integers inside a read-only region.
+We're using `r'` to specify that a reference is in a read-only region. For example, an `&r'[]int` is an non-owning reference to an array of integers inside a read-only region.
 
 
 
@@ -540,7 +540,7 @@ We can use these for our concurrency, with the following rule:
 
 
 
-Elaborating on the `'r` a little more:
+Elaborating on the `r'` a little more:
 
  * The `r` is arbitrary, we can name it anything we want.
  * By default, any named region is *immutable*. To make it mutable, we can say `'r!` or just leave it unnamed.
@@ -590,11 +590,11 @@ Thanks for reading! If you want to discuss more, come by the [r/Vale](http://red
 
 ## Afterword: Vale Regions and Rust Lifetimes
 
-The `'r` seems to hint that they're similar! Let's take another look:
+The `r'` seems to hint that they're similar! Let's take another look:
 
 
 ```vale
-func blur(input 'r &[][]int, x int, y int) int {
+func blur(input &r'[][]int, x int, y int) int {
   ... // Loop over the 3x3 ints around x,y in input and return the average
 }
 ```
@@ -603,15 +603,15 @@ func blur(input 'r &[][]int, x int, y int) int {
 
 There are some similarities:
 
- * We can't mix up objects' regions; we can't use an object in `'r` where we expect an object in another region (e.g. `'b`), the compiler keeps them separate. [# Though, we can have structs in one temporary region pointing into structs in another region, like `'r MyStruct<'b>`.]
- * A reference to an object in region `'r` can't outlive region `'r`'s scope.
+ * We can't mix up objects' regions; we can't use an object in `r'` where we expect an object in another region (e.g. `b'`), the compiler keeps them separate. [# Though, we can have structs in one temporary region pointing into structs in another region, like `'r MyStruct<'b>`.]
+ * A reference to an object in region `r'` can't outlive region `r'`'s scope.
  * Vale names this a "region borrow checker", similar to Rust's "borrow checker".
 
 
 The biggest difference is that Vale lifts mutability to the region level:
 
  * In Rust, references are either immutable (`&`) or mutable (`&mut`) borrows. In Vale, there is only `&`.
- * Instead, Vale's _regions_ are inherently mutable or immutable. We see them as read-only (`'r`) or read-write (`'r!` or unnamed).
+ * Instead, Vale's _regions_ are inherently mutable or immutable. We see them as read-only (`r'`) or read-write (`'r!` or unnamed).
 
 
 The compiler enforces that nobody changes objects in immutable regions by:

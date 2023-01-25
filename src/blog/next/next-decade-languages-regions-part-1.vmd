@@ -99,7 +99,7 @@ The compiler knows that it doesn't need to do any reference counting increments 
 Consider the below example:
 
 ```
-pure func CellularAutomata(map 'r &PatternMap<bool>) PatternMap<bool> {
+pure func CellularAutomata(map &r'PatternMap<bool>) PatternMap<bool> {
   rand = RandomNumberGenerator();
   new_map = PatternMap<bool>(make_pentagon_9_pattern());
 

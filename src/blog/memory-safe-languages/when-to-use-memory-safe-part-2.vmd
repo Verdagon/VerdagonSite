@@ -154,13 +154,12 @@ From [Microsoft Security Response Center](https://msrc-blog.microsoft.com/2020/1
 > We’ve assessed the theoretical impact of CHERI on all the memory safety vulnerabilities we received in 2019, and concluded that in its current state, and combined with other mitigations, it would have deterministically mitigated at least two thirds of all those issues.
 
 
-One could reason that CHERI can reduce memory-unsafety related development slowdowns by two thirds, which is pretty incredible. Arm CPUs are even starting to have hardware support for it, *[bringing its run-time overhead down to 6.8%](https://lobste.rs/s/nw7hsd/how_memory_safe_is_zig_updated#c_tyzbaf)*.
+One could reason that CHERI can reduce memory-unsafety related development slowdowns by two thirds, which is pretty incredible. Arm CPUs are even starting to have hardware support for it, *[bringing its run-time overhead down to 6.8%](https://lobste.rs/s/nw7hsd/how_memory_safe_is_zig_updated#c_tyzbaf)*. [#valethird]
 
 
-That remaining one third is solved by [Vale](https://vale.dev/) which takes this approach even further in the form of its [generational references](https://verdagon.dev/blog/generational-references). By building it into the language itself, it can know exactly when it does or doesnt need to perform a check, and by adding [native region support](https://verdagon.dev/blog/zero-cost-memory-safety-regions-overview) it can theoretically skip the vast majority of them, bringing its run-time overhead even closer to zero, within the noise of any C or C++ program. With that kind of speed, we can leave the protections enabled even in release mode.
-
-
-<slice/>
+<slice>
+#valethird: That remaining one third could be solved by [Vale](https://vale.dev/) which takes this approach even further in the form of its [generational references](https://verdagon.dev/blog/generational-references). By building it into the language itself, it can know exactly when it does or doesnt need to perform a check, and by adding [native region support](https://verdagon.dev/blog/zero-cost-memory-safety-regions-overview) it can theoretically skip the vast majority of them, bringing its run-time overhead even closer to zero, within the noise of any C or C++ program. With that kind of speed, we can leave the protections enabled even in release mode.
+</slice>
 
 
 # Borrow Checking
@@ -522,25 +521,31 @@ MMM, borrow checking, GC, and RC each have their strengths and weaknesses. Howev
  * Borrow checking is slower, but can be good if we augment it with Rust's other aspects like `RefCell`.
 
 
-But that's too general! Here's some rough guidelines to help with more specific situations:
+Of course, a language's memory safety approach is only _one_ factor in its development velocity. Development velocity can be helped or hindered in other ways.
 
- * When making a game, default to something GC or RC, like Swift or C#. They offer great development velocity, plus value types (`struct`) for the more performance-sensitive areas. If one need even more performance, then:
-    * If working on a single player game, an MMM language with proper architecture and memory safety mitigations is a great option.
-    * If working on a multiplayer game, then Rust is a stellar option as it helps address security concerns while still being fast.
- * When making a web server, default to a memory-safe language with RC or GC (such as C#), and bonus points if it has good concurrency support like Pony or Go.
-    * If working on something extremely latency-sensitive, Rust could be better. MMM isn't really advisable for something exposed to the network.
- * When making a mobile app, stick to Swift, Kotlin, or Typescript. GC is particularly good here because its pauses can happen in between user actions.
+
+Opinions may differ, but here's some examples:
+
+ * Good compile times, like Zig or Go, greatly improve development velocity.
+ * Static typing generally helps developer velocity, except in certain rare cases. [# If you're writing a small program, not working on a team, and the program terminates fairly quickly, then static typing can sometimes be a needless step. For example, small CLI scripts or integration test scripts.]
+ * Having `nil` or `null` can harm developer velocity, such as in Go. However, if it's tracked in the type system like in Kotlin or Swift, then it can be a good thing.
+ * Having a strong type system with generics, such as in Scala or Rust, can help detect more errors at compile time, without adding too much artificial complexity.
+ * [Structural subtyping](https://en.wikipedia.org/wiki/Structural_type_system), such as in Typescript or Go, helps decouple codebases more than nominal subtyping like in Java or Python.
+
+
+Weighing all these factors together is worthy of an entire book, but here's some rough guidelines:
+
+ * When making a web server, default to a memory-safe language with RC or GC (such as C#), and bonus points if it has good concurrency support like Pony.
+    * If working on an extremely latency-sensitive server, like for high-frequency trading, Rust could be better. Otherwise, it's likely not worth the refactoring slowdowns.
+    * MMM isn't quite advisable for anything exposed to the internet.
+ * When making a turn-based game, or the non-engine parts of a real-time game, something GC'd is a stellar choice. They offer great development velocity, garbage collections can happen in-between user actions, and they have value types (`struct`) for the more performance-sensitive areas.
+ * GC is a good choice for web, mobile, and desktop apps, for the same reason.
+ * When making a real-time game engine or a multiplayer game, Rust is likely the best bet, as it suffers no pauses while remaining secure.
+    * If it's a single player game, then security matters less, and MMM can be a better choice if assisted with good tooling, and especially if using proper architecture.
  * If working on something that needs high reliability and correctness, look into something like Pony. It's run-time is guaranteed to never cause a run-time error that's not explicitly created by the user.
 
 
 There are also a lot of other languages improving, blending, and even creating new memory safety paradigms.
-
-
-Of course, one should consider all this in context. Developer velocity is one of the most important factors in language choice, but not the only factor:
-
- * An open-source project might want a language that encourages simplicity more, for a healthier community of contributors.
- * A real-time first-person shooter game would still want an approach with more predictable performance, even if it takes longer to code.
- * A safety critical application would still want an approach that encourages more correctness, even at the cost of developer velocity.
 
 
 I hope this post has given you a broader perspective on how various memory safety approaches affect development velocity!

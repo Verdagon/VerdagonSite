@@ -36,7 +36,7 @@ pure func SumList(list &List<int>) int {
   sum = 0;
   i = 0;
   while i < list.size() { «foreach»
-    sum += list.get(i);
+    set sum = sum + list.get(i);
   }
   return sum;
 }
@@ -50,7 +50,7 @@ func SumList<r' imm, x' rw>(list &r'List<r'int>) 'int { «iso»
   sum x'int = 0;
   i x'int = 0;
   while i < list.size() {
-    sum += list.get(i);
+    set sum = sum + list.get(i);
   }
   return iso(sum); «isoint»
 }
@@ -82,6 +82,7 @@ func thrice(a int) int {
   result = a + a + a;
   return result;
 }
+```
 
 needs to become this:
 
@@ -234,7 +235,7 @@ The internet often makes fun of Go for taking ten years to add their generics. H
 The problem is that I'm just an engineer with some skills in data structures and architecture. I'm not a type theoretician, and this more mathematical abstract thinking doesn't come naturally to me. With generics, we're taking abstract thinking to a whole new level: we're type-checking functions that don't exist yet, conjuring "placeholder" types, and putting bounds information in places that I didn't even know existed.
 
 
-If you want to hear more about how crazy generics are, check out [How Summoning Golems Helps Us Understand Generics](/blog/summoning-golems-generics] and [When a Language Should Have Generics, Templates, or Both](/blog/templates-generics-blend.vmd). I can't promise they'll make sense, but I _can_ promise that it felt _very_ good to rant about generics in them.
+If you want to hear more about how crazy generics are, check out [How Summoning Golems Helps Us Understand Generics](/blog/summoning-golems-generics) and [When a Language Should Have Generics, Templates, or Both](/blog/templates-generics-blend.vmd). I can't promise they'll make sense, but I _can_ promise that it felt _very_ good to rant about generics in them.
 
 
 I also want to give a shout-out to the amazing people in my server who helped me get through the journey. Huge thanks to Jon Goodwin (of [Cone](cone.jondgoodwin.com/)), Arthur Weagel, Ivo Balbaert, RazzBerry, zikzak323, Zodey, keeslinp, mikey, IsaacPaul, kurtkuehnert, DestyNova, librarianmage, devast8a, and cristian.vasile! I'm not sure I could have finished without their support and positive energy. You all are awesome!
@@ -259,6 +260,7 @@ func thrice(a int) int {
   result = a + a + a;
   return result;
 }
+```
 
 ...into this function:
 

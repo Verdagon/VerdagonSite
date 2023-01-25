@@ -175,7 +175,7 @@ func callerFuncA() {
   myShips = List<Ship>();
   myShips.add(Ship(10));
   myShips.add(Ship(20));
-  ...
+  // …
   printShipNames(&myShips);
 }
 
@@ -227,8 +227,8 @@ We then hand this raw reference to `printShipNames`, in this example.
 ////
 ```vale
 func callerFuncB() {
-  myShips &List<Ship> = ...;
-  ...
+  myShips &List<Ship> = …;
+  // …
   // Generation pre-check here
   printShipNames(&myShips);
 }

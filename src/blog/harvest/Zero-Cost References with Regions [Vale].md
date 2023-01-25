@@ -488,7 +488,7 @@ completely avoided malloc and free overhead.
     > allocation.
 
 The only memory overhead we pay is when we copy findNearbyUnits\'s \'i
-List\<\'r &Unit\> result from the pool region into the caller\'s region.
+List\<&r\'Unit\> result from the pool region into the caller\'s region.
 
 Because Vale makes it so easy to optimize with pool allocation, Vale
 could become the obvious choice for performance-critical software.
