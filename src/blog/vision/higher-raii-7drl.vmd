@@ -28,7 +28,7 @@ This was the first year I used the [Vale programming language](https://vale.dev/
 Vale is bringing three innovations into the programming languages world:
 
  * Generational references, where the compiler will make sure the object is alive when we dereference a reference to it. [# Generational references are faster than reference counting, and gives us control over our memory layouts for better performance. It's also more flexible than borrow checking, and gives us more freedom with our architectures!]
- * The [region borrow checker](/blog/zero-cost-memory-safety-regions-overview) (mentioned in [Seamless, Fearless, and Structured Concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency)) which improves upon Rust's borrow checker to handle shared mutable objects.
+ * The [region borrow checker](/blog/zero-cost-borrowing-regions-overview) (mentioned in [Seamless, Fearless, and Structured Concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency)) which improves upon Rust's borrow checker to handle shared mutable objects.
  * *Higher RAII*, where we can tell the compiler to make sure we call a function at some point in the future.
 
 
@@ -249,7 +249,7 @@ C++ has had regular RAII since the 90s, and D and Rust have picked it up since t
 This is mostly because of their decisions w.r.t. exceptions and stack-unwinding. When a C++ exception is in flight, or a Rust panic is unwinding the stack, they call the destructors for any object they're destroying.
 
 
-Vale has a different approach. Basically, when a panic happens, we blast away only the containing region [# There are various ways to make new regions, such as creating a thread or mutex or `iso` object, or "try-calling" a pure function, etc.] and allow the rest of the program to continue running. [# The [region borrow checker](https://verdagon.dev/blog/zero-cost-memory-safety-regions-overview) tracks which objects are in which regions.]
+Vale has a different approach. Basically, when a panic happens, we blast away only the containing region [# There are various ways to make new regions, such as creating a thread or mutex or `iso` object, or "try-calling" a pure function, etc.] and allow the rest of the program to continue running. [# The [region borrow checker](https://verdagon.dev/blog/zero-cost-borrowing-regions-overview) tracks which objects are in which regions.]
 
 To deal with any open resources (like file descriptors, mutex locks, etc), we can either:
 

@@ -284,7 +284,7 @@ In this quest, we've discovered and implemented a lot of new techniques:
 
 These techniques have also opened up some new emergent possibilities, which we hope to implement:
 
- * [Region Borrow Checking](/blog/zero-cost-memory-safety-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Region Borrow Checking](/blog/zero-cost-borrowing-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
  * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
  * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
  * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.

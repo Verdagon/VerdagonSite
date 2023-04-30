@@ -45,8 +45,8 @@
       </item>
 
       <item>
-         <guid>https://verdagon.dev/blog/zero-cost-memory-safety-regions-part-1-pure-functions</guid>
-         <link>https://verdagon.dev/blog/zero-cost-memory-safety-regions-part-1-pure-functions</link>
+         <guid>https://verdagon.dev/blog/zero-cost-borrowing-regions-part-1-pure-functions</guid>
+         <link>https://verdagon.dev/blog/zero-cost-borrowing-regions-part-1-pure-functions</link>
          <pubDate>Sat, 23 July 2022 10:15:00 -0400</pubDate>
          <category>Programming Languages</category>
          <category>Vale Programming Language</category>

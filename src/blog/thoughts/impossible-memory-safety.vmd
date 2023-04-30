@@ -148,10 +148,6 @@ Every real-world program will have inherent shared mutability. Even if we "refer
 
 
 
-
-
-
-
 As we just saw, when we translate another language's pointer or reference to Rust, all of the available options have some overhead.
 
 
@@ -206,7 +202,7 @@ Luckily, crates like
 
 
 
-[Vale](https://vale.dev/) uses the same combination, but from the other direction: it uses generational references by default under the hood, combined with static analysis, [immutability](https://verdagon.dev/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing), and [regions](https://verdagon.dev/blog/zero-cost-memory-safety-regions-overview) for something that's surprisingly similar to the combination of generational indices and borrow checking, without the borrow checker's restrictions.
+[Vale](https://vale.dev/) uses the same combination, but from the other direction: it uses generational references by default under the hood, combined with static analysis, [immutability](https://verdagon.dev/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing), and [regions](https://verdagon.dev/blog/zero-cost-borrowing-regions-overview) for something that's surprisingly similar to the combination of generational indices and borrow checking, without the borrow checker's restrictions.
 
 
 
@@ -342,3 +338,7 @@ There are twelve ways to achieve memory safety, and none of them are actually ze
 
 
 This is no surprise to those who work on languages, but it's often news to others, so here's an article explaining why!
+
+
+"the borrow checker actually does cause more overhead, but disguises it as bounds checking, like a person hiding their personal costs in a non-taxable business account."
+

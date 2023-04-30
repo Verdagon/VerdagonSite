@@ -14,7 +14,7 @@ sponsor: us
 A few years ago, a [2am realization](/blog/making-regions-part-1-human-factor) changed the course of my life forever, and eventually turned me into a nomadic hermit [# Or rather a "digital nomad" as it's said these days! The details of how Vale turned me purposefully homeless is a ridiculous story worthy of another entire blog post.] and language designer.
 
 
-The realization was that we could use [regions](/blog/zero-cost-memory-safety-regions-overview) to eliminate memory safety overhead when we access data. It's something weird and new, like borrow checking without the reference restrictions, or perhaps more like if C++'s `const` and D's `pure` had a demonic hellspawn lovechild. [# My editor told me to take this line out, but all my beta readers told me to keep it in.]
+The realization was that we could use [regions](/blog/zero-cost-borrowing-regions-overview) to eliminate memory safety overhead when we access data. It's something weird and new, like borrow checking without the reference restrictions, or perhaps more like if C++'s `const` and D's `pure` had a demonic hellspawn lovechild. [# My editor told me to take this line out, but all my beta readers told me to keep it in.]
 
 
 [Last time](/blog/making-regions-part-1-human-factor), I talked about how the first step towards implementing regions was to make the compiler's backend [# The "backend" is the part that takes Vale's representation of the code, and converts it into a form that LLVM is able to turn into binary code. I suppose one could be said LLVM is the _real_ backend, but I consider LLVM to be more the back-back-end, I suppose.] aware of multiple regions. After that, it was just another three weeks to make the first feature that used regions under the hood: [Fearless FFI](https://verdagon.dev/blog/fearless-ffi).
@@ -66,7 +66,7 @@ If you're curious, here's what just happened:
  * It notes that all data created inside the function is in the read-write region `x'`.
 
 
-In other words, it *assigns a region* to every type. `List<int>` becomes `r'List<r'int>`, to know that the list and its contents both came into the pure function. Check out [Immutable Region Borrowing](https://verdagon.dev/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing) for more on this! [#tricky]
+In other words, it *assigns a region* to every type. `List<int>` becomes `r'List<r'int>`, to know that the list and its contents both came into the pure function. Check out [Immutable Region Borrowing](https://verdagon.dev/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing) for more on this! [#tricky]
 
 
 Vale's compiler isn't at that point yet, of course. It currently acts like every other language, where all data in a function is in the same region.
@@ -102,11 +102,11 @@ I thought so too!
 
 
 <slice>
-#tricky: This is already looking tricky, and we aren't even at the more advanced region features like [custom isolates](/blog/zero-cost-memory-safety-regions-part-2-isolates), [one-way isolation](/blog/zero-cost-memory-safety-regions-part-3-one-way-isolation), [multi-region data](/blog/zero-cost-memory-safety-regions-part-4-multi-region-data), or [region-scoped data](/blog/zero-cost-memory-safety-regions-part-5-region-scoped-data). I try not to think about that too much.
+#tricky: This is already looking tricky, and we aren't even at the more advanced region features like [custom isolates](/blog/zero-cost-borrowing-regions-part-2-isolates), [one-way isolation](/blog/zero-cost-borrowing-regions-part-3-one-way-isolation), [multi-region data](/blog/zero-cost-borrowing-regions-part-4-multi-region-data), or [region-scoped data](/blog/zero-cost-borrowing-regions-part-5-region-scoped-data). I try not to think about that too much.
 
 #foreach: One would normally use a `foreach` here, but we're showing a more primitive function so the upcoming transform is a little clearer.
 
-#iso: `'T` means an "isolated" `T`. It means nothing points at the `T`, nothing inside the `T` points out, and nothing outside the `T` points in. See [this explanation](/blog/zero-cost-memory-safety-regions-part-2-isolates) for more. Anything returned from a pure function is automatically isolated. In this case, `'int` is later simplified to just `int` since it's a value type.
+#iso: `'T` means an "isolated" `T`. It means nothing points at the `T`, nothing inside the `T` points out, and nothing outside the `T` points in. See [this explanation](/blog/zero-cost-borrowing-regions-part-2-isolates) for more. Anything returned from a pure function is automatically isolated. In this case, `'int` is later simplified to just `int` since it's a value type.
 
 #isoint: Value automatically "isolates" anything that a pure function returns, so that it can be merged into the caller's region. This `iso` function can sometimes have a run-time cost for more complex data structures, but that can be avoided if the user manually assembles an isolate instead.
 
@@ -325,7 +325,7 @@ In this quest, we've discovered and implemented a lot of new techniques:
 
 These techniques have also opened up some new emergent possibilities, which we hope to implement:
 
- * [Region Borrow Checking](/blog/zero-cost-memory-safety-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Region Borrow Checking](/blog/zero-cost-borrowing-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
  * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
  * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
  * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.

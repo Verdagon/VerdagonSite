@@ -4,7 +4,7 @@ subtitle: Watch regions eliminate memory safety overhead!
 author: Evan Ovadia
 date: Nov 14, 2022
 realm: blog
-path: blog/zero-cost-memory-safety-regions-overview
+path: blog/zero-cost-borrowing-regions-overview
 layout: annotated
 namespace: c-blog m-annotated
 sponsor: us
@@ -29,7 +29,7 @@ The first technique is called [generational references](/blog/generational-refer
 We can make it even faster by combining it with a new technique called *regions*. [# Regions also power Vale's more interesting features like [Seamless, Fearless, Structured Concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), [Fearless FFI](/blog/next-fearless-ffi), allocators, and [hybrid-generational memory](https://verdagon.dev/blog/hybrid-generational-memory).]
 
 
-This article is a summary of the [five-part series](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing) explaining regions, check that out if you want more details!
+This article is a summary of the [five-part series](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing) explaining regions, check that out if you want more details!
 
 
 <slice />
@@ -133,7 +133,7 @@ void {
 >>>>
 
 
-This is only a high-level taste, check out [Immutable Region Borrowing](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing) for more on how this works!
+This is only a high-level taste, check out [Immutable Region Borrowing](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing) for more on how this works!
 
 
 It's pretty easy to do this for any function that only _reads_ from its parameters. And in practice, functions can often be adjusted to be read-only, so that they can add the `pure` keyword too.
@@ -177,7 +177,7 @@ The compiler uses these region markers to make sure that:
  1. A reference into a region doesn't outlive the region itself.
 
 
-For more on this, check out [Immutable Region Borrowing](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing).
+For more on this, check out [Immutable Region Borrowing](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing).
 
 
 Before we talk about the other ways to put data into regions, let's talk about the *motivating principles* behind regions!
@@ -270,7 +270,7 @@ Lastly, we can use `.read`, which gives us read-only access while allowing it to
 Note that isolates are a little more restricted when inside structs. We can avoid those restrictions by using a *cell*, like `''Cannon`, which moves the `.imm`-versus-`.open` check to run-time.
 
 
-Check out [Isolates](/blog/zero-cost-memory-safety-regions-part-2-isolates) for more!
+Check out [Isolates](/blog/zero-cost-borrowing-regions-part-2-isolates) for more!
 
 
 <slice>
@@ -314,7 +314,7 @@ We also get this for free if we use generics. The compiler assumes that the `T` 
 
 
 
-Check out [One-way Isolation](/blog/zero-cost-memory-safety-regions-part-3-one-way-isolation) for more on this!
+Check out [One-way Isolation](/blog/zero-cost-borrowing-regions-part-3-one-way-isolation) for more on this!
 
 
 <slice />
@@ -323,12 +323,12 @@ Check out [One-way Isolation](/blog/zero-cost-memory-safety-regions-part-3-one-w
 # And so much more!
 
 
-There are a lot of interesting aspects in the [five-part series](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing) that aren't covered here, such as:
+There are a lot of interesting aspects in the [five-part series](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing) that aren't covered here, such as:
 
  * Every mutex contains an isolate! [# Plus, every global is in a mutex, so every global has a isolate.]
- * We saw non-owning references to other regions, but a struct can actually _contain_ another region's data. [# Collections do this. For example, we can have a `List<x'Ship>`, where each List node literally contains and owns some data from region `x'`.] [Multi-Region Data](/blog/zero-cost-memory-safety-regions-part-4-multi-region-data) explains more on this.
+ * We saw non-owning references to other regions, but a struct can actually _contain_ another region's data. [# Collections do this. For example, we can have a `List<x'Ship>`, where each List node literally contains and owns some data from region `x'`.] [Multi-Region Data](/blog/zero-cost-borrowing-regions-part-4-multi-region-data) explains more on this.
  * Regions help enable [Seamless, Fearless, Structured Concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency).
- * Structs can immutably borrow from isolates. This is how Vale achieves zero-cost iteration, and makes entire architectures like [entity-component-system](https://en.wikipedia.org/wiki/Entity_component_system) zero-cost. [Scoped Data](/blog/zero-cost-memory-safety-regions-part-5-region-scoped-data) has more on this!
+ * Structs can immutably borrow from isolates. This is how Vale achieves zero-cost iteration, and makes entire architectures like [entity-component-system](https://en.wikipedia.org/wiki/Entity_component_system) zero-cost. [Scoped Data](/blog/zero-cost-borrowing-regions-part-5-region-scoped-data) has more on this!
  * [Fearless FFI](/blog/next-fearless-ffi) uses regions under the hood, to give us memory safety even when interacting with non-memory-safe languages.
  * We can attach an allocator to an isolate, such as `BumpAllocator^'Fleet`. [# Actual syntax TBD.]
  * We can completely contain a third-party library's code inside an isolate if we wanted to; isolates are very composable.
@@ -383,11 +383,11 @@ As we saw, regions let us temporarily freeze specific data in our program, to le
 
 If you want to learn more, check out the more in-depth series:
 
- * [Part 1: Immutable Region Borrowing](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing) shows how we can use pure functions to temporarily freeze and get zero-cost access to all pre-existing memory.
- * [Part 2: Isolates](/blog/zero-cost-memory-safety-regions-part-2-isolates) covers how we can freeze data even without pure functions.
- * [Part 3: One-way Isolation](/blog/zero-cost-memory-safety-regions-part-3-one-way-isolation) shows how isolates can have references outside themselves, which is great for optimizing objects' private data.
- * [Part 4: Multi-Region Data](/blog/zero-cost-memory-safety-regions-part-4-multi-region-data) shows how an object or array can contain other regions' objects inline.
- * [Part 5: Scoped Data](/blog/zero-cost-memory-safety-regions-part-5-region-scoped-data) shows how regions make iteration zero-cost, such as in [entity-component-system](https://en.wikipedia.org/wiki/Entity_component_system) architectures.
+ * [Part 1: Immutable Region Borrowing](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing) shows how we can use pure functions to temporarily freeze and get zero-cost access to all pre-existing memory.
+ * [Part 2: Isolates](/blog/zero-cost-borrowing-regions-part-2-isolates) covers how we can freeze data even without pure functions.
+ * [Part 3: One-way Isolation](/blog/zero-cost-borrowing-regions-part-3-one-way-isolation) shows how isolates can have references outside themselves, which is great for optimizing objects' private data.
+ * [Part 4: Multi-Region Data](/blog/zero-cost-borrowing-regions-part-4-multi-region-data) shows how an object or array can contain other regions' objects inline.
+ * [Part 5: Scoped Data](/blog/zero-cost-borrowing-regions-part-5-region-scoped-data) shows how regions make iteration zero-cost, such as in [entity-component-system](https://en.wikipedia.org/wiki/Entity_component_system) architectures.
 
 
 *That's all for now!* We hope you enjoyed this article. If you want more, then subscribe to our [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), [discord server](https://discord.gg/SNB8yGH), or [subreddit](https://reddit.com/r/vale)!
@@ -440,7 +440,7 @@ In this quest, we've discovered and implemented a lot of new techniques:
 
 These techniques have also opened up some new emergent possibilities, which we hope to implement:
 
- * [Region Borrow Checking](/blog/zero-cost-memory-safety-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Region Borrow Checking](/blog/zero-cost-borrowing-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
  * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
  * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
  * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.

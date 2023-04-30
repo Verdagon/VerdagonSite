@@ -19,7 +19,7 @@ I use this site to blog about my endeavors. Enjoy!
 
  * [Memory Safety Approaches and Development Velocity](/blog/when-to-use-memory-safe-part-2)
  * [Implementing a New Memory Safety Approach, Part 1](/blog/making-regions-part-1-human-factor)
- * [Zero-Cost Memory Safety with Vale Regions (Preview)](/blog/zero-cost-memory-safety-regions-overview)
+ * [Zero-Cost Memory Safety with Vale Regions (Preview)](/blog/zero-cost-borrowing-regions-overview)
  * [Hash Codes, Non-Determinism, and Other Eldritch Horrors](/blog/generics-hash-codes-horrors)
  * [Safety in Non-Memory-Safe Languages](/blog/when-to-use-memory-safe-part-1)
  * [Perfect Replayability](/blog/perfect-replayability-prototyped)
@@ -86,7 +86,7 @@ I'm combining the best parts of C++, Rust, and Scala (and even a tiny bit of Jav
 
  * Generational Memory, an alternative to RC, GC, or borrow checking.
  * HGM, speeding up Generational Memory with "LifeCell"s.
- * [Region Borrow Checking](/blog/zero-cost-memory-safety-regions-overview), which allows us to temporarily treat all pre-existing memory as immutable, enabling optimizations and seamless structured concurrency.
+ * [Region Borrow Checking](/blog/zero-cost-borrowing-regions-overview), which allows us to temporarily treat all pre-existing memory as immutable, enabling optimizations and seamless structured concurrency.
 
 Check it out at [https://vale.dev/](https://vale.dev/)!
 

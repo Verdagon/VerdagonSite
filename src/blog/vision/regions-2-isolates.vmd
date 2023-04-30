@@ -4,7 +4,7 @@ subtitle: Watch how we split our memory into regions, for more performance!
 author: Evan Ovadia
 date: Preview, Draft
 realm: blog
-path: blog/zero-cost-memory-safety-regions-part-2-isolates
+path: blog/zero-cost-borrowing-regions-part-2-isolates
 layout: annotated
 namespace: c-blog m-annotated
 sponsor: us
@@ -20,7 +20,7 @@ Vale has an ambitious goal: to be fast, memory safe, and most importantly, _easy
 To do this, we're harnessing a new concept called *regions*.
 
 
-In [Part 1](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing), we saw how we can use `pure` functions to easily "immutably borrow" a region, to eliminate memory safety costs when accessing it.
+In [Part 1](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing), we saw how we can use `pure` functions to easily "immutably borrow" a region, to eliminate memory safety costs when accessing it.
 
 
 That works really well for the sections of our program that can be phrased as pure functions. [#puref]
@@ -46,9 +46,9 @@ Some examples:
  * A message sent via a channel from one thread to another would be an isolate, giving a language [fearless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency).
 
 
-By default, nothing _inside_ an isolate can point _out_ either, though [Part 3](/blog/zero-cost-memory-safety-regions-part-3-one-way-isolation) shows how we can enable that using *one-way isolation*. Most private data can actually be expressed very cleanly with one-way isolation. [# `pure` functions use it under the hood as well, if you squint hard enough.]
+By default, nothing _inside_ an isolate can point _out_ either, though [Part 3](/blog/zero-cost-borrowing-regions-part-3-one-way-isolation) shows how we can enable that using *one-way isolation*. Most private data can actually be expressed very cleanly with one-way isolation. [# `pure` functions use it under the hood as well, if you squint hard enough.]
 
-[Part 4](/blog/zero-cost-memory-safety-regions-part-4-multi-region-data) also shows how one-way isolation can make certain patterns (iterating, determinants, etc.) and entire architectures (like [entity-component-system](https://en.wikipedia.org/wiki/Entity_component_system)) zero-cost. [# Together, isolates, `pure` functions, and one-way isolation combine to form something that looks suspiciously like an entire new programming paradigm... whether that's true remains to be seen!]
+[Part 4](/blog/zero-cost-borrowing-regions-part-4-multi-region-data) also shows how one-way isolation can make certain patterns (iterating, determinants, etc.) and entire architectures (like [entity-component-system](https://en.wikipedia.org/wiki/Entity_component_system)) zero-cost. [# Together, isolates, `pure` functions, and one-way isolation combine to form something that looks suspiciously like an entire new programming paradigm... whether that's true remains to be seen!]
 
 For the rest of this post though, we'll focus on regular isolates, where nothing inside can point out.
 
@@ -74,7 +74,7 @@ One would `'`-annotate only the parts of their program that profiling suggests w
 We can immutably borrow an isolate's data, allowing the compiler to skip generation checks when reading it. This can make our code faster.
 
 
-This is the same mechanism used by `pure` functions, described in [Part 1](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing#how-regions-work).
+This is the same mechanism used by `pure` functions, described in [Part 1](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing#how-regions-work).
 
 
 This allows us to get the optimization benefits of affine types (like those seen in Rust and Cyclone), but with a vital improvement: it doesn't have aliasing restrictions, and enables techniques and optimizations that require shared mutability. [# Techniques like [intrusive data structures](https://lwn.net/Articles/907876/) and [graphs](https://news.ycombinator.com/item?id=24996001), plus useful patterns like [observers](https://www.reddit.com/r/rust/comments/pwqju6/is_there_an_underlying_reason_that_idiomatic_rust/), [back-references](https://users.rust-lang.org/t/back-reference-to-the-parent-struct/7413/2), [dependency references](https://en.wikipedia.org/wiki/Dependency_injection), [callbacks](https://news.ycombinator.com/item?id=12029238), [delegates](https://medium.com/@nimjea/delegation-pattern-in-swift-4-2-f6aca61f4bf5) and many forms of RAII and [higher RAII](https://verdagon.dev/blog/higher-raii-7drl).]
@@ -540,13 +540,13 @@ There are some details we didn't cover in the article:
  * We can completely contain a third-party library's code inside an isolate if we wanted to; isolates are very composable.
 
 
-[Part 3](/blog/zero-cost-memory-safety-regions-part-3-one-way-isolation) also shows how an isolate's contents can point outside the isolate using *one-way isolation*, which fits well with most structs' private data.
+[Part 3](/blog/zero-cost-borrowing-regions-part-3-one-way-isolation) also shows how an isolate's contents can point outside the isolate using *one-way isolation*, which fits well with most structs' private data.
 
 
-[Part 4](/blog/zero-cost-memory-safety-regions-part-4-multi-region-data) shows how we can have one object contain another region's data inline.
+[Part 4](/blog/zero-cost-borrowing-regions-part-4-multi-region-data) shows how we can have one object contain another region's data inline.
 
 
-[Part 5](/blog/zero-cost-memory-safety-regions-part-5-region-scoped-data) then shows how to combine that with one-way isolation to make certain patterns (iterating collections, calculating determinants, etc.) and entire architectures (like entity-component-system) zero-cost. [# Together, isolates, `pure` functions, and one-way isolation combine to form something that looks suspiciously like an entire new programming paradigm... whether that's true remains to be seen!]
+[Part 5](/blog/zero-cost-borrowing-regions-part-5-region-scoped-data) then shows how to combine that with one-way isolation to make certain patterns (iterating collections, calculating determinants, etc.) and entire architectures (like entity-component-system) zero-cost. [# Together, isolates, `pure` functions, and one-way isolation combine to form something that looks suspiciously like an entire new programming paradigm... whether that's true remains to be seen!]
 
 
 
@@ -608,7 +608,7 @@ In this quest, we've discovered and implemented a lot of new techniques:
 
 These techniques have also opened up some new emergent possibilities, which we hope to implement:
 
- * [Region Borrow Checking](/blog/zero-cost-memory-safety-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Region Borrow Checking](/blog/zero-cost-borrowing-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
  * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
  * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
  * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.

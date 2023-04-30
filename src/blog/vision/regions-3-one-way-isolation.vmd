@@ -4,7 +4,7 @@ subtitle: Watch how we split our memory into regions, for more performance!
 author: Evan Ovadia
 date: Preview, Draft
 realm: blog
-path: blog/zero-cost-memory-safety-regions-part-3-one-way-isolation
+path: blog/zero-cost-borrowing-regions-part-3-one-way-isolation
 layout: annotated
 namespace: c-blog m-annotated
 sponsor: us
@@ -20,10 +20,10 @@ Vale has an ambitious goal: to be fast, memory safe, and most importantly, _easy
 To do this, we're harnessing a new concept called *regions*.
 
 
-In [Part 1](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing) we saw how we can use *pure functions* to easily *immutably borrow* data to make it faster to access.
+In [Part 1](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing) we saw how we can use *pure functions* to easily *immutably borrow* data to make it faster to access.
 
 
-[Part 2](/blog/zero-cost-memory-safety-regions-part-2-isolates) showed us how we could more precisely create regions via *isolates*, and immutably borrow them too.
+[Part 2](/blog/zero-cost-borrowing-regions-part-2-isolates) showed us how we could more precisely create regions via *isolates*, and immutably borrow them too.
 
 
 The isolates we've seen so far have had *complete isolation*: no outside data can point to any inside data, and vice versa. This is useful for a lot of things, but there are times when we want inside data to point out.
@@ -202,7 +202,7 @@ In a way, regions and isolation allow us to get the optimization power of borrow
 As we saw, one-way isolation can allow us to use isolation even for data that points to things outside itself.
 
 
-[Part 4](/blog/zero-cost-memory-safety-regions-part-4-multi-region-data) shows how one object can contain another region's data inline, and [Part 5](/blog/zero-cost-memory-safety-regions-part-5-region-scoped-data) shows how that combined with one-way isolation can make certain patterns (iterating collections, calculating determinants, etc.) and entire architectures (like entity-component-system) zero-cost. [# Together, isolates, `pure` functions, and one-way isolation combine to form something that looks suspiciously like an entire new programming paradigm... whether that's true remains to be seen!]
+[Part 4](/blog/zero-cost-borrowing-regions-part-4-multi-region-data) shows how one object can contain another region's data inline, and [Part 5](/blog/zero-cost-borrowing-regions-part-5-region-scoped-data) shows how that combined with one-way isolation can make certain patterns (iterating collections, calculating determinants, etc.) and entire architectures (like entity-component-system) zero-cost. [# Together, isolates, `pure` functions, and one-way isolation combine to form something that looks suspiciously like an entire new programming paradigm... whether that's true remains to be seen!]
 
 
 
@@ -267,7 +267,7 @@ In this quest, we've discovered and implemented a lot of new techniques:
 
 These techniques have also opened up some new emergent possibilities, which we hope to implement:
 
- * [Region Borrow Checking](/blog/zero-cost-memory-safety-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Region Borrow Checking](/blog/zero-cost-borrowing-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
  * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
  * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
  * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.

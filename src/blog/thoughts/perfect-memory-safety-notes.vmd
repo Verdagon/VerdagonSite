@@ -29,3 +29,22 @@ Type 1 means that a correct program will eventually fail. That's not the case wi
 
 
  or atomic reference counting which could overflow
+
+
+
+
+ 
+
+To the developer there is no difference, but it does change Vale's approach to security.
+
+
+There are four factors in gauging the effectiveness of any password-based system:
+
+ * The password's length, or the probability of guessing it.
+ * Whether we can predict a password.
+ * The cost of guessing a password.
+ * The consequences of a failed challenge, in other words a generation check failure.
+
+
+
+

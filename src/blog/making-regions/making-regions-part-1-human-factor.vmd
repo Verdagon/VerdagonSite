@@ -20,10 +20,10 @@ Suddenly, my eyes flew open as a realization hit me.
 That realization sparked a chain reaction of events that spanned years, and led to discovering an entire new memory safety approach.
 
 
-This is the first post (of hopefully many!) about the journey of creating, designing, and implementing *[regions](/blog/zero-cost-memory-safety-regions-overview)*, a static analysis technique that lets us make *efficient, memory-safe code without garbage collection, reference counting, or a borrow checker.*
+This is the first post (of hopefully many!) about the journey of creating, designing, and implementing *[regions](/blog/zero-cost-borrowing-regions-overview)*, a static analysis technique that lets us make *efficient, memory-safe code without garbage collection, reference counting, or a borrow checker.*
 
 
-This post in particular talks about what originally led to the idea, and the first bits of implementation. If you instead want to learn about regions themselves, head over to [the regions overview](/blog/zero-cost-memory-safety-regions-overview)! [# If you like this post, consider submitting it to Hacker News, Reddit, or your favorite link aggregator! It helps me out a lot, and helps spread these ideas more widely.]
+This post in particular talks about what originally led to the idea, and the first bits of implementation. If you instead want to learn about regions themselves, head over to [the regions overview](/blog/zero-cost-borrowing-regions-overview)! [# If you like this post, consider submitting it to Hacker News, Reddit, or your favorite link aggregator! It helps me out a lot, and helps spread these ideas more widely.]
 
 
 # Regions and the Chronobase
@@ -49,10 +49,10 @@ After the challenge, I wanted to write functions in the chronobase language, not
 For various reasons, I decided that the outside objects (the ones given as inputs to these functions) would be immutable. An outside Goblin would be `r'Goblin` and immutable, while a Goblin already in the database would be `db'Goblin` and mutable.
 
 
-And at 2am, that fateful night, it occurred to me that *we can skip reference counting and generation checks* for any of these inputs (like `r'Goblin`) because they're *temporarily immutable* while we're inside the function. [# This idea eventually evolved into [immutable borrowing](https://verdagon.dev/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing), the core concept that enables regions.]
+And at 2am, that fateful night, it occurred to me that *we can skip reference counting and generation checks* for any of these inputs (like `r'Goblin`) because they're *temporarily immutable* while we're inside the function. [# This idea eventually evolved into [immutable borrowing](https://verdagon.dev/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing), the core concept that enables regions.]
 
 
-If you're curious about why this works, check out [the explanation](/blog/zero-cost-memory-safety-regions-overview), but for now I'll continue the tale!
+If you're curious about why this works, check out [the explanation](/blog/zero-cost-borrowing-regions-overview), but for now I'll continue the tale!
 
 
 <slice>
@@ -84,7 +84,7 @@ It _kind of_ made sense.
 And then I noticed a triple-underlined statement: *"can skip run-time safety overhead!"*.
 
 
-"Holy hells!" I said to myself and sprang out of bed. It all came rushing back, and I finally remembered all the details. [# At the time, Vale was based on a single-ownership form of reference counting called [constraint references](https://verdagon.dev/blog/raii-next-steps), and Night Evan had realized that references into immutable regions could [completely skip the reference counting overhead](/blog/zero-cost-refs-regions). Nowadays, Vale is based on [generational references](/blog/generational-references), but regions have the [same optimizing effect](/blog/zero-cost-memory-safety-regions-overview) for them too.]
+"Holy hells!" I said to myself and sprang out of bed. It all came rushing back, and I finally remembered all the details. [# At the time, Vale was based on a single-ownership form of reference counting called [constraint references](https://verdagon.dev/blog/raii-next-steps), and Night Evan had realized that references into immutable regions could [completely skip the reference counting overhead](/blog/zero-cost-refs-regions). Nowadays, Vale is based on [generational references](/blog/generational-references), but regions have the [same optimizing effect](/blog/zero-cost-borrowing-regions-overview) for them too.]
 
 
 With this technique, it might be possible to skip almost all memory-safety overhead in a program, and it didn't even require aliasing restrictions! [# It's generally impossible to skip _all_ memory safety overhead in a program. One will always need at least bounds checking.] [# This is referring to the borrow checker's restrictions, which enforce that nobody else can have a reference to anything that might be modified.]
@@ -104,7 +104,7 @@ I posted the designs, and people started reaching out to me about other designs 
 I'm told that regions look like some sort of unified generalized form of affine typing (one of the concepts underlying Rust's borrow checker), Pony's [iso permission](https://tutorial.ponylang.io/reference-capabilities/reference-capabilities.html#isolated-data-is-safe), and a few other languages' mechanisms, all combined into one.
 
 
-I hammered on this design in my head for a long time while I built out Vale's foundations. [# I haven't stopped hammering on it in my mind, even now. People still find me randomly staring at walls, thinking about regions. It's only mildly concerning.] [# The biggest revelation came when I was lying on the floor in a random Georgia AirBnB named "Little Mexico" when I realized that we could make "one-way isolation". Check out [One-way Isolation](/blog/zero-cost-memory-safety-regions-part-3-one-way-isolation) for more on this, it's pretty trippy.] Eventually, generational references and regions combined to form something that looked suspiciously like an entire new paradigm. [# One person in our server described it as a "higher-level, more precise, opt-in Rust".]
+I hammered on this design in my head for a long time while I built out Vale's foundations. [# I haven't stopped hammering on it in my mind, even now. People still find me randomly staring at walls, thinking about regions. It's only mildly concerning.] [# The biggest revelation came when I was lying on the floor in a random Georgia AirBnB named "Little Mexico" when I realized that we could make "one-way isolation". Check out [One-way Isolation](/blog/zero-cost-borrowing-regions-part-3-one-way-isolation) for more on this, it's pretty trippy.] Eventually, generational references and regions combined to form something that looked suspiciously like an entire new paradigm. [# One person in our server described it as a "higher-level, more precise, opt-in Rust".]
 
 
 <slice />
@@ -215,7 +215,7 @@ In this quest, we've discovered and implemented a lot of new techniques:
 
 These techniques have also opened up some new emergent possibilities, which we hope to implement:
 
- * [Region Borrow Checking](/blog/zero-cost-memory-safety-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Region Borrow Checking](/blog/zero-cost-borrowing-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
  * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
  * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
  * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.

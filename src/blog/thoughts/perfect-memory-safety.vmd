@@ -25,10 +25,16 @@ Our first approach had "perfect memory safety"; it could be mathematically prove
 We later realized that if we *randomized* the generation instead, and allowed repeats, we could unlock some really powerful optimizations. Suddenly, we could put objects directly on the stack and inside other structs and arrays.
 
 
+Conceptually, it means that generations work like *passwords*, where every object has a password and every reference remembers it. And like any password-based system, we can be confident in the mechanism's security by making these passwords (generations) unobservable, unpredictable, and prohibitively costly to guess.
+
+
+Before we talk about the security aspect, let's talk about the theory.
+
+
 ## False Negatives
 
 
-The implication, of course, is that a "false negative" is possible. A false negative is when we destroy an object and later create a new object in its place which randomly has the same generation, and a use-after-free for the old object isn't detected because the generations match.
+This change means that a "generation check false positive" is theoretically possible. A false positive is when we destroy an object and later create a new object in its place which randomly has the same generation, and a use-after-free for the old object isn't detected because the generations match.
 
 
 Before we talk about how we address this, let's acknowledge that this *only affects erroneous code*. It doesn't mean a working program will randomly fail; it only affects the error detection mechanism.
@@ -93,6 +99,53 @@ If one needs theoretical perfection, then one should probably not use Vale, C, J
 
 
 I hope this helped, and feel free to come by the [discord server](https://discord.gg/SNB8yGH) or [subreddit](https://reddit.com/r/vale) with any questions!
+
+
+## Questions and Answers
+
+### Why do we randomize the generations?
+
+Let's say that instead of randomizing the generations, we used a monotonically-increasing thread-local `nextGen` integer.
+
+
+An attacker could then do the below sequence of events. Imagine that they're making requests to a server API which intentionally cause the below to happen.
+
+ * Create a `Foo` object. It's generation is `1007`, `nextGen` is `1008`.
+ * Create a reference to it, `fooRef`, which contains `Foo`'s address and generation `1007`.
+ * Repeat 2^64-1 times:
+    * Create a `Bar` object, incrementing `nextGen`.
+    * Destroy that `Bar` object.
+ * (`nextGen` has wrapped around and reached `1007` again.)
+ * Destroy the `Foo` object.
+ * Create the `Zork` object. It's generation is `1007`.
+
+
+(It's arguable whether making 2^65+5 requests is possible before the heat death of the universe, but let's roll with it.)
+
+
+In most allocators, when you destroy object A then create object B, object B will reuse the now-available memory from object A. That means the `Zork` is where the `Foo` once was.
+
+
+*Now the final step:* they write to `fooRef`, even though the `Foo` has already been freed. This is bad, because the *generations match but the types are different*; they're now writing to `Zork`'s memory as if it's a `Foo`.
+
+
+Writing to the wrong type like that means the attacker can overwrite a pointer with an integer, which would indirectly allow them to manipulate any memory in the process.
+
+
+This is a particularly sneaky attack because there are no loud generation failures to alert the server's team that there is a use-after-free bug here.
+
+
+Luckily, *randomization helps with this.* If each new object's generation is random, then they wouldn't know how many times to repeat that inner loop.
+
+
+### Why do we halt the entire process on a generation check failure?
+
+
+The main reason is to make the failure as loud as possible, so the team is aware of the use-after-free bug that someone found.
+
+
+Another reason is to make it more difficult to brute-force past a generation check. Let's say that an attacker tried to brute-force a generation check by trying a dereference 5 billion times a second. It would still take an average of [81 years](https://www.wolframalpha.com/input?i=%28ln%28.5%29%2Fln%281-1%2F2%5E64%29%29%2F%285000000000%29%2F60%2F60%2F24%2F365) to get that first false negative. If restarting a halted process takes about a second, then it will take them an average of [405 billion](https://www.wolframalpha.com/input?i=%28ln%28.5%29%2Fln%281-1%2F2%5E64%29%29%2F60%2F60%2F24%2F365&key=3iw41) years.
+
 
 
 <slice/>

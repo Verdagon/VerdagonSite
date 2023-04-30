@@ -337,8 +337,8 @@ fi
 
 if [ $TARGET == "regions-overview" ] || [ $TARGET == "all" ] ; then
   echo "Doing regions-overview"
-  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-overview src/blog/vision/regions-overview.vmd
-  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-overview src/blog/vision/regions-overview.vmd
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-borrowing-regions-overview src/blog/vision/regions-overview.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-borrowing-regions-overview src/blog/vision/regions-overview.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -347,8 +347,8 @@ fi
 
 if [ $TARGET == "regions-1-immutable-borrowing" ] || [ $TARGET == "all" ] ; then
   echo "Doing regions-1-immutable-borrowing"
-  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing src/blog/vision/regions-1-immutable-borrowing.vmd
-  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing src/blog/vision/regions-1-immutable-borrowing.vmd
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing src/blog/vision/regions-1-immutable-borrowing.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing src/blog/vision/regions-1-immutable-borrowing.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -357,8 +357,8 @@ fi
 
 if [ $TARGET == "regions-2-isolates" ] || [ $TARGET == "all" ] ; then
   echo "Doing regions-2-isolates"
-  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-2-isolates src/blog/vision/regions-2-isolates.vmd
-  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-2-isolates src/blog/vision/regions-2-isolates.vmd
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-borrowing-regions-part-2-isolates src/blog/vision/regions-2-isolates.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-borrowing-regions-part-2-isolates src/blog/vision/regions-2-isolates.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -367,8 +367,8 @@ fi
 
 if [ $TARGET == "regions-3-one-way-isolation" ] || [ $TARGET == "all" ] ; then
   echo "Doing regions-3-one-way-isolation"
-  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-3-one-way-isolation src/blog/vision/regions-3-one-way-isolation.vmd
-  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-3-one-way-isolation src/blog/vision/regions-3-one-way-isolation.vmd
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-borrowing-regions-part-3-one-way-isolation src/blog/vision/regions-3-one-way-isolation.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-borrowing-regions-part-3-one-way-isolation src/blog/vision/regions-3-one-way-isolation.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -377,8 +377,8 @@ fi
 
 if [ $TARGET == "regions-4-multi-region-data" ] || [ $TARGET == "all" ] ; then
   echo "Doing regions-4-multi-region-data"
-  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-4-multi-region-data src/blog/vision/regions-4-multi-region-data.vmd
-  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-4-multi-region-data src/blog/vision/regions-4-multi-region-data.vmd
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-borrowing-regions-part-4-multi-region-data src/blog/vision/regions-4-multi-region-data.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-borrowing-regions-part-4-multi-region-data src/blog/vision/regions-4-multi-region-data.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -387,8 +387,8 @@ fi
 
 if [ $TARGET == "regions-5-region-scoped-data" ] || [ $TARGET == "all" ] ; then
   echo "Doing regions-5-region-scoped-data"
-  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-5-region-scoped-data src/blog/vision/regions-5-region-scoped-data.vmd
-  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-memory-safety-regions-part-5-region-scoped-data src/blog/vision/regions-5-region-scoped-data.vmd
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-borrowing-regions-part-5-region-scoped-data src/blog/vision/regions-5-region-scoped-data.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/zero-cost-borrowing-regions-part-5-region-scoped-data src/blog/vision/regions-5-region-scoped-data.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -419,6 +419,16 @@ if [ $TARGET == "making-regions-part-2-generics" ] || [ $TARGET == "all" ] ; the
   echo "Doing making-regions-part-2-generics"
   echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-2-generics src/blog/making-regions/making-regions-part-2-generics.vmd
   eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-2-generics src/blog/making-regions/making-regions-part-2-generics.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
+if [ $TARGET == "making-regions-part-7-results" ] || [ $TARGET == "all" ] ; then
+  echo "Doing making-regions-part-7-results"
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-7-results src/blog/making-regions/making-regions-part-7-results.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-7-results src/blog/making-regions/making-regions-part-7-results.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1

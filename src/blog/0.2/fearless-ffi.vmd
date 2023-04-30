@@ -169,7 +169,7 @@ It instead gives a *wide generational reference,* which contains:
  * A pointer to the object's type metadata (or vtable, if an interface reference).
 
 
-For those unfamiliar, a *generational reference* is a reference containing a pointer to an object, and a "remembered generation" which is an integer that matched the "actual generation" integer from the object itself. When we free the object, the object's actual generation is incremented. Before dereferencing a generational reference, Vale asserts that the generations matched, to ensure we haven't deallocated the object since then. By our last measurements, generational references are [over twice as fast as reference counting](/blog/generational-references), and could get even faster when we add our planned [region borrow checker](/blog/zero-cost-memory-safety-regions-overview) and [hybrid-generational memory](https://verdagon.dev/blog/hybrid-generational-memory) features.
+For those unfamiliar, a *generational reference* is a reference containing a pointer to an object, and a "remembered generation" which is an integer that matched the "actual generation" integer from the object itself. When we free the object, the object's actual generation is incremented. Before dereferencing a generational reference, Vale asserts that the generations matched, to ensure we haven't deallocated the object since then. By our last measurements, generational references are [over twice as fast as reference counting](/blog/generational-references), and could get even faster when we add our planned [region borrow checker](/blog/zero-cost-borrowing-regions-overview) and [hybrid-generational memory](https://verdagon.dev/blog/hybrid-generational-memory) features.
 
 
 The "wide" generational reference is then compressed into 32 bytes [# There are quite a few unused bits in pointers, that can be repurposed for other things.] and then *scrambled*:
@@ -446,7 +446,7 @@ In this quest, we've discovered and implemented a lot of new techniques:
 
 These techniques have also opened up some new emergent possibilities, which we hope to implement:
 
- * [Region Borrow Checking](/blog/zero-cost-memory-safety-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Region Borrow Checking](/blog/zero-cost-borrowing-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
  * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
  * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
  * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.

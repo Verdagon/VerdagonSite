@@ -31,7 +31,7 @@ This is my tale, where I discovered a terrifying truth underlying our world, and
 # A Worthy Goal
 
 
-For the last several months, I've been working on Vale's support for [regions](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing), which involves adding a sort of "opt-in borrow checker" to the language. Since it's opt-in and not [upwardly infectious](https://www.reddit.com/r/ProgrammingLanguages/comments/vofiyv/thoughts_on_infectious_systems_asyncawait_and_pure/), it should pair well with our [generational references](https://verdagon.dev/blog/generational-references) to give us speed and safety while still keeping the language easy to use. As someone who mainly uses C++ and Rust, this makes me _very_ excited.
+For the last several months, I've been working on Vale's support for [regions](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing), which involves adding a sort of "opt-in borrow checker" to the language. Since it's opt-in and not [upwardly infectious](https://www.reddit.com/r/ProgrammingLanguages/comments/vofiyv/thoughts_on_infectious_systems_asyncawait_and_pure/), it should pair well with our [generational references](https://verdagon.dev/blog/generational-references) to give us speed and safety while still keeping the language easy to use. As someone who mainly uses C++ and Rust, this makes me _very_ excited.
 
 
 This meant adding more functionality to our type system and function resolution, and transitioning from [templates](https://www.tutorialspoint.com/cplusplus/cpp_templates.htm) to full [generics](https://learn.microsoft.com/en-us/dotnet/csharp/programming-guide/generics/differences-between-cpp-templates-and-csharp-generics). [# Mostly because regions require that we monomorphize any read-only region into both an immutable and mutable region, so that we can better avoid shared mutability restrictions.]
@@ -212,7 +212,7 @@ In this quest, we've discovered and implemented a lot of new techniques:
 
 These techniques have also opened up some new emergent possibilities, which we hope to implement:
 
- * [Region Borrow Checking](/blog/zero-cost-memory-safety-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Region Borrow Checking](/blog/zero-cost-borrowing-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
  * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
  * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
  * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.

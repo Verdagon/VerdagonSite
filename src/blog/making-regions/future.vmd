@@ -57,3 +57,49 @@ In other words, if it's a struct, then `r'Spaceship` will actually be lowered to
  * I refactored the backend to decouple the memory management strategy from the code itself, and added two "regions" to start out: raw and generational references. [# I later even used this to benchmark generational references!]
  * I rounded out the rest of the compiler's unfinished in-progress features, such as [Higher RAII](https://verdagon.dev/blog/higher-raii-7drl), [Perfect Replayability](https://verdagon.dev/blog/perfect-replayability-prototyped), internal namespacing, and a faster generics solver. Regions is a massive endeavor that will break _everything_ that's not already finished and well-tested, so I spent some time to finish and add tests for these features.
 
+
+
+
+
+
+Throwing the Hail Mary: The first program of a new memory model
+
+
+it's been N years since i released 0.1, and M years since i discovered regions. 
+
+
+
+# human side
+
+project confidence in the face of overwhelming odds.
+
+- a new programming language is created every day
+- a language that doesn't have corporate backing can basically never survive. [# hat tip to zig]
+- there are entire swaths of programmers that will attack a language just because it doesn't have their preferred feature, and i'm about to step squarely into their crosshairs.
+
+
+But there's one thing I know: (insert something inspiring here)
+
+
+
+
+
+# tech debt
+
+I used to believe in a *programming myth* that tech debt is always bad.
+
+talk about the cycle between sprinting and cleaning up.
+
+important for morale, important for direction. important to know when 
+
+
+
+
+
+
+
+# notes
+
+I am a software engineer. I've been one for ten years now, working with and learning from the best of the best. [# Shout out to Francis Gastellu and Brian Ellis, who taught me everything I know about being a software engineer!]
+
+All of my decisions are motivated by real-world software engineering, and not theory.

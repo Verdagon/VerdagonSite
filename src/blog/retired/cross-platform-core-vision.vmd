@@ -88,7 +88,7 @@ Another example: specifying the allocation strategy (heap, bump, pool, etc) [#re
 Vale is high-level enough to work on all environments, yet gives us tools to write incredibly efficient code.
 
 <slice>
-#regions: See [Zero-Cost Memory Safety with Vale Regions](/blog/zero-cost-memory-safety-regions-overview) for more about regions and how they can drastically speed up a program.
+#regions: See [Zero-Cost Memory Safety with Vale Regions](/blog/zero-cost-borrowing-regions-overview) for more about regions and how they can drastically speed up a program.
 
 #inl: The compiler is intelligent and will put objects on the stack whenever possible, but the user can use the `inl` keyword to force it. The `inl` keyword would be obeyed on native, but ignored on JVM or JS.
 </slice>

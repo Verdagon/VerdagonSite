@@ -13,7 +13,7 @@ sponsor: us
 ! Note: This article is only a draft, describing how we think regions will work out in practice. Once we finish regions and benchmark it to determine how much overhead this eliminates, we'll publish it for real.
 
 
-In [this article](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing), we explain how regions work in Vale.
+In [this article](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing), we explain how regions work in Vale.
 
 
 These mechanisms likely sound similar to the traditional borrow checking approach seen in Rust, Cyclone, BorrowScript, and a couple others.

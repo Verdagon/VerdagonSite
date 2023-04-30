@@ -65,7 +65,7 @@ There are generally four approaches to memory safety:
  * *Reference counting* (RC), like in Swift, Nim, Lobster, etc.
 
 
-There's also a fifth approach, [generational references with regions](https://verdagon.dev/blog/zero-cost-memory-safety-regions-overview) which we'll talk about elsewhere; this series is comparing the more traditional approaches.
+There's also a fifth approach, [generational references with regions](https://verdagon.dev/blog/zero-cost-borrowing-regions-overview) which we'll talk about elsewhere; this series is comparing the more traditional approaches.
 
 
 But by the end of this, you'll have a much better idea of which is best for a particular situation, whether it be a game development challenge, web server, or anything else.
@@ -158,7 +158,7 @@ One could reason that CHERI can reduce memory-unsafety related development slowd
 
 
 <slice>
-#valethird: That remaining one third could be solved by [Vale](https://vale.dev/) which takes this approach even further in the form of its [generational references](https://verdagon.dev/blog/generational-references). By building it into the language itself, it can know exactly when it does or doesnt need to perform a check, and by adding [native region support](https://verdagon.dev/blog/zero-cost-memory-safety-regions-overview) it can theoretically skip the vast majority of them, bringing its run-time overhead even closer to zero, within the noise of any C or C++ program. With that kind of speed, we can leave the protections enabled even in release mode.
+#valethird: That remaining one third could be solved by [Vale](https://vale.dev/) which takes this approach even further in the form of its [generational references](https://verdagon.dev/blog/generational-references). By building it into the language itself, it can know exactly when it does or doesnt need to perform a check, and by adding [native region support](https://verdagon.dev/blog/zero-cost-borrowing-regions-overview) it can theoretically skip the vast majority of them, bringing its run-time overhead even closer to zero, within the noise of any C or C++ program. With that kind of speed, we can leave the protections enabled even in release mode.
 </slice>
 
 
@@ -411,7 +411,7 @@ Some languages are using it under the hood:
  * [Kind](https://github.com/Kindelia/Kind) is using a blend of borrowing and cloning to fuel a purely functional language.
 
 
-[Vale](https://vale.dev/) is building something similar to borrow checking but at the [regions](https://verdagon.dev/blog/zero-cost-memory-safety-regions-overview) level, to largely eliminate memory safety overhead without introducing aliasing restrictions. Its opt-in nature means the user can use it where it makes sense and doesn't hinder development velocity.
+[Vale](https://vale.dev/) is building something similar to borrow checking but at the [regions](https://verdagon.dev/blog/zero-cost-borrowing-regions-overview) level, to largely eliminate memory safety overhead without introducing aliasing restrictions. Its opt-in nature means the user can use it where it makes sense and doesn't hinder development velocity.
 
 
 [Verona](https://github.com/microsoft/verona) and [Forty2](http://forty2.is/) are experimenting with mixing regions and garbage collection.
@@ -496,7 +496,7 @@ With these advances, we might be able to get GC's development velocity advantage
 Reference counting, like in Swift, generally has the benefits that garbage collection does.
 
 
-It does have one drawback: any cycle of references pointing at each other could cause a memory leak, wasting the available memory. This can be largely mitigated with good tooling that detects these cycles in development.
+It does have one drawback: any cycle of references pointing at each other could cause a memory leak, wasting the available memory. This can be largely mitigated with good tooling that detects these cycles in development. [# Nim has a particularly fascinating approach here: it only runs its cycle collector for types that could possibly be cyclic. This helps ensure faster deterministic cleanup, and lets us use destructors too.]
 
 
 However, reference counting has three nice benefits: weak references, deterministic destruction, and the ability to make constraint references.

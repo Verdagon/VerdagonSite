@@ -507,7 +507,7 @@ Key takeaways:
 <slice>
 #whatsvale: [Vale](https://vale.dev/) is a language we're making to explore techniques for easy, fast, and safe code.
 
-We actually discovered this "seamless, fearless, structured concurrency" while playing around with Vale's [region borrow checker](/blog/zero-cost-memory-safety-regions-overview), which blends mutable aliasing with Rust's borrow checker.
+We actually discovered this "seamless, fearless, structured concurrency" while playing around with Vale's [region borrow checker](/blog/zero-cost-borrowing-regions-overview), which blends mutable aliasing with Rust's borrow checker.
 
 #executor: The `parallel` block has a default executor, but can be overloaded with `parallel(num_threads)` or `parallel(an_executor)`.
 

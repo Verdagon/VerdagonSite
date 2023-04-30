@@ -86,7 +86,7 @@ Higher RAII can be also be used for more powerful [type-state programming](http:
 
 
 <slice>
-#longer: We're particularly excited to prototype the [region borrow checker](/blog/zero-cost-memory-safety-regions-overview), which could help Vale approach C++'s speed by getting rid of the vast majority of our memory safety overhead, and enable concurrency features like described in [Seamless, Fearless, Structured Concurrency](/blog/seamless-fearless-structured-concurrency).
+#longer: We're particularly excited to prototype the [region borrow checker](/blog/zero-cost-borrowing-regions-overview), which could help Vale approach C++'s speed by getting rid of the vast majority of our memory safety overhead, and enable concurrency features like described in [Seamless, Fearless, Structured Concurrency](/blog/seamless-fearless-structured-concurrency).
 
 We've been looking forward to this version for a long time!
 
@@ -396,7 +396,7 @@ In this quest, we've discovered and implemented a lot of new techniques:
 
 These techniques have also opened up some new emergent possibilities, which we hope to implement:
 
- * [Region Borrow Checking](/blog/zero-cost-memory-safety-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
+ * [Region Borrow Checking](/blog/zero-cost-borrowing-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
  * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
  * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
  * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.

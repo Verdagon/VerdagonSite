@@ -48,8 +48,8 @@
 
       <item>
          <title>Zero-Cost Memory Safety with Vale Regions (Preview)</title>
-         <guid>https://verdagon.dev/blog/zero-cost-memory-safety-regions-overview</guid>
-         <link>https://verdagon.dev/blog/zero-cost-memory-safety-regions-overview</link>
+         <guid>https://verdagon.dev/blog/zero-cost-borrowing-regions-overview</guid>
+         <link>https://verdagon.dev/blog/zero-cost-borrowing-regions-overview</link>
          <pubDate>Wed, 16 Nov 2022 10:15:00 -0400</pubDate>
          <category>Programming Languages</category>
          <category>Vale Programming Language</category>

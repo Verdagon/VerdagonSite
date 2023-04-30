@@ -1,4 +1,7 @@
 
+https://www.reddit.com/r/ProgrammingLanguages/comments/zta49c/comment/j1ei4br/?utm_source=reddit&utm_medium=web2x&context=3
+"Everyone knows Rust is fantastic at being correct. The problem is that it's simply not as productive, despite how much I like it. I can't in good conscience introduce it to a team of non experts because release times will increase enormously. Go isn't elegant, perfect or correct by any means but it does a good enough job that it's a great tool for a lot of teams and applications."
+
 
 These weaknesses are can be subtle, and often don't appear in small projects when it's still easy to change a program's architecture. They start to reveal themselves more in larger projects, as a project starts scaling across multiple developers. As [one user says,](https://news.ycombinator.com/item?id=27458058 .anecdote) "Six weeks into the whole thing and people spend more time un-breaking builds than writing code."
 
@@ -71,3 +74,41 @@ https://mdwdotla.medium.com/using-rust-at-a-startup-a-cautionary-tale-42ab823d94
 
 
 [# Verona might the capacity for arenas one day too, judging from [this issue](https://github.com/microsoft/verona/issues/10).]
+
+
+
+
+from https://ceronman.com/2021/07/22/my-experience-crafting-an-interpreter-with-rust/:
+> Side note: Dealing with the borrow checker is a well-known struggle for Rust beginners. This was the reason why I spent so much time here. The rules are simple but for some reason, it’s really hard to keep track of them in a big system. I would often write huge refactorings thinking that they would be a solution to a borrow checker error, just to get another one at the end of the refactoring. This happens less frequently the more experience I get with the language, but it still happens. The book Learn Rust With Entirely Too Many Linked Lists  has some good examples of how brutally complex the borrow checker can be.
+
+
+# do we really want to enable more speed things?
+
+no. we really don't. reaching for absolute performance can lead to the "fractal of complexity" effect, where we add more and more and more complexity to the language to get closer and closer to zero.
+
+it's also not a great tradeoff; languages will still have things like random access bounds checks. [# I say random access here because languages can drastically reduce bounds checks in code that uses iterators.] If you can never get to zero, then you need to ask yourself when you would stop making sacrifices for an extra hundredth of a percent.
+
+this is also the core reason that people still (and should!) use languages like java, go.
+
+
+
+
+(word it so that it reminds people of complex languages like rust and haskell)
+
+
+# What does this enable?
+
+faster speeds
+
+fearless colorless parallelism
+
+
+# can other languages do this?
+
+there are only two other languages that could, by my estimation:
+1. nim (confirmed!)
+2. lobster
+
+
+
+
