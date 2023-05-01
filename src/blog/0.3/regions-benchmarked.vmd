@@ -1,8 +1,4 @@
 
-- article on how we used regions to make a full CA and roguelike
-- we actually used it to get down to zero gen checks
-- benchmarks
-
 
 possible names:
 - Vale Regions, First Prototype
@@ -84,30 +80,6 @@ the language gets out of your way so you can focus on your problem. then, when t
 
 we dont know what it will lead to. it's already showing some really cool capabilities, like zero-cost borrowing, seamless concurrency, fearless ffi.
 
-
-
-# Finally real!
-
-after a (links) ridiculously long journey, we've finally done it.
-
-*This code has zero generation checks.*
-
-you can see it too with the flag --count_checks.
-
-
-
-# What is this program?
-
-This is a cellular automata program, a common algorithm in roguelike game design.
-
-
-This program is not an average program. this is a very number-crunchy program.
-
-
-this is coincidentally a very good fit for immutable borrowing. generally, very functional-style programs will do well with borrowing, ones that transform some data into other new data. when we need to update any sort of state, other measures will likely be needed to get a program down to zero gen checks. this technique of using pure functions is usable for a _lot_ of a program, but not everywhere of course.
-
-
-in non-number-crunchy programs (like servers), there will be less opportunity for pure functions, and that's when isolates will come into play more. [# Though, ironically, that's when the program is likely already latency-bound (bottlenecked on CPU-to-RAM communication), and the CPU will eagerly do bounds checking and generation checking in parallel during those stalls.]
 
 
 
@@ -213,13 +185,6 @@ that even rust has about 3% overhead, counting bounds checks. sources:
 
 
 
-# Can we eliminate all generation checks if we try hard enough?
-
-This could be possible one day via isolates. We've only implemented the first part of the regions design, immutable borrowing. Once we have isolates, we'll have much more fine-grained control over regions, and be able to freeze parts of our program with more precision rather than freezing the entire world like we do now.
-
-However, I would caution any user that wants to remove all generation checks in their program. This can be a fun exercise, but it's generally considered premature optimization. I'd recommend users only use borrowing for areas that a profiler says are the bottleneck for a program.
-
-Borrowing is a constraint, and constraints often come at the cost of flexibility and decoupling. That's the beauty of regions: since they're opt-in, we can keep the rest of the codebase flexible while applying regions only in the parts of the code where it makes sense to borrow.
 
 
 # Can this be used for other languages?
@@ -313,10 +278,12 @@ use phrases:
 - zero-cost borrowing
 - zero-cost references
 - zero-cost region borrowing
+- can eliminate all gen checks with regions and linear style
 
 avoid or be careful around phrases:
 
 - zero-cost memory safety
+- immutable borrowing eliminates all gen checks
 
 
 
