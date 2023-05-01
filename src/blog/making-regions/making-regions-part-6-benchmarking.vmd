@@ -1,0 +1,28 @@
+---
+title: Implementing a New Memory Safety Approach, Part 2: An Unexpected Quest
+subtitle: Generics help us avoid code size explosions!
+author: Evan Ovadia
+date: Jan 20, 2022
+realm: blog
+path: blog/making-regions-part-2-generics
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: us
+---
+
+
+
+the exhiliration of seeing that zero checks thing
+
+rediscovering that regions are, of course, not enough
+
+the realization that there is no such thing as zero cost memory safety
+
+discovering that i suck at benchmarking; it was saying that gen refs were faster than unsafe which means my benchmarking set up is broken
+
+and of course it is, im just running hyperfine on a mac lol
+
+
+still getting nonsense results. ah, there it is, im still doing bounds checks lol
+
+to make sure i did bounds checking everywhere, im leaning on the type system. adding a wrapper for an integer to represent that yes, it was checked in bounds. thisll be a great use for linear types once i can self-host.

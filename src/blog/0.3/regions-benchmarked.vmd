@@ -1,0 +1,329 @@
+
+- article on how we used regions to make a full CA and roguelike
+- we actually used it to get down to zero gen checks
+- benchmarks
+
+
+possible names:
+- Vale Regions, First Prototype
+- First Prototype of Vale Regions
+
+
+src0 O2i (use this one):
+Summary
+  './build_unsafe_no_bounds/main' ran
+    1.13 ± 0.01 times faster than './build_resilientv3/main'
+    1.13 ± 0.01 times faster than './build_safe_64/main'
+    1.18 ± 0.01 times faster than './build_unsafe_with_bounds/main'
+    1.18 ± 0.01 times faster than './build_safe_fastest/main'
+    1.18 ± 0.01 times faster than './build_safe_32/main'
+    1.31 ± 0.01 times faster than './build_safe_baseline/main'
+
+src O2i:
+Summary
+  './build_unsafe_with_bounds/main' ran
+    1.12 ± 0.00 times faster than './build_resilientv3/main'
+    1.14 ± 0.00 times faster than './build_unsafe_no_bounds/main'
+    1.15 ± 0.00 times faster than './build_safe_32/main'
+    1.15 ± 0.00 times faster than './build_safe_fastest/main'
+    1.16 ± 0.00 times faster than './build_safe_64/main'
+    1.32 ± 0.00 times faster than './build_safe_baseline/main'
+
+src1 O2i (use this one):
+Summary
+  './build_unsafe_no_bounds/main' ran
+    1.05 ± 0.01 times faster than './build_unsafe_with_bounds/main'
+    1.09 ± 0.01 times faster than './build_safe_32/main'
+    1.09 ± 0.01 times faster than './build_safe_fastest/main'
+    1.41 ± 0.02 times faster than './build_safe_64/main'
+    1.79 ± 0.01 times faster than './build_resilientv3/main'
+    1.81 ± 0.01 times faster than './build_safe_baseline/main'
+
+src2 O2i:
+Summary
+  './build_resilientv3/main' ran
+    1.01 ± 0.01 times faster than './build_safe_64/main'
+    1.28 ± 0.01 times faster than './build_unsafe_with_bounds/main'
+    1.30 ± 0.01 times faster than './build_safe_fastest/main'
+    1.30 ± 0.01 times faster than './build_safe_32/main'
+    1.58 ± 0.01 times faster than './build_unsafe_no_bounds/main'
+    1.69 ± 0.02 times faster than './build_safe_baseline/main'
+
+src3 O2i:
+Summary
+  './build_safe_fastest/main' ran
+    1.00 ± 0.01 times faster than './build_safe_64/main'
+    1.00 ± 0.01 times faster than './build_safe_32/main'
+    1.24 ± 0.01 times faster than './build_resilientv3/main'
+    1.37 ± 0.01 times faster than './build_unsafe_with_bounds/main'
+    1.50 ± 0.01 times faster than './build_safe_baseline/main'
+    1.78 ± 0.01 times faster than './build_unsafe_no_bounds/main'
+
+
+
+# Why we're excited for Region Borrowing
+
+we've been looking for a way to get the benefits of both Rust and Go, specifically, the ability to "borrow" memory without overhead, while still keeping the language flexible and easy. we'd like to keep doing all the safe and useful patterns like observers, backreferences, higher raii, and intrusive data structures like linked lists, while borrowing. we'd like it to compose well with features like concurrency. we knew all of these things are theoretically possible.
+
+
+"can use regions for areas where we want zero-cost memory safety"
+
+"we wanted to use borrowing where it made sense, and have everything else in a more flexible state."
+
+"by raising mutability to the regions level, we suddenly are able to do a lot of things more easily."
+"it turns out, decoupling the borrow checker from individual data was a great idea"
+
+the language gets out of your way so you can focus on your problem. then, when the profiler reveals which part of your program would benefit from extra speed, it gives you the tools to do that without disrupting the rest of the program.
+
+"we wanted an opt-in rust. a language where we can program in an easy, flexible style by default, but then use borrowing semantics when it makes sense to." 
+ perhaps praise rust as being a great way to take AxM as another tool in the toolbox for when it works well. say it does some things really well. then highlight that you dont want to use it everywhere, for example observers.
+
+"in Rust terms, it means that borrowing is now compatible and composable with mutable aliasing."
+
+- back in 2020, i wrote about how i thought we could do it. back then, it was about reference counting, but since then it's switched to gen refs. check out the full design too.
+
+we dont know what it will lead to. it's already showing some really cool capabilities, like zero-cost borrowing, seamless concurrency, fearless ffi.
+
+
+
+# Finally real!
+
+after a (links) ridiculously long journey, we've finally done it.
+
+*This code has zero generation checks.*
+
+you can see it too with the flag --count_checks.
+
+
+
+# What is this program?
+
+This is a cellular automata program, a common algorithm in roguelike game design.
+
+
+This program is not an average program. this is a very number-crunchy program.
+
+
+this is coincidentally a very good fit for immutable borrowing. generally, very functional-style programs will do well with borrowing, ones that transform some data into other new data. when we need to update any sort of state, other measures will likely be needed to get a program down to zero gen checks. this technique of using pure functions is usable for a _lot_ of a program, but not everywhere of course.
+
+
+in non-number-crunchy programs (like servers), there will be less opportunity for pure functions, and that's when isolates will come into play more. [# Though, ironically, that's when the program is likely already latency-bound (bottlenecked on CPU-to-RAM communication), and the CPU will eagerly do bounds checking and generation checking in parallel during those stalls.]
+
+
+
+
+caveats:
+
+- if we read a mutable non-owning reference from an immutable region, the compiler does a generation pre-check. like rust, it excels in going downwards along ownership lines. when something refers to something above it, thats when something extra is needed. in rust this is done manually with indices or WeakRef, vale does this automatically for its generational references.
+
+- we're borrowing for zero cost, we dont get to avoid the other overhead such as bounds checking, making the new arrays, any wasted space in the arrays, or any metadata per object (see Whats Next?).
+
+
+# How does this work?
+
+
+the key to this is an unexpected trick that lets us do borrow checking. (plus another one later on called isolates)
+
+in region borrowing, world shifts?
+
+(link to part 1, immutable borrowing)
+
+parts 2-5 are coming soon!
+
+
+
+
+
+- there is theoretically some overhead in this program, there are still 8 bytes at the top of every array to put the generation in. this seems to make no difference. this particular snippet has no generation checks, though it still has some unrelated memory safety overhead, specifically filling in the generations. such a thing might be solved later with isolates or uni permissions, but its unclear if it we want to make the language as complex as rust just to get from 5% to 3%, especially considering so much overhead comes from other sources in rust and vale, such as invisible complexity (LINK), ergonomics cost, parallelism opportunity cost. we should focus on those. this *program* is not zero-cost. the region borrowing, however, is.
+
+- if you have an array of non-unique structs, theyll each have generations, similar to a SlotMap or generational arena in rust. regions can help this by making the array and each struct into an _isolate_.
+
+
+
+
+
+# What this enables
+
+
+these examples im showing are also just showing why some people might prefer the vale way of doing things. its okay that its not your cup of tea. for others, it will be.
+
+
+## Some example that makes use of readonly being compatible with both
+
+regions are for going the extra mile. gen refs are already very cheap, but regions go even further. and then they enable multithreading for even more power.
+
+show we can use something from whatever mutability. it doesnt impose an immutability restriction on its caller.
+
+"this is awesome. it means..."
+
+talk about how this doesnt impose any restrictions on the caller. that means we can do things gradually. thats the real strength of regions: the ability to start easy and progressively optimize when we know we should.
+
+"along the lines of [gradual performance]"
+
+
+
+## Observers
+
+observer, start with rustish example, add mut ref
+
+another downside of using rc is that it forces something onto the heap. with gen refs, they can be wherever you want.
+
+it's not just observers. dependency refs, intrusive data structures (such as doubly linked list), higher raii, backreferences, etc. are all the same.
+
+easier to do whatever pattern the situation calls for.
+
+
+## Seamless Concurrency
+
+easier concurrency, without having to rearchitect your entire program to fit a certain mold. just add parallel and youre good.
+
+- seamless concurrency. have an Rc<Pattern> in Level? or a Cell<HP> in units or somewhere, perhaps to allow for a unit damaging itself when it explodes. perhaps even a Cell<gen_index> for whoever attacked them last. all the components are trait objects too. any other possible uses of Rc?
+
+
+## RAII?
+
+
+## CLI app?
+
+
+## What this enables
+
+
+
+then say "3/4 of these cant be done by borrow checking." lol
+
+though be careful, rust can do two of these with RC. be sure to then highlight cost of rc perhaps.
+
+
+
+# Does this mean Vale's memory safety is completely zero cost? 
+
+No language gets complete memory safety for zero cost. even just bounds checking alone is 15%, and no language has solved this [dependenttypes, iterating]. (though it can often be done in parallel by the CPU, similar to gen refs).
+
+rather, individual _features_ have zero-cost memory safety. For vale, that's regions. For rust, it's borrow checking.
+
+It should also be mentioned that even though region borrowing and borrow checking themselves are zero cost, they sometimes move cost outwards. Whenever someone goes from updating an array/vector/string in-place to producing a new version, we've just done an expensive call to malloc under the hood. If one isn't paying attention, a feature's zero-cost memory safety can actually incur some cost. GC'd and functional programming languages resolve this by making allocation extremely fast, and Vale plans to have region allocators for that same purpose.
+
+
+that even rust has about 3% overhead, counting bounds checks. sources:
+- the vale compiler
+- the C snippet
+- shnatsel's article
+- maybe even mention in a side note that my own experimenting shows about 10-28% overhead in some cases varying by O3, and shnatsel's shows 15%.
+
+
+
+# Can we eliminate all generation checks if we try hard enough?
+
+This could be possible one day via isolates. We've only implemented the first part of the regions design, immutable borrowing. Once we have isolates, we'll have much more fine-grained control over regions, and be able to freeze parts of our program with more precision rather than freezing the entire world like we do now.
+
+However, I would caution any user that wants to remove all generation checks in their program. This can be a fun exercise, but it's generally considered premature optimization. I'd recommend users only use borrowing for areas that a profiler says are the bottleneck for a program.
+
+Borrowing is a constraint, and constraints often come at the cost of flexibility and decoupling. That's the beauty of regions: since they're opt-in, we can keep the rest of the codebase flexible while applying regions only in the parts of the code where it makes sense to borrow.
+
+
+# Can this be used for other languages?
+
+Some of them, yes!
+
+Single-threaded reference-counted languages like Nim and Lobster can get these same benefits, in theory.
+
+For fun, I benchmarked this against Vale's secret alternate reference-counted backend, and found that it reduces reference counting overhead by a _lot_. If you want to see the numbers click (LINK), but don't take the numbers too seriously, Vale uses "naive" reference counting with no optimizations. It's unclear whether these numbers would be higher or lower when added to a language with other reference counting optimizations already.
+
+This is pretty promising for the future of reference counting. If anyone's making a new language with single-threaded reference counting, let us know!
+
+A borrow checked language like Rust could theoretically use this if it introduces a true "immutable" reference, as opposed to Rust's shared references.
+
+
+# Why have we never seen this before?
+
+We've seen a few things that are similar:
+
+Pony allows us to temporarily turn an `iso` object into an `imm` object to share it among multiple actors.
+
+Forty2 does (stuff here)
+
+Rust lets us freeze a single object, kind of like every object is its own little region.
+
+
+# What's next?
+
+Our job isn't done here yet. Even though we have zero-cost borrowing, there's another aspect of generational references we'd like to resolve: some objects still have (useless) generation numbers.
+
+
+<<<<
+For example, in this program, there's still a generation number above `Spaceship`, even though nobody ever checks it. [# It's pretty common for languages to have metadata for some objects. Swift's 8-byte reference counts, Java's 8-24 bytes ([metadata](https://www.javamex.com/tutorials/memory/object_memory_usage.shtml) plus a possible [remembered hash code](https://stackoverflow.com/a/3796963)). Vale's case is better because embedded structs don't have generations, only the containing local, heap allocation, or array slot. It's most similar to the 8-byte overhead we see in Rust's `SlotMap` or `GenerationalArena`.]
+
+In the future, we'll be able to solve that by putting the Spaceship in its own private region called an isolate (link here) like `ship 'Spaceship = ...` which means that only one person can have a reference to it at a given time.
+////
+```
+struct Spaceship {
+  health i64;
+  engine Engine;
+  navigation Nav;
+  wings Wings;
+}
+struct Engine { fuel i64; }
+struct Nav { height i64; }
+struct Wings { width i64; }
+
+func main() {
+  ship Spaceship = ...;
+  println(ship.health);
+}
+```
+>>>>
+
+In the cellular automata program from before, each array had a generation at the top of it. The 1000x1000 `[][]bool` would have 1001 generations (one for the outer array, and one for each inner array). If that was an `[][]Spaceship`, it would have one generation per Spaceship. To avoid those generation numbers, we could have an array of isolated spaceships, like `[][]'Spaceship`.
+
+
+
+there is theoretically some overhead in this program, there are still 8 bytes at the top of every array to put the generation in. this seems to make no difference. this particular snippet has no generation checks, though it still has some unrelated memory safety overhead, specifically filling in the generations. such a thing might be solved later with isolates or uni permissions, but its unclear if it we want to make the language as complex as rust just to get from 5% to 3%, especially considering so much overhead comes from other sources in rust and vale, such as invisible complexity (LINK), ergonomics cost, parallelism opportunity cost. we should focus on those. this *program* is not zero-cost. the region borrowing, however, is.
+
+
+
+# I want to try it out!
+
+
+this is using a _very_ incomplete alpha version of the compiler. if you want to play with regions, let us know in the discord and we're happy to help you navigate around the sharp edges of the alpha version!
+
+
+
+# Appendix: Show me the Numbers!
+
+
+- O3 noise is pretty intense. the tiniest changes cause big swings, up to 14% sometimes. things that should make it slower sometimes make it faster and vice versa. this is because CPUs are complicated. keep an eye out, we'll be adding more programs.
+- we're measuring vale against itself.
+- if the rest of vale's codegen improves, that will make these look worse.
+
+
+perhaps dont show 15,18,40. instead show 15,3,25.
+no reason to give bounds checking the advantage there.
+ "less overhead than bounds checking" lol
+
+be very clear these are not c vs rust vs vale benchmarks, theyre just comparing the memory management strategies.
+
+
+
+# Notes
+
+
+use phrases:
+
+- zero-cost borrowing
+- zero-cost references
+- zero-cost region borrowing
+
+avoid or be careful around phrases:
+
+- zero-cost memory safety
+
+
+
+official stances (update rest of site to be consistent):
+- Vale has features that have zero cost memory safety, not all memory safety in Vale is zero-cost. (same as rust)
+- Regions are zero-cost memory safety, gen-refs are not. (be sure to asterisk for loading non-owning refs. perhaps mention that we can avoid that in the same way as rust, by using ids/indices)
+- we dont know where regions will lead, but they are *promising*.
+- we'll show some examples, not to prove anything, but to show why some people might prefer this over other ways.
+- generational references has overhead. regions do not (minus loading non-ownings from imm regions).
+- regions have zero generation checks (though they very occasionally have generation pre-checks.)

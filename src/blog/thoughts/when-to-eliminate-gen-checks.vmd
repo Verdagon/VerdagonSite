@@ -1,0 +1,42 @@
+
+# When should we eliminate `__check`s?
+
+The *linear style* is very familiar to anyone who has used borrow-checked languages ([Rust](https://www.rust-lang.org/), [Cone](https://cone.jondgoodwin.com/), etc.) or linear-typed languages ([Austral](https://borretti.me/article/introducing-austral), [Val](https://www.val-lang.dev/), etc.).
+
+
+In the linear style, every object has a single owner. This makes code more memory-efficient and much faster because:
+
+ * No run-time is spent figuring out when to free or reuse a spot in memory.
+ * We can put data on the stack, which is often faster to access than data on the heap.
+ * We can embed objects directly in other objects, which keeps a program cache-friendly.
+
+
+On the other hand, languages like Swift, Go, Nim, etc. are often faster to develop with, [# Check out [How Memory Safety Approaches Speed Up and Slow Down Development Velocity](https://verdagon.dev/blog/when-to-use-memory-safe-part-2)] enourage more solid APIs and less refactoring, and are flexible enough to use patterns that help keep our codebases simple:
+
+ * [Observers](https://www.reddit.com/r/rust/comments/pwqju6/is_there_an_underlying_reason_that_idiomatic_rust/) [# When someone adds an entire GUI framework dependency because their paradigm won't allow a simple observer, that's a red flag that their approach might have a problem!]
+ * [Intrusive data structures](https://lwn.net/Articles/907876/) for optimization.
+ * [Back-references](https://users.rust-lang.org/t/back-reference-to-the-parent-struct/7413/2) and bidirectional references (doubly-linked lists, balanced binary trees, etc.)
+ * [Dependency references](https://en.wikipedia.org/wiki/Dependency_injection) to non-owned components (`NetworkRequester`, `ResourceCache`, etc.)
+ * [Graphs](https://news.ycombinator.com/item?id=24996001)
+ * [Callbacks](https://news.ycombinator.com/item?id=12029238)
+ * [Delegates](https://medium.com/@nimjea/delegation-pattern-in-swift-4-2-f6aca61f4bf5)
+ * ...and so on. [# This is why languages like Rust are wise to include escape hatches like `Rc<RefCell<T>>`. These are quite helpful, but they unfortunately force objects onto the heap and give up the benefits of having a single owner.]
+
+
+Generational references get the best of both worlds. Even with `__check`s, they still get all the speed benefits of single ownership, yet also allow the patterns that keep our code simple. Then, if we want to go even faster, we can apply the linear style where we want.
+
+
+In other words, Vale's strength is that it gives an *easy, flexible, fast default* and then gives us the power to *optimize even more where it makes sense.*
+
+
+A software engineer that values simplicity and performance might start with these guidelines:
+
+ * Write the program with just generational references, prioritizing simplicity and flexibility.
+ * Profile the code to find the functions that are impacting the program's run time.
+ * See if `__checks` are a bottleneck by using the `--skipchecks=...` compiler flag [# This is only available to the final user, libraries have no way to specify this flag.] for that function. They usually aren't; similar to bounds checking, they are branch-predictor friendly [# This means the CPU's branch predictor knows to assume the check will pass and proceed with future calculations.] and often fill the empty space in the CPU pipeline. [# Most programs are memory latency bound, which means they spend most of their time idle and waiting on data from caches and RAM.]
+ * Add `pure` to any of those functions that don't modify any pre-existing data.
+ * Refactor other impactful areas according to the restricted aliasing mindset mindset.
+
+
+This is a completely new paradigm, so we're excited to see what other approaches and best practices might come from this combination of generational references and regions.
+

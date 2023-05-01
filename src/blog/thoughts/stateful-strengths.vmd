@@ -1,0 +1,31 @@
+Stateful Strengths
+
+
+
+(describe a lot of things that are good about OO without using the word OO lol)
+
+
+
+stateful programming is about embracing the inherent statefulness of an application, and putting healthy boundaries on it.
+
+a lot of paradigms (FP, borrow checking, etc.) are unwieldy with state, and instead of regarding it as a weakness of the paradigm, regard it as a weakness of statefulness. such a thing is denying reality, and imposes invisible complexity on our programs.
+
+
+
+
+
+oo is superior to anything else in this aspect: it can more easily refer to and interact with a stateful thing over there.
+
+its better at referring to it because you dont need a universal path to it, like a struct of various ID steps. if you want just one ID you can flatten your entire application but now youve raised everything to the top level of your application. this is fine for small applications, but it scales really badly.
+
+another reason flattening is bad is because it breaks single ownership (in the c++ sense). it means that you can forget to remove something that you "own" but the type system doesnt know you own. see AVL tree for an example, there's nothing enforcing you to delete your child, since all you really have is an ID to it.
+
+just put it on the heap, and have a pointer to it. and if you think that's unsafe, use a language that does it safely, like Vale.
+
+
+
+its better at interacting with it because of interfaces. theyre much more solid in OO.
+
+these are hidden benefits that a lot of languages support really well, and i dont want to forget them while designing the language.
+
+

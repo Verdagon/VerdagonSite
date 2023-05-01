@@ -1,0 +1,172 @@
+---
+title: Draft Preview: Zero-Cost Memory Safety with Vale Regions, Part 5: Hold Refs
+subtitle: Watch how we split our memory into regions, for more performance!
+author: Evan Ovadia
+date: Draft, Preview
+realm: blog
+path: blog/zero-cost-memory-safety-regions-part-5-hold-refs
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: us
+---
+
+
+
+Vale has an ambitious goal: to be fast, memory safe, and most importantly, _easy_. There are a lot of stellar languages that have two, and we suspect it's possible to really maximize all three.
+
+
+To do this, we're harnessing a new concept called *regions*.
+
+
+In [Part 1](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing) we saw how we can use *pure functions* to easily *immutably borrow* data to make it faster to access.
+
+
+[Part 2](/blog/zero-cost-memory-safety-regions-part-2-isolates) showed us how we could more precisely create regions via *isolates*, and immutably borrow them too.
+
+
+[Part 3](/blog/zero-cost-memory-safety-regions-part-3-one-way-isolation) showed us how we can get the benefit of isolates with many more kinds of data.
+
+
+Then in [Part 4](/blog/zero-cost-memory-safety-regions-part-4-multi-region-data), we saw how we could immutably borrow only part of an object, so that we could have more precise control over what parts of our data were immutable.
+
+
+In this final part, we'll show a little more detail on what happens when we say `.open`, `.read`, and `.imm`, and see the best example of using them: iterators.
+
+
+# An iterator freezes its collection's internal region
+
+
+<<<<
+In Part 4, we saw a basic linked list.
+
+
+Here it is again, renamed to `LinkedListNode` to be consistent with Vale's standard library.
+
+
+We also have a `LinkedList` class which holds the head and has some convenience methods like `add` and `remove`.
+////
+```
+struct LinkedListNode<T> {
+  ship T;
+  next priv vary Option<^LinkedListNode<T>>;
+}
+
+struct LinkedList<T> {
+  head ?^LinkedListNode<T>;
+}
+```
+>>>>
+
+
+<<<<
+Here, we're using it without regions.
+////
+```
+exported func main() {
+  list = LinkedList<Ship>();
+  list.add(Ship("Serenity", 10));
+  list.add(Ship("Raza", 22));
+
+  foreach x in &list {
+    println(x);
+  }
+}
+```
+>>>>
+
+
+<<<<
+As we saw in [Part 2](/blog/zero-cost-memory-safety-regions-part-2-isolates), we can wrap the list in a cell, which lets us immutably borrow the list for faster reading.
+
+
+Note that the `Ship`s themselves are still mutable. It's only the LinkedList that's immutable. This is because of Vale's "multi-region data" described back in [Part 4](/blog/zero-cost-memory-safety-regions-part-4-multi-region-data).
+////
+```
+exported func main() {
+  list = ''LinkedList<Ship>();
+  list.rw.add(Ship("Serenity", 10));
+  list.rw.add(Ship("Raza", 22));
+
+  foreach x in list.imm {
+    println(x);
+  }
+}
+```
+>>>>
+
+
+## `foreach` is just `while` with an iterator
+
+
+Under the hood, this is using an *iterator*, a small struct that keeps track of where we are in the list.
+
+
+<<<<
+`foreach` is just syntactic sugar for using iterators.
+
+Here's the above program, without the `foreach` syntactic sugar.
+
+
+First, it takes the expression after `in` (here, `list.imm`) and puts it in a local, `iterable`. (1)
+
+Then, it makes an iterator for it using its `Begin` function. (2)
+
+Every iteration, it will first call `HasNext` to see if there's a next element (3), and then call `Next` to get it. (4)
+////
+```
+exported func main() {
+  list = ...;
+
+  iterable = list.imm; // 1
+  iterator = iterable.Begin(); // 2
+  while iterator.HasNext() { // 3
+    x = iterator.Next(); // 4
+
+    println(x);
+  }
+}
+```
+>>>>
+
+
+There are two interesting things happening here, regarding regions:
+
+ * `list.imm` is borrowing a cell immutably. `iterable` is a cell guard, like we saw in Part 2.
+ * `Begin` is making an iterator that is also "holding on to that borrow".
+
+
+Let's talk about that second one.
+
+
+When we say `iterable.Begin()`, we're giving it a `&i'LinkedList<Ship>`, where `i'` is the implicit hidden region tied to the lifetime of `iterable`, like we saw in Part 2.
+
+
+`LinkedList.vale` has a function which accepts that type:
+
+
+```
+func Begin<x', T>(list &x'LinkedList<T>) LinkedListIter<x', T> {
+  return LinkedListIter<x', T>(list, list.head); «xandt»
+}
+```
+
+When we call it, we receive a `LinkedListIter<i', Ship>`. Later, we can call `.HasNext()` and `.Next()` on it.
+
+
+Note how `i'` is its region annotation. The compiler uses this to make sure that this `LinkedListIter` does not outlive the `i'` region.
+
+Since that region was produced by the `CellGuard`, the compiler therefore makes sure that this LinkedListIter does not outlive the `CellGuard`.
+
+
+That's what it means to "hold a borrow"; if a struct has a region parameter, it must not outlive that region.
+
+
+# Conclusion
+
+As you can see, theres really not much connection between cells and iterators. this is really just a glorified example lol.
+
+
+<slice>
+#xandt: The `<x', T>` is just included for clarity, the compiler can infer it if we leave it out.
+</slice>
+

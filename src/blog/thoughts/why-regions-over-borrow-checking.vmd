@@ -1,0 +1,92 @@
+
+
+"vale may move UAF to run-time, but it moves postconditions to compile-time. it's a different approach, one that i think is a good tradeoff. after all, UAF was a tiny minority of problems reported to google earth."
+
+
+> I recently came across your language and thought it was interesting. I'm curious how this is different from Rust. Why did you choose to use regions instead of something like Rust's borrow checker? Isn't this less flexible if you want some objects in a region to be mutable?
+
+
+that's a pretty tricky question as i have a lot of scattered thoughts in the area, good to have a chance to clarify that especially since ill be drafting some articles soon on that topic
+the biggest reasons are:
+- it's designed to be more flexible. we can use safe shared-mutability-based patterns like observers, back references, intrusive data structures (think doubly linked lists), dependency references, higher RAII, etc. and then later just immutably borrow it all at once
+- it allows for things like seamless concurrency (https://verdagon.dev/blog/seamless-fearless-structured-concurrency) which give us fearless concurrency without data coloring (such as rust's sync/send) or function coloring (async vs sync vs both)
+- it's more compatible with existing code and requires less refactoring, which is healthier for codebases in general
+- it's a nice vehicle for using better allocators with existing code that wasnt necessarily designed to be allocator-agnostic (https://verdagon.dev/blog/zero-cost-refs-regions goes into this a bit)
+those are the reasons off the top of my head
+Verdagon — Today at 4:58 PM
+there are also some downsides, as with any approach. since regions were explicitly designed to be opt-in instead of enforced everywhere, that means that if a user chooses to not use regions, that area of their code won't be as fast it could be in theory
+
+
+
+"a little more forgiving and helpful" lol
+
+
+that makes sense. we're intentionally backing off the super aggressive use of borrow checking, so we can cruise a little more in the average case.
+
+less constraints and restrictions on how you code. you get to focus on what your program should do, not how to trick the compiler into doing it.
+
+
+need to be honest and clear about the message: vale is for better programs, ones that are flexible and simple in general, with regions to do zero-cost memory safety where it's called for.
+
+
+try phrasing more positive. healthier codebases. easier to change. extensible, decoupled, composable.
+
+
+there were also a few other things we wanted to solve, which genrefs+regions look promising for:
+- easier concurrency
+- default safety, so we dont have to trust dependencies with our safety.
+- fearless FFI, since we copy between regions.
+- universal FFI, since every region can have its own language
+
+
+- relate to the reader. say we wanted something as fast as rust, but without the restrictions that make it more difficult than something like python or go. we didnt want to optimize the entire program, that's ridiculous. with gen refs and regions, we might have a chance at that. (go hard on the hope theme)
+
+
+"if you push this further to the extreme, things get really complex and you start to cut off a lot of the user's freedom. that's what happened with rust's borrow checker."
+
+
+
+as we start to approach the extreme of compile-time checking, we get to extremes of complexity. we discovered this with C++ template metaprogramming, and we're starting to see symptoms of this in Rust's design as well.
+
+
+rust's approach of starting from zero and building upwards seems to lead inevitably to this culture of performance golfing, adding more and more complexity to optimize when it doesnt make sense.
+
+
+write parts of it in the context of getting your game done, like how https://kevinlynagh.com/rust-zig/ talked about it in the context of getting his driver done. it made things really resonate.
+
+
+"premature borrow checking"
+
+
+a language should not have zero cost memory safety anywhere. building premature optimization into the language like that is harmful. it leads to too many constraints on the code, which makes it harder to change and causes artificial complexity and harmful refactoring. (but if one wants zero cost memory safety anywhere, one can use deep isos in theory, but its not recommended.)
+
+
+"something that we learned from C++ (and more recently, Rust) is ..."
+
+
+
+
+
+talk about the performance benefits of ease:
+- if we can just swap out and use an arena somewhere, then we can experiment to see where it speeds up. no rearchitecting needed.
+- if we can just swap out and use parallel, then thats good.
+- if we can just swap out and use pure, then thats good.
+between all of these, we'll have a lot more optimization power.
+
+
+
+
+# Does this compete with Rust?
+
+It's hard to say, and it definitely depends on the domain.
+
+Vale's concurrency features could be stellar for high-performance use cases like servers, games, and command line tools which like doing operations in parallel.
+
+However, Rust has a great ecosystem of libraries and momentum.
+
+
+ "i know the existence of something while its changing" shared mutability is a fact of life, of all useful software
+
+
+
+

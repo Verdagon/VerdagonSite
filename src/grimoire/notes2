@@ -1,0 +1,161 @@
+
+
+Hardened Boundaries
+
+This is actually an option! And you can still have FFI, by using deep copying and encryption.
+
+Encoding Things in the Pointer
+
+The top byte or two is a great place to do this. Also, the lower 4 bytes, as long as we're pointing at something big enough.
+
+Good for constant stuff.
+
+The Basil Approach
+
+Encoding Things in the Address Itself
+
+If we choose the memory location based on something, we've effectively coded it into the address.
+
+For example:
+Size bucket of the allocation
+
+An alternative to encoding things in the pointer. If you do both, you can get quite a bit of savings.
+
+Change Detectors
+
+A good alternative to AXM, detects it later.
+
+Examples:
+Optimistic locking
+Generational memory
+ConcurrentModificationException
+
+Constraint References
+
+Check-on-set
+
+Can assert that you're the only one with a reference to this particular object. Easy with constraint refs, RC, and you can do it with scope tethers.
+
+Thread Isolation
+
+It really helps to know that threads cant touch each other.
+
+Channels that copy can help too.
+
+If you want to deal with mutexes, you gonna need RBC or some other mechanism to maintain memory safety.
+
+Type Stability
+
+Useful in arrays, why not more?
+
+Runtime Checking we're in a Pure Function
+
+Extending Lifetime
+
+Asserting Lifetime
+
+Containing Lifetime
+
+Shape Stability
+
+It's especially nice because anything flat is basically the same thing.
+
+Deep Copying
+
+Can help when we're using a temporary allocator, and when we're sending something to another thread.
+
+Allocators
+
+Can even keep a counter of live objects in there, and halt if we delete it too early.
+
+Page Headers
+
+If you & ~0xFFFF, you get the top of the page, which might have something useful!
+
+Can even check it in a central table to see if it's a legit page.
+
+Freeze References
+
+Top-Byte-Ignore, Memory Tagging
+
+Like GM lite.
+
+Aspect Tracking
+
+Track things in the type system besides types! Examples:
+Permission
+Region (RBC)
+Ownership
+Inline or heap
+
+This is the opposite of onion typing.
+
+Region Borrow Checking
+
+Isolates
+
+RBC can help, regular borrow checker can help.
+
+Can combine with optionals as a pseudo mutex.
+
+Pure Functions
+
+With RBC, lets you do crazy optimizations.
+
+Final References
+
+They enable hierarchy borrowing! Can elide RC increments!
+
+Watch out though, final references inside varying inlines aren't actually final.
+
+Hierarchy Borrowing
+
+Made possible with final references or freeze refs, basically.
+
+Immutability
+
+Inline Data
+
+Borrow Checker
+
+Scope Tethering
+
+Its a cousin to RefCell, perhaps.
+
+Single Ownership
+
+Not just for C++ and rust anymore. Can also do it with c-refs, gen refs, and type stability.
+
+Temporary Copies of Immutable Data
+
+For example, if we know something's immutable (via RBC or freeze ref maybe?), and we want to take an address of a unique, we can copy it out temporarily. Then we can take its address!
+
+Generational Memory
+
+And also, we can put generations inline.
+
+Virtual Memory
+
+You can map two address spaces to the same underlying physical page.
+
+Maybe link that crazy circular buffer thing.
+
+Or, you can map a page to all 1s. Particularly useful for GM.
+
+Stack Scanning
+
+Not really sure what useful things we can say about it though.
+
+Reserved Memory
+
+Reserve some address space ahead of time! Let the loader grab it for you. Can try to pull from there instead of asking malloc. One compare-and-swap will do it, or maybe there's even faster techniques, like comparing your thread ID to the one at the destination memory and then a nonatomic compare-and-swap.
+
+Remembering Scope in Object
+
+rndmprsn had an idea where an object will have an integer to remember the stack frame it was allocated in. This is its lifetime. We could extend an object's life by lowering its lifetime.
+
+The only tricky part is that we'd have to lower every descendant's lifetime too.
+
+Perhaps there's a way to hybridize it?
+
+Undead Cycle

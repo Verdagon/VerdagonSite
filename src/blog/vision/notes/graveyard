@@ -1,0 +1,228 @@
+graveyard
+
+
+
+ * *The links below are only to anecdotes, not evidence.* I strive to stay true to their original context, let me know if any connection is unclear.
+ * These are here to help explain valid *alternate perspectives*, not to convince.
+ * We're comparing Rust [# here we say rust, talk about borrow checking] with manually memory managed languages, not Vale. If you'd like a follow-up post on that, let me know!
+
+
+
+
+
+
+
+
+
+
+The borrow checker helps with [# The borrow checker is actually one aspect of memory safety, complemented by other safety mechanisms like bounds checking, Rc, and other unsafe-made tools.] memory safety without directly impacting run-time performance. It's a rather revolutionary mechanism, and a major step forward for a huge swath of the industry.
+
+
+It sounds perfect, right? For some situations, yes.
+
+
+However, even it has its costs, according to those who have used it: 
+
+
+ * It can create [difficulty prototyping and iterating](#prototyping-and-iterating), even for experienced users.
+ * It doesn't support a lot of [simple, useful, and safe patterns](#unsupported-simple-useful-safe-patterns) that could be best for the situation.
+ * It [feels like a puzzle](#feels-like-a-puzzle), which can be fun, but sometimes frustrating and stressful.
+ * It has a [very expensive learning curve](#learning-curve).
+ * It can guide us to better architectures in some cases, but to [sub-optimal ones](#architectures-and-artificial-complexity) in others.
+ * It can cause [leaky abstractions](#leaky-abstractions-and-api-stability) and [API stability problems](#leaky-abstractions-and-api-stability).
+ * It can reduce complexity in some cases, but it can incur [artificial complexity](#architectures-and-artificial-complexity) in others.
+
+
+I know that this a taboo subject in some circles, and I can already feel the pitchforks and torches coming out. [#bias] [# TODO move this note into the intro]
+
+But read on anyway, you might be surprised at some of the nuances even if you don't agree with everything said here.
+
+
+
+
+
+
+Any computer science graduate can make a solution that works.
+
+
+It takes a _lot_ more skill and experience to make a solution that can later be built upon and expanded while still remaining healthy and accomplishing it goals.
+
+
+
+
+
+
+
+In other words, one might have to climb a second learning curve (the `Rc<RefCell<T>>` balance) to overcome the first learning curve (the borrow checker).
+
+
+It makes one wonder: at what point does a *learning curve* problem become a *complexity* problem?
+
+After all, despite their benefits, helicopters are the most difficult aircraft to fly, yet we don't just say that they have a learning curve problem.
+
+I'm not saying the borrow checker is to that point, but it's an interesting thought.
+
+
+
+
+
+
+Though I should say, this isn't a fundamental truth about memory-safety... just a fundamental truth of garbage collection, reference counting, and borrow checking. [# It's not hard to imagine a language that enforces the more resilient patterns mentioned in the previous section. It would be completely memory safe, with even less overhead than borrow checking.]
+
+
+
+
+# Old Intro
+
+A long time ago, I got into an intense debate with my classmate about which programming paradigms were better. Intelligence was questioned, insults were thrown, and blood vengeances were sworn. In other words, an average day in the computer science labs.
+
+
+Since then, I've worked with some amazing engineers on some amazing teams, and I've learned a very important lesson: when encountering someone with a different way of thinking, *learn more about their perspective* before arguing with them.
+
+
+Explore their beliefs and see _why_ they think that way. [Steelman](https://themindcollection.com/steelmanning-how-to-discover-the-truth-by-helping-your-opponent/) their arguments. Learn their situation, the relevant factors, and why they prioritize the way they do.
+
+
+With this outlook, I've unlearned a lot of myths, dogma, and absolutisms.
+
+
+ * I used to believe that *any amount of technical debt is always bad.* [# TODO any always awkward] Of course, anyone who has actually launched a product knows that it's better to have two solid, tested, and useful features than one absolutely perfect feature.
+
+ * I used to believe that one should *demand a complete set of requirements* and specifications from the product managers before starting any task. Then I learned that sometimes, that's called the [waterfall model](https://en.wikipedia.org/wiki/Waterfall_model) and at some levels it's better to develop iteratively. [# TODO too similar points, makes next mem safety jarring]
+
+ * I also used to think that one should only use memory-safe languages, and that compromising away any memory safety is always a bad idea. But in the real world, that's not necessarily true.
+
+
+Even though I personally use memory safety for most of my use cases and push for [better memory safety](https://vale.dev/memory-safe) in general, we shouldn't aimlessly require its use in every situation without recognizing the costs we pay.
+
+
+This post is *not trying to convince you* that memory safety doesn't matter, [# double negative] or that you should use a memory unsafe language for your specific use case.
+
+
+Rather, there's been a lot of talking past each other on this debate lately, so I'm hoping this post can help bring some nuance, clarity, and understanding to the conversation.
+
+
+
+
+
+
+
+"You make it sound like it's the end of the world and all of civilization collapses if we have a memory safety bug. News flash: It doesn't. We rarely get a bug report from those. Who are you to tell me that it's more of a problem than the borrow checker's own problems?"
+
+
+
+
+
+
+
+
+
+<<<<
+As a starting point, here are what languages are generally known for (though reasonable opinions differ, of course):
+
+ * Go is simple and safe, but quite slow.
+ * Swift is simple and safe, but slow in different ways.
+ * Rust is fast and safe, but can be complex and inflexible.
+ * Zig is the fastest and simple, but not as safe.
+////
+<div class="comparison">
+  <table width="100%">
+    <thead>
+      <th></th>
+      <th>Simple</th>
+      <th>Safe</th>
+      <th>Fast</th>
+    </thead>
+    <tbody>
+      <tr>
+        <th>Go</th>
+        <td class="good">Yes</td>
+        <td class="good">Yes</td>
+        <td class="bad">No</td>
+      </tr>
+      <tr>
+        <th>Swift</th>
+        <td class="good">Yes</td>
+        <td class="good">Yes</td>
+        <td class="good">No</td>
+      </tr>
+      <tr>
+        <th>Rust</th>
+        <td class="bad">No</td>
+        <td class="na">Yes</td>
+        <td class="good">Yes</td>
+      </tr>
+      <tr>
+        <th>C</th>
+        <td class="bad">Yes</td>
+        <td class="bad">No</td>
+        <td class="good">Yes</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+>>>>
+
+This is a drastic oversimplification, and there's a lot of nuance in this realm. For example:
+
+ * Swift and Go are slow in different ways.
+ * Rust isn't _quite_ memory-safe, and it gets less difficult after a while.
+ * C's unsafety can be mitigated with tooling, which is enough in some situations.
+
+
+
+
+
+
+This post is already thirty smoots too long [# [Smoot](https://en.wikipedia.org/wiki/Smoot)] so I won't be comparing any of these languages with Vale, but stay tuned!
+
+
+
+There's no language today that achieves all three of these yet. We're getting close:
+
+ * Pony's fully concurrent GC basically eliminates pauses altogether, by separating actors' memory from each other.
+ * Lobster is using some novel static analysis to reduce reference counting overhead by 95%, while keeping the language simple.
+ * Rust has programs that are a lot more complex, but its borrow checker has much less cost than the other two.
+
+
+There are a lot of upcoming languages in development which are getting even closer to that perfect balance (such as Vale, Cone, Forty2, Ante, and many more) but for this post we'll just talk about established languages.
+
+
+
+
+
+
+
+
+I'm not saying it's easy to avoid memory unsafety. [# too defensive?] But nowadays, it's as easy to detect as most other bugs, and most bugs are from other causes. [# something in here sounds hostile]
+
+
+Still, if we can catch these bugs at compile-time, or eliminate them entirely, why wouldn't we? Why not use a borrow checker? [# but all these sections were about memory safety, not borrow checking]
+
+
+
+
+
+
+
+# Afterword: Thoughts on Borrow Checkers and Language Design
+
+
+Even if it has its tradeoffs, the borrow checker has shown us an interesting new dimension of memory management. In situations where it works well, it's truly a game changer. It's also inspiring new mechanisms in the next generation of languages:
+
+
+ * [Ante](https://antelang.org/) is using borrow-checker-like [lifetime inference](https://antelang.org/docs/language/#lifetime-inference) for its memory management.
+ * [Vale](https://vale.dev/) is adding a [region-based borrow checker](https://verdagon.dev/blog/zero-cost-refs-regions) for optimization and [fearless structured concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency).
+ * [Cone](https://cone.jondgoodwin.com/) is adding a borrow checker in a way that's decoupled and compatible with any built-in or custom memory management strategy.
+ * [HVM](https://github.com/Kindelia/HVM) strategically inserts `clone`s and borrowing for immutable data.
+ * [Lobster](https://www.strlen.com/lobster/) is using borrow semantics under the hood to [reduce reference counting](https://aardappel.github.io/lobster/memory_management.html) costs to lower than any language before it.
+
+
+There are even more approaches past borrow checking, reference counting, and garbage collection: [generational references](https://verdagon.dev/blog/generational-references), [static allocation](https://github.com/tigerbeetledb/tigerbeetle/blob/main/docs/TIGER_STYLE.md#safety), linear typing, [stack-based mechanisms](https://degaz.io/blog/632020/post.html), and so on.
+
+
+Each one of these approaches has its strengths and weaknesses, and we're starting to see a trend of new languages blending memory safety approaches, getting closer and closer to the "holy grail" of memory management.
+
+
+And perhaps one of these new blends will come from an unlikely source, so new language designs should be explored, and any responsible use of any language should be encouraged.
+
