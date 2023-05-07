@@ -11,10 +11,10 @@ sponsor: us
 ---
 
 
-A few years ago, a [2am realization](/blog/making-regions-part-1-human-factor) changed the course of my life forever, and eventually turned me into a nomadic hermit [# Or rather a "digital nomad" as it's said these days! The details of how Vale turned me purposefully homeless is a ridiculous story worthy of another entire blog post.] and language designer.
+A few years ago, a [2am realization](/blog/making-regions-part-1-human-factor) changed the course of my life forever, and eventually turned me into a nomadic hermit [# Or rather a "digital nomad" as it's said these days. The details of how Vale made me follow the winds is a ridiculous story worthy of another entire blog post.] and language designer.
 
 
-The realization was that we could use [regions](/blog/zero-cost-borrowing-regions-overview) to eliminate memory safety overhead when we access data. It's something weird and new, like borrow checking without the reference restrictions, or perhaps more like if C++'s `const` and D's `pure` had a demonic hellspawn lovechild. [# My editor told me to take this line out, but all my beta readers told me to keep it in.]
+The realization was that we could use [regions](/blog/zero-cost-borrowing-regions-overview) to eliminate memory safety overhead when we access data. It's something weird and new, like borrow checking without the reference restrictions, or perhaps more like if C++'s `const` and D's `pure` had a demonic hellspawn lovechild. [# My friend that reviews these articles told me to take this line out, but all my beta readers told me to keep it in.]
 
 
 [Last time](/blog/making-regions-part-1-human-factor), I talked about how the first step towards implementing regions was to make the compiler's backend [# The "backend" is the part that takes Vale's representation of the code, and converts it into a form that LLVM is able to turn into binary code. I suppose one could be said LLVM is the _real_ backend, but I consider LLVM to be more the back-back-end, I suppose.] aware of multiple regions. After that, it was just another three weeks to make the first feature that used regions under the hood: [Fearless FFI](https://verdagon.dev/blog/fearless-ffi).
