@@ -435,6 +435,16 @@ if [ $TARGET == "making-regions-part-7-results" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
+if [ $TARGET == "regions-prototype" ] || [ $TARGET == "all" ] ; then
+  echo "Doing regions-prototype"
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/regions-prototype src/draft/making-regions/regions-prototype.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/regions-prototype src/draft/making-regions/regions-prototype.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
 
 
 if [ $MODE == "build" ] ; then

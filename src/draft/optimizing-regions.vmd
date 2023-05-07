@@ -2,20 +2,22 @@ The quest to optimize regions
 
 
 
-de-spilling:
-https://stackoverflow.com/questions/2460198/p6-architecture-register-renaming-aside-does-the-limited-user-registers-resul
 
-
-
-- i++ vs ++i
-- restrict vs global
-- local vs global
-- register renaming "r15 is a figment of your imagination"
-- register spilling, unspilling
 - O3 has a lot of (deterministic) noise. restrictptr should not have been faster than unsafe+bounds.
 - needing cset shield
 - bounds cost a lot!
+
+
 - zero cost memory is a myth! is this a point in zigs favor? does rust have invisible complexity?
 - borrowing and immutability cause cloning! slowdowns. another point in zigs favor.
 - the notion that bounds checks cause speedups is completely false, it seems.
 
+
+
+
+generation filling:
+- restrict vs global
+- local vs global
+- register renaming "r15 is a figment of your imagination"
+- register spilling, unspilling: https://stackoverflow.com/questions/2460198/p6-architecture-register-renaming-aside-does-the-limited-user-registers-resul
+- i++ vs ++i

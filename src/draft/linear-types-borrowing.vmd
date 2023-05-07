@@ -1,0 +1,16 @@
+
+What Vale Taught Us About Linear Types and Borrowing
+
+
+
+
+one of the best benefits of using a new language is seeing new ways of thinking.
+
+i mostly design vale, but sometimes, it designs itself.
+
+talk about how we dont need borrow checkers or GC or RC for memory safety. we just need one thing: single ownership.
+
+single ownership first came from c++ blah blah blah
+
+only need a couple constructs: swap, destructure
+

@@ -1,0 +1,170 @@
+---
+title: Chasing the Myth of Zero-Cost Memory Safety, and Some Pictures of Mythical Birds
+subtitle: Implementing a New Memory Safety Approach, Part 3
+author: Evan Ovadia
+date: May 20, 2022
+realm: blog
+path: blog/making-regions-part-3-zero-cost-memory-safety-myths
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: us
+---
+
+
+In my recent article about how linear types can provide memory safety without a borrow checker, reference counting, or tracing garbage collection, I mentioned blah blah blah.
+
+
+Someone in our server asked, "So this means linear types give us zero-cost memory safety like borrow checking then, yeah?"
+
+
+The short answer is, yes, they do!
+
+The long answer though is: zero-cost memory safety doesn't actually exist, and never has!
+
+
+
+Let's talk about memory safe languages!
+
+
+*Rust* is certainly the fastest memory-safe mainstream language. But it's not quite "zero cost", and never really claimed to be. Rust's big innovation is that its borrow checker made memory-safety a *zero-cost abstraction*.
+
+
+From Bjarne Stroustrup:
+
+> What you don’t use, you don’t pay for. And further: What you do use,
+you couldn’t hand code any better.
+
+(FIND A BETTER SOURCE)
+
+
+A zero-cost abstraction isn't necessarily zero-cost, of course. It just means that it doesn't introduce any additional overhead.
+
+
+So let's ask: does the borrow checker introduce additional overhead?
+
+
+It does, actually.
+
+
+read https://users.rust-lang.org/t/not-quite-zero-cost-abstraction/11514
+
+read https://www.reddit.com/r/cpp/comments/degmy1/cppcon_2019_chandler_carruth_there_are_no/
+
+
+
+
+Even at the time though, it never 
+
+
+
+
+
+
+
+There was once a scholar who hunted a mythical bird called the (name here). He was hoping that by finding the bird, he could unlock the 
+
+
+
+When you aim for the absolute best, and you fail, you end up with something _incredible_. This happened when I optimized a thing in CSC 305 lol.
+
+
+
+
+What Rust does well is *making overhead explicit*. (Vale will have a keyword for that soon.)
+
+Zig is really the gold standard for this.
+
+
+
+
+
+Wild goose chase
+
+
+
+
+Snipe hunting
+
+
+
+
+
+
+Let's talk about that!
+
+
+
+
+
+But how close are linear types and borrow checking to "zero cost"?
+
+
+must come after the linear types post, so we can say that vale and rust both have this stuff. but how zero cost are they really?
+
+
+
+article: What is "Zero Cost Memory Safety"?
+or: "Understanding Zero Cost Memory Safety"
+
+- everyone knows what it is, and nobody agrees. it's like... need example. systems programming, lol. republican. "natural" in food https://listverse.com/2014/11/20/10-everyday-words-with-meanings-no-one-can-agree-on/, patriot, open source, emo, roguelike.
+- it doesnt have RC or GC.
+- doesnt mean the language is memory safe for zero cost. we still need bounds checking, for example. (dependent types can do something here, but in practice move a lot of cost to run-time)
+- it's eliminating undefined behavior, or at least being able to in theory (minus implementation bugs)
+- in fact, sometimes we shove cost outward into things like bounds checks, hashing, cloning, or generational indices. a doubly linked list based on a vec is technically zero cost but it moves some overhead into vec expansion and bounds checking. a winning trade sometimes, but the overhead is there. in a random access program, performance will suffer a little bit. branching can have cost, see emulator link.
+- ZCMS is... what exactly?
+
+"makes explicit"
+"cost is opt in"
+no true Scotsman fallacy
+
+mention val, austral, hvm, cone
+
+note to self: theres no such thing, it was really zero cost abstraction lol
+
+
+
+we don't *want* full zero cost memory safety. this is the sweet spot because only downwardly infectious
+
+
+
+"there is no such thing as 'zero cost'. experienced rust users know this. in the presence of non-trivial requirements, the only way forward is to incur overhead. cloning, indexing, hashing, bounds checking. you cant avoid them, and they all cause overhead. the question is how far you want to fight that truth, and how long before you give up and decide to just get your work done."
+
+
+
+
+
+the goal is not (and was never) to get to zero cost memory safety. its ridiculous, impossible, and unhealthy.
+
+our goal is to make a new balance between performance, safety, and usability. we're right on target for that.
+
+remember:
+"vale doesnt have zero cost memory safety like rust."
+"rust doesnt either, it has to fall back to bounds checks."
+"some performance hits are okay for safety, its a tradeoff"
+"vale's tradeoffs are much better"
+
+
+
+
+
+https://news.ycombinator.com/item?id=33821755
+
+
+"I'm surprised at how slowly I'm getting used to it!
+
+I mean I've improved but I still have a lot of "wtf" moments. End up doing a lot of deep copying and heap allocations just to shut the compiler up, which makes me question just how "zero cost" the safety is."
+
+
+
+rust never said it had zero-cost memory safety, it said it had zero-cost abstractions.
+
+
+
+"zero cost memory safety and the complexity mine field"
+
+
+
+thr borrow checker isnt zero cost. it sends massive shockwaves of complexity cost outward.
+
+
+

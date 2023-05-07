@@ -28,6 +28,16 @@
 
 
       <item>
+         <title>How To Survive Your Project's First 100,000 Lines</title>
+         <guid>https://verdagon.dev/blog/first-100k-lines</guid>
+         <link>https://verdagon.dev/blog/first-100k-lines</link>
+         <pubDate>Tue, 2 May 2023 11:15:00 -0600</pubDate>
+         <category>Programming Languages</category>
+         <category>Vale Programming Language</category>
+         <author>noreply@verdagon.dev (Evan Ovadia)</author>
+      </item>
+
+      <item>
          <title>How Memory Safety Approaches Speed Up and Slow Down Development Velocity</title>
          <guid>https://verdagon.dev/blog/when-to-use-memory-safe-part-2</guid>
          <link>https://verdagon.dev/blog/when-to-use-memory-safe-part-2</link>

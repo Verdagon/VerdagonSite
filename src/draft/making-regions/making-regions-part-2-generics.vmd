@@ -43,7 +43,9 @@ pure func SumList(list &List<int>) int {
 ```
 
 
+
 Under the hood though, some pretty complex things have to happen. The compiler needs to transform the above function into something like this:
+
 
 ```vale
 func SumList<r' imm, x' rw>(list &r'List<r'int>) 'int { «iso»
@@ -55,6 +57,7 @@ func SumList<r' imm, x' rw>(list &r'List<r'int>) 'int { «iso»
   return iso(sum); «isoint»
 }
 ```
+
 
 
 If you're curious, here's what just happened:
@@ -157,11 +160,11 @@ At the start of this, Vale didn't have full generics (like Java), it had *templa
 
 Let's say we have this template function in Vale:
 
-```
+```vale
 func sum<T>(a T, b T) T {
   return a + b;
 }
-```
+```: notest
 
 Vale doesn't type-check that function up-front.
 
@@ -172,17 +175,19 @@ Instead, it waits for other functions to call it, like so:
 func bork() int {
   return sum<int>(4, 5);
 }
-```
+```: notest
 
-Now, Vale can *instantiate* the `sum` function, to generate a version of it with `int` instead of `T`, like this:
+Then, Vale can *instantiate* the `sum` function, to generate a version of it with `int` instead of `T`, like this:
 
-```
+```vale
 func sum<int>(a int, b int) int {
   return a + b;
 }
-```
+```: notest
+
 
 Then it type-checks it, including making sure that there's a `int + int` operation available. [# Or more specifically, it makes sure that there's a `func +(int, int)` available.]
+
 
 This identical to how C++ works, under the hood. Or if you've used C, it's similar to how preprocessor macros work. Specifically, it does *substitutions first*, then *type-checks after*.
 
@@ -190,7 +195,10 @@ This identical to how C++ works, under the hood. Or if you've used C, it's simil
 That's how a templating system works. Generics are a bit different.
 
 
-When a compiler uses generics under the hood, it does it in the reverse order: it type-checks the function first, _before_ it knows what `T` really is. Then later, after the entire program has been type-checked, it instantiates the different versions of the functions.
+When a compiler uses generics under the hood, it does it in the reverse order:
+
+ 1. It type-checks the function first, _before_ it knows what `T` really is.
+ 1. Later, after the entire program has been type-checked, it instantiates the different versions of the functions.
 
 
 <slice />
@@ -204,11 +212,11 @@ If the compiler uses generics, then we can do some region-related things after t
 Specifically, the compiler would:
 
  1. Type-check all functions.
- 2. Region-check all functions; make sure that the user doesn't mix up data from two regions.
- 3. Remove all traces of regions. For example:
+ 1. Region-check all functions; make sure that the user doesn't mix up data from two regions.
+ 1. Remove all traces of regions. For example:
     * It would turn `func thrice<x' rw>(...)` into `func thrice(...)`.
     * Instead of requesting a `thrice<main'>` and a `thrice<spork'>`, callers would only request a simple `thrice`.
- 4. Instantiate the functions.
+ 1. Instantiate the functions.
 
 
 By removing all traces of regions, step 4 won't instantiate a different `thrice<main'>` and a `thrice<spork'>`. Only a single `thrice` will be generated, solving our problem.
@@ -223,19 +231,16 @@ This is sometimes called "erasure". By "erasing" the differences in the earlier 
 Generics are _way_ harder than templates.
 
 
-I thought it would only take a few weeks at most. By the end, it had taken 81 days and [23,588 lines](https://github.com/ValeLang/Vale/commit/93eb8e140bbbda3a8f47099b3215c5eb700c90f6) of intense coding.
+I thought it would only take a few weeks at most. By the end, it had taken 81 days and [23,588 lines](https://github.com/ValeLang/Vale/commit/93eb8e140bbbda3a8f47099b3215c5eb700c90f6) of rather intense coding.
 
 
 When I'm coding something particularly challenging, I have to get out my pencil and paper [# Elegant weapons, for a more civilized age.] and just start scribbling notes and thoughts until something starts to make sense. Usually this happens once or twice per feature... _thirty pages_ of my notebook are about generics. It was _brutal_.
 
 
-The internet often makes fun of Go for taking ten years to add their generics. Honestly, after this endeavor, _I don't blame them one bit._ I kind of want to find the folks on the Go team that implemented its generics, and comisserate together over some Delirious Blue. [# We also named of one of our test cases after this drink.] Anyone who looked over would see two grown engineers crying over their drinks, saying weird words like "polymorphism" and "interface bounds" over and over.
+The internet often pokes fun at Go for taking ten years to add their generics. Honestly, after this endeavor, _I don't blame them one bit._ I kind of want to find the folks on the Go team that implemented its generics, and comisserate together over some Delirious Blue. [# We also named of one of our test cases after this drink.] Anyone who looked over would see two grown engineers crying over their drinks, saying weird words like "polymorphism" and "interface bounds" over and over.
 
 
 The problem is that I'm just an engineer with some skills in data structures and architecture. I'm not a type theoretician, and this more mathematical abstract thinking doesn't come naturally to me. With generics, we're taking abstract thinking to a whole new level: we're type-checking functions that don't exist yet, conjuring "placeholder" types, and putting bounds information in places that I didn't even know existed.
-
-
-If you want to hear more about how crazy generics are, check out [How Summoning Golems Helps Us Understand Generics](/blog/summoning-golems-generics) and [When a Language Should Have Generics, Templates, or Both](/blog/templates-generics-blend.vmd). I can't promise they'll make sense, but I _can_ promise that it felt _very_ good to rant about generics in them.
 
 
 I also want to give a shout-out to the amazing people in my server who helped me get through the journey. Huge thanks to Jon Goodwin (of [Cone](cone.jondgoodwin.com/)), Arthur Weagel, Ivo Balbaert, RazzBerry, zikzak323, Zodey, keeslinp, mikey, IsaacPaul, kurtkuehnert, DestyNova, librarianmage, devast8a, and cristian.vasile! I'm not sure I could have finished without their support and positive energy. You all are awesome!

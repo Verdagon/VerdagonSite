@@ -10,7 +10,116 @@ These are articles that:
 - Are a benefit to people who aren't even that interested in Vale. They stand on their own, and only mention Vale in passing.
 - Don't raise the stressful question of "is this thing youre talking about ready yet?" and stalls it for a while, yet still tells people of our approaches and philosophy.
 
+
+## What Vale Taught Me About Linear Types and Borrowing
+
+
+
+## Move Semantics Without a Borrow Checker
+
+- talk about vale, lobster, c++, rust, inko
+"single ownership without a borrow checker"
+basically the same thing lol
+
+
+
+## Single Ownership, from a C Perspective
+
+(SOFCP)
+
+See blog/single-ownership-from-c-perspective
+
+maybe even mention that you can write a program entirely in terms of single ownership. would you want to? heck no. that would end up as complicated as rust lol.
+
+
+## Writing a Compiler Nomadically
+
+A bunch of tips for programming on the go:
+
+ * Leave context clues for yourself, and use some good static typing.
+ * Bring a generator with you. Not really a generator, but one of these things. I call it a "yellow dwarf" because it outputs an insane amount of power.
+ * Bring a brita filter!
+ * Get an unlimited data plan!
+ * Get South Dakota residency!
+ * Coffee shops are getting *amazing* lately. Avocado toast, egg sandwiches, all sorts of things. Be sure to tip well, and take off if there are no tables available and you've been there for a while, so others can sit down.
+
+Won't be able to do this forever. Posture is a potential problem.
+
+
+
+## Whether to use <> for generics
+
+Mention we're doing it in vale, nothing bad has happened yet.
+
+its part of the style anyway.
+
+myArray[i] is ambiguous with List[int]
+
+Can either do myArray[i] and List\&lt;int\&gt;(...)
+
+or
+
+myArray(i) and List[int](...)
+
+i like myArray[i], it makes it clear we're operating on a local variable.
+
+Mention it's up in the air for Vale. We could do a switch in our one remaining syntactical breaking change.
+
+
+
+## Single Ownership, from a GC Perspective
+
+(SOFGCP)
+
+See blog/single-ownership-from-gc-perspective
+
+
+## Surprising Weak References, Redux
+
+sometime soon: update the HGM article and add a note to the top of weak references saying this is out of date, and we'll be using chaining instead
+
+say that with our switch to gen refs V2, it's now an open question again how we'll implement weak references
+
+
+## Infix Calling
+
+Talk about how it was really easy, just do alternating, and lowest precedence.
+
+
+## Three languages I'd Like to Use in 2033
+
+nice inspiring article
+
+say that my primary goal is to make vale mainstream, but if i cant, i want to trigger the creation of these three languages, which i'll call X, Y, Z.
+
+- RC with regions and inline. nim could have been this, but its creator doesn't believe it's possible.
+- C# with regions. verona comes close.
+- vale basically. even one that integrates into CHERI or memory tagging. regions are nice for parallelism even if we dont do memory safety.
+
+basically spend the entire article extolling vale lol
+
+might want to wait for regions proof to come out actually.
+
+
+
+
+## Infectious Systems
+
+for infectious article (best wait for seamless concurrency)
+
+talk about "red tape syndrome"
+
+infectious problem: everyone above you needs to approve something youre doing. why does everyone care if youre doing this thing?
+
+they give you reasons, but then you look at the next company over and they avoid the problem completely by thinking about the problem a different way. makes you wonder, what went wrong?
+
+
+
+
+
 ## When Static Typing Goes Too Far
+
+(dont post it this way; static typing is good because it has escape hatches. static *analysis* can be bad.)
 
 Intentionally titled a bit provocatively.
 
@@ -24,14 +133,6 @@ some problematic examples: async/await. pure.
 
 recommendation: be aware of this. have strong APIs. avoid viral constraints.
 
-
-## Surprising Weak References, Redux
-
-sometime soon: update the HGM article and add a note to the top of weak references saying this is out of date, and we'll be using chaining instead
-
-## The Zero Overhead Function
-
-the same article mentioned in the yak shaving article, go into more detail about it
 
 ## What I Told 4,000 Nooglers About Impostor Syndrome
 
@@ -51,41 +152,10 @@ everyone else is pretending. there are no experts, just people playing the part.
 
 maybe thats okay. its better to have a direction, even if its only semi-informed
 
-## Single Ownership, from a C Perspective
-
-(SOFCP)
-
-See blog/single-ownership-from-c-perspective
-
-## Single Ownership, from a GC Perspective
-
-(SOFGCP)
-
-See blog/single-ownership-from-gc-perspective
-
-## When to use \&lt;\&gt; for generics
-
-Mention we're doing it in vale, nothing bad has happened yet.
-
-its part of the style anyway.
-
-myArray[i] is ambiguous with List[int]
-
-Can either do myArray[i] and List\&lt;int\&gt;(...)
-
-or
-
-myArray(i) and List[int](...)
-
-i like myArray[i], it makes it clear we're operating on a local variable.
 
 ## Enums are Really Just Interfaces
 
-## Infix Calling
-
-Talk about how it was really easy, just do alternating, and lowest precedence.
-
-## A Compiler's First 100,000 Lines: Lessons Learned
+## A Compiler's First 150,000 Lines
 
 (r/programminglanguages, r/programming, HN)
 
@@ -99,9 +169,9 @@ Talk about how it was really easy, just do alternating, and lowest precedence.
 - mental:
   - talk about how youre always in the details, the edge cases, the part that are weird. but, those are the parts that like, 0.01% of people will see anyway.
   - when you program in your own language, you see how beautiful it really is, because youre coding it like the average coder.
-  - everything your write is throwaway code. get used to this early on. what youre really building is the expertise.
+  - everything your write is throwaway code. get used to this early on. what youre really building is the expertise. and then later on, your goal is to make your expertise less important, via docs and testing.
   - keep an eye out for isolated projects: small, medium, large. these will be great for onboarding people.
-  - its difficult to work on a language when people keep asking you "why do this when rust/zig/nim already exist". gotta keep goin!
+
 
 ## Declaration and Mutation Statements
 
@@ -575,6 +645,15 @@ While posting the below, also post the 19 vision docs.
   - Vale's metaprogramming
 
 # Encouraging People to Try Vale
+
+
+## How to do borrow checking in vale
+
+- an article for people coming from rust
+- say up-front that vale doesnt use borrow checking, it uses region borrowing, which is designed to be simpler and compose a little better with other features like concurrency, shared mutability, and deterministic runs.
+- &mut becomes linear style
+- & often becomes pure functions and pure blocks that freeze the entire world
+- anyone who needs more precision could use isolates but most of the time using borrow checking to that extent will backfire and end up using more CPU.
 
 ## Pentagonal Cellular Automata in Vale
 
