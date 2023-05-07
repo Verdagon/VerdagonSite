@@ -1,5 +1,5 @@
 ---
-title: Draft Preview: Zero-Cost Memory Safety with Vale Regions, Part 5: Hold Refs
+title: Draft Preview: Zero-Cost Borrowing with Vale Regions, Part 5: Hold Refs
 subtitle: Watch how we split our memory into regions, for more performance!
 author: Evan Ovadia
 date: Draft, Preview
