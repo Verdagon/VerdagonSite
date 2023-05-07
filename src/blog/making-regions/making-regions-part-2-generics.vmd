@@ -72,7 +72,7 @@ If you're curious, here's what just happened:
 In other words, it *assigns a region* to every type. `List<int>` becomes `r'List<r'int>`, to know that the list and its contents both came into the pure function. Check out [Immutable Region Borrowing](https://verdagon.dev/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing) for more on this! [#tricky]
 
 
-Vale's compiler isn't at that point yet, of course. It currently acts like every other language, where all data in a function is in the same region.
+Vale's compiler isn't at that point yet, of course. [# The Vale compiler actually is at that point, but I'm a few months behind publishing these posts. To see the posts I haven't published yet, [sponsor us on GitHub](https://github.com/sponsors/ValeLang)! (Or just send me an email, happy to give anyone access!)] It currently acts like every other language, where all data in a function is in the same region.
 
 
 The first step to get from here to there is to make the compiler _aware_ that everything is in the same region.
@@ -214,8 +214,8 @@ Specifically, the compiler would:
  1. Type-check all functions.
  1. Region-check all functions; make sure that the user doesn't mix up data from two regions.
  1. Remove all traces of regions. For example:
-    * It would turn `func thrice<x' rw>(...)` into `func thrice(...)`.
-    * Instead of requesting a `thrice<main'>` and a `thrice<spork'>`, callers would only request a simple `thrice`.
+    1. It would turn `func thrice<x' rw>(...)` into `func thrice(...)`.
+    1. Instead of requesting a `thrice<main'>` and a `thrice<spork'>`, callers would only request a simple `thrice`.
  1. Instantiate the functions.
 
 
@@ -228,7 +228,7 @@ This is sometimes called "erasure". By "erasing" the differences in the earlier 
 ## Generics are a Nightmare [# I actually called it a [gorram](https://screenrant.com/firefly-swear-word-guide-gorram/) nightmare but I promised myself that in 2023 I wouldn't put any more Firefly references into my articles.]
 
 
-Generics are _way_ harder than templates.
+Generics are _much_ harder to implement than templates.
 
 
 I thought it would only take a few weeks at most. By the end, it had taken 81 days and [23,588 lines](https://github.com/ValeLang/Vale/commit/93eb8e140bbbda3a8f47099b3215c5eb700c90f6) of rather intense coding.
@@ -237,10 +237,10 @@ I thought it would only take a few weeks at most. By the end, it had taken 81 da
 When I'm coding something particularly challenging, I have to get out my pencil and paper [# Elegant weapons, for a more civilized age.] and just start scribbling notes and thoughts until something starts to make sense. Usually this happens once or twice per feature... _thirty pages_ of my notebook are about generics. It was _brutal_.
 
 
-The internet often pokes fun at Go for taking ten years to add their generics. Honestly, after this endeavor, _I don't blame them one bit._ I kind of want to find the folks on the Go team that implemented its generics, and comisserate together over some Delirious Blue. [# We also named of one of our test cases after this drink.] Anyone who looked over would see two grown engineers crying over their drinks, saying weird words like "polymorphism" and "interface bounds" over and over.
+The internet often pokes fun at Go for taking ten years to add their generics. Honestly, after this endeavor, _I don't blame them one bit._ I kind of want to find the folks on the Go team and comisserate together over some Delirious Blue. [# We also named of one of our test cases after this drink.] Anyone who looked over would see two grown engineers crying over their drinks, saying weird words like "polymorphism" and "interface bounds" over and over.
 
 
-The problem is that I'm just an engineer with some skills in data structures and architecture. I'm not a type theoretician, and this more mathematical abstract thinking doesn't come naturally to me. With generics, we're taking abstract thinking to a whole new level: we're type-checking functions that don't exist yet, conjuring "placeholder" types, and putting bounds information in places that I didn't even know existed.
+The problem is that I'm just an engineer with some skills in data structures and architecture. I'm not a type theoretician, and this more mathematical abstract thinking doesn't come naturally to me. When implementing generics, we're taking abstract thinking to a whole new level: we're type-checking functions that don't exist yet, conjuring "placeholder" types, and putting bounds information in places that I didn't even know existed.
 
 
 I also want to give a shout-out to the amazing people in my server who helped me get through the journey. Huge thanks to Jon Goodwin (of [Cone](cone.jondgoodwin.com/)), Arthur Weagel, Ivo Balbaert, RazzBerry, zikzak323, Zodey, keeslinp, mikey, IsaacPaul, kurtkuehnert, DestyNova, librarianmage, devast8a, and cristian.vasile! I'm not sure I could have finished without their support and positive energy. You all are awesome!
@@ -252,7 +252,7 @@ I also want to give a shout-out to the amazing people in my server who helped me
 ## Next Steps
 
 
-Now that generics is finally finished, I can resume progress with regions.
+Now that generics is finally finished, I can resume progress with regions!
 
 
 The next step is to make it so every function is aware that everything is in the same region.
@@ -276,8 +276,8 @@ func thrice<x' rw>(a x'int) x'int {
 }
 ```
 
-
 ...then the compiler will be "region-aware". After that, we can start playing with multi-region functions and the real fun can begin!
+
 
 
 *That's all for now!* I hope you enjoyed this article. Keep an eye out for the next one on our [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), [discord server](https://discord.gg/SNB8yGH), or [subreddit](https://reddit.com/r/vale)!

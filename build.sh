@@ -407,8 +407,8 @@ fi
 
 if [ $TARGET == "making-regions-part-2-generics" ] || [ $TARGET == "all" ] ; then
   echo "Doing making-regions-part-2-generics"
-  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-2-generics src/draft/making-regions/making-regions-part-2-generics.vmd
-  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-2-generics src/draft/making-regions/making-regions-part-2-generics.vmd
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-2-generics src/blog/making-regions/making-regions-part-2-generics.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-2-generics src/blog/making-regions/making-regions-part-2-generics.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
