@@ -155,8 +155,8 @@ fi
 
 if [ $TARGET == "generational-references-v1" ] || [ $TARGET == "all" ] ; then
   echo "Doing generational-references-v1"
-  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/generational-references-v1 src/blog/retired/generational-references-v1.vmd
-  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/generational-references-v1 src/blog/retired/generational-references-v1.vmd
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/generational-references src/blog/retired/generational-references.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/generational-references src/blog/retired/generational-references.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -165,8 +165,8 @@ fi
 
 if [ $TARGET == "generational-references" ] || [ $TARGET == "all" ] ; then
   echo "Doing generational-references"
-  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/generational-references src/blog/vision/generational-references.vmd
-  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/generational-references src/blog/vision/generational-references.vmd
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/generational-references-v2 src/blog/vision/generational-references-v2.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/generational-references-v2 src/blog/vision/generational-references-v2.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -238,16 +238,6 @@ if [ $TARGET == "python-data-races" ] || [ $TARGET == "all" ] ; then
   echo "Doing python-data-races"
   echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/python-data-races src/blog/retired/python-data-races.vmd
   eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/python-data-races src/blog/retired/python-data-races.vmd
-  if [ $? != 0 ]; then
-    echo "Failed!"
-    exit 1
-  fi
-fi
-
-if [ $TARGET == "googler-to-traveler" ] || [ $TARGET == "all" ] ; then
-  echo "Doing googler-to-traveler"
-  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/googler-to-traveler src/blog/thoughts/googler-to-traveler.vmd
-  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/googler-to-traveler src/blog/thoughts/googler-to-traveler.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -417,8 +407,8 @@ fi
 
 if [ $TARGET == "making-regions-part-2-generics" ] || [ $TARGET == "all" ] ; then
   echo "Doing making-regions-part-2-generics"
-  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-2-generics src/blog/making-regions/making-regions-part-2-generics.vmd
-  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-2-generics src/blog/making-regions/making-regions-part-2-generics.vmd
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-2-generics src/draft/making-regions/making-regions-part-2-generics.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-2-generics src/draft/making-regions/making-regions-part-2-generics.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -427,8 +417,8 @@ fi
 
 if [ $TARGET == "making-regions-part-7-results" ] || [ $TARGET == "all" ] ; then
   echo "Doing making-regions-part-7-results"
-  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-7-results src/blog/making-regions/making-regions-part-7-results.vmd
-  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-7-results src/blog/making-regions/making-regions-part-7-results.vmd
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-7-results src/draft/making-regions/making-regions-part-7-results.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/making-regions-part-7-results src/draft/making-regions/making-regions-part-7-results.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1

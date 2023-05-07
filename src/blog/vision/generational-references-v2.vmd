@@ -273,6 +273,8 @@ pure func PrintFuel(ship_ref &Spaceship) {
   println(ship_ref.fuel);
 }
 ```
+>>>>
+
 
 
 This is called [zero-cost borrowing](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing). It's a pretty in-depth topic, check out [this series](/blog/zero-cost-memory-safety-regions-overview) which talks about other ways that regions help eliminate `__check`s.
@@ -415,6 +417,9 @@ But overall, the technique looks very promising, and feels pretty good to use.
 
 
 # Notes
+
+
+[#zerochecks]
 
 
 <slice>

@@ -94,7 +94,7 @@ Check it out at [https://vale.dev/](https://vale.dev/)!
 
 ```vale
 exported func main() {
-  planets = []["Venus", "Earth", "Mars"];
+  planets = [#]("Venus", "Earth", "Mars");
   foreach planet in planets {
     println("Hello " + planet + "!");
   }

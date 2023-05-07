@@ -141,7 +141,7 @@ struct Vec4<T> {
   elements [#4]T; // 4-element array of T
 }
 exported func main() {
-  v = Vec3<int>([#][3, 4, 5]);
+  v = Vec3<int>([#](3, 4, 5));
   ...
 }
 ```
@@ -153,7 +153,7 @@ struct Vec<N Int, T> {
   elements [#N]T;
 }
 exported func main() {
-  v = Vec<3, int>([#][3, 4, 5]);
+  v = Vec<3, int>([#](3, 4, 5));
   ...
 }
 ```
