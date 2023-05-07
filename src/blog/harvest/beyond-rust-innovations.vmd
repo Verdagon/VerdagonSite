@@ -192,7 +192,7 @@ With this, Vale makes it so that a function call (and any functions it indirectl
 
 It keeps these separate by tracking which region every reference is pointing into.
 
-You can read more about this at [Zero-Cost Memory Safety with Vale Regions](/blog/zero-cost-borrowing-regions-overview).
+You can read more about this at [Zero-Cost Borrowing with Vale Regions](/blog/zero-cost-borrowing-regions-overview).
 
 This is particularly exciting because:
 

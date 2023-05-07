@@ -126,7 +126,7 @@ PatternMap<bool> {
 #concurrency: If we add `parallel` in front of this loop, it can perform these iterations in parallel on multiple threads, using [seamless structured concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency).
 
 
-#immaccess: Because we're accessing data that was a parameter to a pure function, it doesn't have to check that the data is still alive or increment any reference counters, see [Zero-Cost Memory Safety with Vale Regions](/blog/zero-cost-borrowing-regions-overview).
+#immaccess: Because we're accessing data that was a parameter to a pure function, it doesn't have to check that the data is still alive or increment any reference counters, see [Zero-Cost Borrowing with Vale Regions](/blog/zero-cost-borrowing-regions-overview).
 
 
 #hgm: [Hybrid-Generational Memory](https://verdagon.dev/blog/hybrid-generational-memory) would notice that we're iterating over a piece of data we own, so it wouldn't have to keep checking it still exists.

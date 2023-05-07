@@ -1,5 +1,5 @@
 ---
-title: Zero-Cost Memory Safety with Vale Regions, Part 4: Multi-Region Data (Preview, Draft)
+title: Zero-Cost Borrowing with Vale Regions, Part 4: Multi-Region Data (Preview, Draft)
 subtitle: Watch how we split our memory into regions, for more performance!
 author: Evan Ovadia
 date: Preview, Draft
