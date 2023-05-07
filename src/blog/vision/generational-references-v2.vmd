@@ -24,7 +24,7 @@ TODO:
 *Generational references* are a new memory management technique that's easy, deterministic, and fast. [# This is an updated version of the 2021 article, which you can still find [here](/blog/generational-references-v1)]
 
 
-Vale also combines generational references with [regions](/blog/zero-cost-memory-safety-regions-overview) to enable [zero-cost borrowing](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing) for when we want to squeeze every last bit of performance out of our programs. [# Regions have been prototyped, but aren't complete yet. See [here](/blog/regions-first-prototype) for more!]
+Vale also combines generational references with [regions](/blog/zero-cost-borrowing-regions-overview) to enable [zero-cost borrowing](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing) for when we want to squeeze every last bit of performance out of our programs. [# Regions have been prototyped, but aren't complete yet. See [here](/blog/regions-first-prototype) for more!]
 
 
 This article explains:
@@ -258,7 +258,7 @@ func PrintFuel(ship_ref &Spaceship) {
 
 # Skipping even more checks with regions
 
-We can use [regions](/blog/zero-cost-memory-safety-regions-overview)' to safely skip generation checks for a certain scope.
+We can use [regions](/blog/zero-cost-borrowing-regions-overview)' to safely skip generation checks for a certain scope.
 
 
 <<<<
@@ -277,7 +277,7 @@ pure func PrintFuel(ship_ref &Spaceship) {
 
 
 
-This is called [zero-cost borrowing](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing). It's a pretty in-depth topic, check out [this series](/blog/zero-cost-memory-safety-regions-overview) which talks about other ways that regions help eliminate `__check`s.
+This is called [zero-cost borrowing](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing). It's a pretty in-depth topic, check out [this series](/blog/zero-cost-borrowing-regions-overview) which talks about other ways that regions help eliminate `__check`s.
 
 
 # How many `__check`s remain?

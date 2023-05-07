@@ -41,6 +41,36 @@
         "source": "/blog/probabilistic-memory-safety",
         "destination": "/blog/thoughts-on-perfect-memory-safety",
         "type": 302
+      },
+      {
+        "regex": "/blog/zero-cost-memory-safety-regions-overview",
+        "destination": "/blog/zero-cost-borrowing-regions-overview",
+        "type": 302
+      },
+      {
+        "regex": "/blog/zero-cost-memory-safety-1-immutable-borrowin",
+        "destination": "/blog/zero-cost-borrowing-1-immutable-borrowin",
+        "type": 302
+      },
+      {
+        "regex": "/blog/zero-cost-memory-safety-2-isolates",
+        "destination": "/blog/zero-cost-borrowing-2-isolates",
+        "type": 302
+      },
+      {
+        "regex": "/blog/zero-cost-memory-safety-3-one-way-isolation",
+        "destination": "/blog/zero-cost-borrowing-3-one-way-isolation",
+        "type": 302
+      },
+      {
+        "regex": "/blog/zero-cost-memory-safety-4-multi-region-data",
+        "destination": "/blog/zero-cost-borrowing-4-multi-region-data",
+        "type": 302
+      },
+      {
+        "regex": "/blog/zero-cost-memory-safety-5-region-scoped-data",
+        "destination": "/blog/zero-cost-borrowing-5-region-scoped-data",
+        "type": 302
       }
     ]
   }

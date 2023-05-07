@@ -17,14 +17,14 @@ Three years, two states, and one pandemic ago, I wrote about a very weird idea: 
 And a couple months later, another weird idea struck: what if we use generational indices as the foundation for an entire language?
 
 
-These ideas evolved in _weird_ ways. The first one evolved into a full [region-based borrowing system](https://verdagon.dev/blog/zero-cost-memory-safety-regions-overview). The second one become [generational references](/blog/generational-references). Together, they looked like they could form an *entirely new approach* to memory safety, one that doesn't use reference counting, tracing garbage collection, nor borrow checking.
+These ideas evolved in _weird_ ways. The first one evolved into a full [region-based borrowing system](https://verdagon.dev/blog/zero-cost-borrowing-regions-overview). The second one become [generational references](/blog/generational-references). Together, they looked like they could form an *entirely new approach* to memory safety, one that doesn't use reference counting, tracing garbage collection, nor borrow checking.
 
 
 
 The exciting part of all of this was that it's a completely opt-in system, and we're not restricted to a certain programming style. We could write our code in a *normal, comfortable way,* and then come back and add regions later for the parts of our program that we want to optimize. [# This is possible because it makes borrowing compose much better with shared mutability; you can do as much aliasing as you want and then turn the entire world immutable via `pure`.]
 
 
-Even with only [basic use](/blog/zero-cost-memory-safety-regions-part-1-immutable-borrowing) of regions, we could reduce most generation checks [# A "generation check" happens whenever we dereference a generational reference. It checks to make sure the target object is still alive.] away with just a few annotations. Add in [isolates](/blog/zero-cost-memory-safety-regions-part-2-isolates) and linear style, [# Linear style is where we never make a reference to something unless handing it into a pure function.] and we can get generation checks *down to zero* for any Vale code.
+Even with only [basic use](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing) of regions, we could reduce most generation checks [# A "generation check" happens whenever we dereference a generational reference. It checks to make sure the target object is still alive.] away with just a few annotations. Add in [isolates](/blog/zero-cost-borrowing-regions-part-2-isolates) and linear style, [# Linear style is where we never make a reference to something unless handing it into a pure function.] and we can get generation checks *down to zero* for any Vale code.
 
 
 If it all worked, then we could finally have a language where we could easily prototype, easily iterate, and then easily optimize. No language has ever nailed all three, so this was pretty exciting.
@@ -136,7 +136,7 @@ To help me track down the problems, I kept comparing its assembly to the assembl
  * `unsafe_with_bounds` then adds bounds checking for array accesses, similar to how Rust does it.
 
 
-After a couple months of tracking down differences, the resulting assembly looked nearly identical to Vale's `unsafe_with_bounds` mode! Every difference was expected [# The only expected difference is that it put a pseudo-random generation number at the top of every allocation, though it never needed to read it for any generation checks. This is really just a montonically increasing register under the hood, to keep things fast. We'll be able to remove this once we add [isolates](/blog/zero-cost-memory-safety-regions-part-2-isolates) or `uni`que references.] and everything looked pretty reasonable.
+After a couple months of tracking down differences, the resulting assembly looked nearly identical to Vale's `unsafe_with_bounds` mode! Every difference was expected [# The only expected difference is that it put a pseudo-random generation number at the top of every allocation, though it never needed to read it for any generation checks. This is really just a montonically increasing register under the hood, to keep things fast. We'll be able to remove this once we add [isolates](/blog/zero-cost-borrowing-regions-part-2-isolates) or `uni`que references.] and everything looked pretty reasonable.
 
 
 

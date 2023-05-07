@@ -4,7 +4,7 @@ subtitle: Implementing a New Memory Safety Approach, Part 3
 author: Evan Ovadia
 date: May 20, 2022
 realm: blog
-path: blog/making-regions-part-3-zero-cost-memory-safety-myths
+path: blog/making-regions-part-3-zero-cost-borrowing-myths
 layout: annotated
 namespace: c-blog m-annotated
 sponsor: us
