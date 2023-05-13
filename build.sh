@@ -437,8 +437,8 @@ fi
 
 if [ $TARGET == "single-ownership-without-borrow-checking-rc-gc" ] || [ $TARGET == "all" ] ; then
   echo "Doing single-ownership-without-borrow-checking-rc-gc"
-  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/single-ownership-without-borrow-checking-rc-gc src/draft/making-regions/single-ownership-without-borrow-checking-rc-gc.vmd
-  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/single-ownership-without-borrow-checking-rc-gc src/draft/making-regions/single-ownership-without-borrow-checking-rc-gc.vmd
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/single-ownership-without-borrow-checking-rc-gc src/draft/single-ownership-without-borrow-checking-rc-gc.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/single-ownership-without-borrow-checking-rc-gc src/draft/single-ownership-without-borrow-checking-rc-gc.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
