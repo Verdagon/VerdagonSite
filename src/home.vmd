@@ -16,7 +16,7 @@ I use this site to blog about my endeavors. Enjoy!
 
 # Recent posts:
 
-
+ * [Implementing Vale's Region Borrowing, and its Unexpected Quest](/blog/making-regions-part-2-generics)
  * [How To Survive Your Project's First 100,000 Lines](/blog/first-100k-lines)
  * [Memory Safety Approaches and Development Velocity](/blog/when-to-use-memory-safe-part-2)
  * [Implementing a New Memory Safety Approach, Part 1](/blog/making-regions-part-1-human-factor)

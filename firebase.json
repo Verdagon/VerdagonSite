@@ -48,28 +48,28 @@
         "type": 302
       },
       {
-        "regex": "/blog/zero-cost-memory-safety-1-immutable-borrowin",
-        "destination": "/blog/zero-cost-borrowing-1-immutable-borrowin",
+        "regex": "/blog/zero-cost-memory-safety-(regions-)?(part-)?1-immutable-borrowing",
+        "destination": "/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing",
         "type": 302
       },
       {
-        "regex": "/blog/zero-cost-memory-safety-2-isolates",
-        "destination": "/blog/zero-cost-borrowing-2-isolates",
+        "regex": "/blog/zero-cost-memory-safety-(regions-)?(part-)?2-isolates",
+        "destination": "/blog/zero-cost-borrowing-regions-part-2-isolates",
         "type": 302
       },
       {
-        "regex": "/blog/zero-cost-memory-safety-3-one-way-isolation",
-        "destination": "/blog/zero-cost-borrowing-3-one-way-isolation",
+        "regex": "/blog/zero-cost-memory-safety-(regions-)?(part-)?3-one-way-isolation",
+        "destination": "/blog/zero-cost-borrowing-regions-part-3-one-way-isolation",
         "type": 302
       },
       {
-        "regex": "/blog/zero-cost-memory-safety-4-multi-region-data",
-        "destination": "/blog/zero-cost-borrowing-4-multi-region-data",
+        "regex": "/blog/zero-cost-memory-safety-(regions-)?(part-)?4-multi-region-data",
+        "destination": "/blog/zero-cost-borrowing-regions-part-4-multi-region-data",
         "type": 302
       },
       {
-        "regex": "/blog/zero-cost-memory-safety-5-region-scoped-data",
-        "destination": "/blog/zero-cost-borrowing-5-region-scoped-data",
+        "regex": "/blog/zero-cost-memory-safety-(regions-)?(part-)?5-region-scoped-data",
+        "destination": "/blog/zero-cost-borrowing-regions-part-5-region-scoped-data",
         "type": 302
       }
     ]

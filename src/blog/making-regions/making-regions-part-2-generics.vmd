@@ -1,8 +1,8 @@
 ---
-title: Implementing a New Memory Safety Approach, Part 2: An Unexpected Quest
+title: Implementing Vale's Region Borrowing, and its Unexpected Quest
 subtitle: Generics help us avoid code size explosions!
 author: Evan Ovadia
-date: May X, 2022
+date: May 9, 2023
 realm: blog
 path: blog/making-regions-part-2-generics
 layout: annotated
@@ -14,10 +14,10 @@ sponsor: us
 A few years ago, a [2am realization](/blog/making-regions-part-1-human-factor) changed the course of my life forever, and eventually turned me into a nomadic hermit [# Or rather a "digital nomad" as it's said these days. The details of how Vale made me follow the winds is a ridiculous story worthy of another entire blog post.] and language designer.
 
 
-The realization was that we could use [regions](/blog/zero-cost-borrowing-regions-overview) to eliminate memory safety overhead when we access data. It's something weird and new, like borrow checking without the reference restrictions, or perhaps more like if C++'s `const` and D's `pure` had a demonic hellspawn lovechild. [# My friend that reviews these articles told me to take this line out, but all my beta readers told me to keep it in.]
+The realization was that we could use [regions](/blog/zero-cost-borrowing-regions-overview) to eliminate memory safety overhead when we access data. It's something weird and new, like borrow checking without the reference restrictions, or perhaps more like if C++'s `const` and D's `pure` had a demonic hellspawn lovechild. [# My friend told me to take this line out, but all my beta readers told me to keep it in.]
 
 
-[Last time](/blog/making-regions-part-1-human-factor), I talked about how the first step towards implementing regions was to make the compiler's backend [# The "backend" is the part that takes Vale's representation of the code, and converts it into a form that LLVM is able to turn into binary code. I suppose one could be said LLVM is the _real_ backend, but I consider LLVM to be more the back-back-end, I suppose.] aware of multiple regions. After that, it was just another three weeks to make the first feature that used regions under the hood: [Fearless FFI](https://verdagon.dev/blog/fearless-ffi).
+[Last time](/blog/making-regions-part-1-human-factor), I talked about how the first step towards implementing regions was to make the compiler's backend [# The "backend" is the part that takes Vale's representation of the code, and converts it into a form that LLVM is able to turn into binary code. I suppose one could be said LLVM is the _real_ backend, but I consider LLVM to be more the back-back-end, I suppose.] aware of multiple regions. After that, it was just another three weeks to make the first feature that used regions under the hood: [Fearless FFI](/blog/fearless-ffi).
 
 
 Then the real battle began.
@@ -69,13 +69,10 @@ If you're curious, here's what just happened:
  * It notes that all data created inside the function is in the read-write region `x'`.
 
 
-In other words, it *assigns a region* to every type. `List<int>` becomes `r'List<r'int>`, to know that the list and its contents both came into the pure function. Check out [Immutable Region Borrowing](https://verdagon.dev/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing) for more on this! [#tricky]
+In other words, it *assigns a region* to every type. `List<int>` becomes `r'List<r'int>`, to know that the list and its contents both came into the pure function. Check out [Immutable Region Borrowing](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing) for more on this! [#tricky]
 
 
-Vale's compiler isn't at that point yet, of course. [# The Vale compiler actually is at that point, but I'm a few months behind publishing these posts. To see the posts I haven't published yet, [sponsor us on GitHub](https://github.com/sponsors/ValeLang)! (Or just send me an email, happy to give anyone access!)] It currently acts like every other language, where all data in a function is in the same region.
-
-
-The first step to get from here to there is to make the compiler _aware_ that everything is in the same region.
+Before we enable multiple regions, [#early] the first step is to make every function receive a *single, universal region* that all data will live in, which we'll call `m'`.
 
 
 This function:
@@ -90,8 +87,8 @@ func thrice(a int) int {
 needs to become this:
 
 ```vale
-func thrice<x' rw>(a x'int) x'int {
-  result x'int = a + a + a;
+func thrice<m' rw>(a m'int) m'int {
+  result m'int = a + a + a;
   return result;
 }
 ```
@@ -105,38 +102,104 @@ I thought so too!
 
 
 <slice>
-#tricky: This is already looking tricky, and we aren't even at the more advanced region features like [custom isolates](/blog/zero-cost-borrowing-regions-part-2-isolates), [one-way isolation](/blog/zero-cost-borrowing-regions-part-3-one-way-isolation), [multi-region data](/blog/zero-cost-borrowing-regions-part-4-multi-region-data), or [region-scoped data](/blog/zero-cost-borrowing-regions-part-5-region-scoped-data). I try not to think about that too much.
+#tricky: This is already intricate, and we aren't even at the more advanced region features like [custom isolates](/blog/zero-cost-borrowing-regions-part-2-isolates), [one-way isolation](/blog/zero-cost-borrowing-regions-part-3-one-way-isolation), [multi-region data](/blog/zero-cost-borrowing-regions-part-4-multi-region-data), or [region-scoped data](/blog/zero-cost-borrowing-regions-part-5-region-scoped-data)! I try not to think about that too much.
 
 #foreach: One would normally use a `foreach` here, but we're showing a more primitive function so the upcoming transform is a little clearer.
 
 #iso: `'T` means an "isolated" `T`. It means nothing points at the `T`, nothing inside the `T` points out, and nothing outside the `T` points in. See [this explanation](/blog/zero-cost-borrowing-regions-part-2-isolates) for more. Anything returned from a pure function is automatically isolated. In this case, `'int` is later simplified to just `int` since it's a value type.
 
-#isoint: Value automatically "isolates" anything that a pure function returns, so that it can be merged into the caller's region. This `iso` function can sometimes have a run-time cost for more complex data structures, but that can be avoided if the user manually assembles an isolate instead.
+#isoint: Vale automatically "isolates" anything that a pure function returns, so that it can be merged into the caller's region. This `iso` function can sometimes have a run-time cost for more complex data structures, but that can be avoided if the user manually assembles an isolate instead.
 
 
 #likerust: So far, this is similar to the borrow checking rules found in Rust, Cyclone, and [Cone](https://cone.jondgoodwin.com/)'s designs. However, Vale applies those rules to entire regions, not just individual pieces of data.
+
+
+#early: We do have a prototype of multi-region functions working, actually! We have a few more articles about regions, the prototype, and its results queued up.
+
+Feel free to [email me](mailto:vbmrp2g@verdagon.dev) if you'd like an early look. Our sponsors also get everything early, so [consider sponsoring](https://github.com/sponsors/ValeLang)!
 </slice>
 
 
 
 # The Unexpected Quest
 
-I thought that we only ever create one region, inside `main`, because that's the only "exported" function, in other words, function that's callable from C. Let's refer to that region as `main'` (note the apostrophe).
+I thought that we only ever actually create one region, inside `main`, because that's the only "exported" function, in other words, function that's callable from C.
 
 
-If `main` calls the above `thrice`, the compiler creates a version of it called `thrice<main'>`. If `main` calls another function `fice`, a `fice<main'>` would be created. [# "Fice" means to multiply something by five, I promise.] There would be a `<main'>` version of every function in the codebase, which is weird, but fine.
+Above, when `main` called `thrice`, the compiler instantiated (a.k.a. "monomorphized" or "specialized") [# This means to make a copy of it with all the generic arguments (like `T`) filled in with actual types.] a version of it called `thrice<m'>`. 
 
 
-Except there's one problem with what I wrote above. `main` isn't the only exported function! Plenty of functions are exported.
+<<<<
+Similarly, if `main` also calls another function `fice`, a `fice<m'>` would be created. [# "Fice" means to multiply something by five, I promise.]
 
 
-If I have another exported function `spork`, and it calls `thrice` and `fice`, then there's also a `thrice<spork'>` and `fice<spork'>`.
+As you can imagine, there would be a `<m'>` version of every function in the codebase, which is weird, but fine.
+////
+```vale
+func thrice(a int) int {
+  return a + a + a;
+}
+func fice(a int) int {
+  result = a + a + a + a + a;
+  return result;
+}
+// Makes m'
+exported func main() {
+  // Makes thrice<m'>
+  a = thrice(5);
+  println(a);
+}
+```: notest
+>>>>
 
 
-If we have ten exported functions, we might have ten versions of `thrice` and `fice` created. *Our executable file could be up to ten times as large as it needs to be!*
+<<<<
+Except there's one problem... what if `main` isn't the only exported function?
 
 
-It's especially ironic, because `thrice<main'>`, `thrice<spork'>` and all these other versions of `thrice` are *exactly the same*. [# And I don't think LLVM is able to notice that and merge these functions back together. Even if it does, it would use up a _lot_ of compile time, which is a big detriment to development velocity.]
+Let's say we added another function `bar`, and exported it so that C could call into it.
+
+
+Since it's exported, it will also create a region, which we'll call `b'`.
+
+
+Now, since both `main` and `bar` are calling _both_ `thrice` and `fice`, that means we're making *four* instantiations.
+
+
+In other words, we'll not only have a `thrice<m'>` and `fice<m'>` but also a `thrice<b'>` and `fice<b'>`!
+////
+```vale
+func thrice(a int) int {
+  return a + a + a;
+}
+func fice(a int) int {
+  result = a + a + a + a + a;
+  return result;
+}
+// Makes m'
+exported func main() {
+  // Makes thrice<m'>
+  a = thrice(5);
+  // Makes fice<m'>
+  b = fice(a);
+  println(b);
+}
+// Makes b'
+exported func bar(a int) int {
+  // Makes thrice<b'>
+  a = thrice(5);
+  // Makes fice<b'>
+  b = fice(a);
+  return b;
+}
+```: notest
+>>>>
+
+
+If we had ten exported functions, we might have ten versions of `thrice` and `fice` created. *Our executable file could be up to ten times as large as it needs to be!*
+
+
+It's especially ironic, because `thrice<m'>`, `thrice<b'>` and all these other versions of `thrice` are *exactly the same*. [# And I don't think LLVM is able to notice that and merge these functions back together. Even if it does, it would use up a _lot_ of compile time, which is a big detriment to development velocity.]
 
 
 <slice />
@@ -215,14 +278,11 @@ Specifically, the compiler would:
  1. Region-check all functions; make sure that the user doesn't mix up data from two regions.
  1. Remove all traces of regions. For example:
     1. It would turn `func thrice<x' rw>(...)` into `func thrice(...)`.
-    1. Instead of requesting a `thrice<main'>` and a `thrice<spork'>`, callers would only request a simple `thrice`.
+    1. Instead of requesting a `thrice<m'>` and a `thrice<spork'>`, callers would only request a simple `thrice`.
  1. Instantiate the functions.
 
 
-By removing all traces of regions, step 4 won't instantiate a different `thrice<main'>` and a `thrice<spork'>`. Only a single `thrice` will be generated, solving our problem.
-
-
-This is sometimes called "erasure". By "erasing" the differences in the earlier stages, we can get smaller executables in the end. Java does this with some of its generics too, calling it "type erasure".
+By removing all traces of regions, step 4 won't instantiate a different `thrice<m'>` and a `thrice<spork'>`. Only a single `thrice` will be generated, solving our problem.
 
 
 ## Generics are a Nightmare [# I actually called it a [gorram](https://screenrant.com/firefly-swear-word-guide-gorram/) nightmare but I promised myself that in 2023 I wouldn't put any more Firefly references into my articles.]
@@ -240,7 +300,7 @@ When I'm coding something particularly challenging, I have to get out my pencil 
 The internet often pokes fun at Go for taking ten years to add their generics. Honestly, after this endeavor, _I don't blame them one bit._ I kind of want to find the folks on the Go team and comisserate together over some Delirious Blue. [# We also named of one of our test cases after this drink.] Anyone who looked over would see two grown engineers crying over their drinks, saying weird words like "polymorphism" and "interface bounds" over and over.
 
 
-The problem is that I'm just an engineer with some skills in data structures and architecture. I'm not a type theoretician, and this more mathematical abstract thinking doesn't come naturally to me. When implementing generics, we're taking abstract thinking to a whole new level: we're type-checking functions that don't exist yet, conjuring "placeholder" types, and putting bounds information in places that I didn't even know existed.
+The problem is that I'm just an engineer with some skills in data structures and architecture. I'm not a type theorist, and this more mathematical abstract thinking doesn't come naturally to me. When implementing generics, we're taking abstract thinking to a whole new level: we're type-checking functions that don't exist yet, conjuring "placeholder" types, and putting bounds information in places that I didn't even know existed.
 
 
 I also want to give a shout-out to the amazing people in my server who helped me get through the journey. Huge thanks to Jon Goodwin (of [Cone](cone.jondgoodwin.com/)), Arthur Weagel, Ivo Balbaert, RazzBerry, zikzak323, Zodey, keeslinp, mikey, IsaacPaul, kurtkuehnert, DestyNova, librarianmage, devast8a, and cristian.vasile! I'm not sure I could have finished without their support and positive energy. You all are awesome!

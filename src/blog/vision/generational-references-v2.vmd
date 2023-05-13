@@ -20,6 +20,21 @@ TODO:
 - sure, we lose a little bit of reproducibility for UAFs, just like rust loses some with its unsafe problems. but overall, vale is actually the best with reproducibility because of deterministic replayability.
 
 
+adding offset stuff should only cause gens to be a bit slower, about 33%. it goes from 3 serial data dependencies to 4.
+no inline:
+  x = ptr - 8
+  y = *x
+  y == gen
+with inline:
+  offset = thing & 0xFF
+  x = ptr - offset
+  y = *x; gen = thing - offset
+  y == gen
+not so bad when you consider instructions are free compared to memory access
+
+
+"they complement each other nicely"
+
 
 *Generational references* are a new memory management technique that's easy, deterministic, and fast. [# This is an updated version of the 2021 article, which you can still find [here](/blog/generational-references-v1)]
 
