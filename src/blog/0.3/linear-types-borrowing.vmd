@@ -11,6 +11,13 @@ namespace: c-blog m-annotated
 ---
 
 
+[# J: Make sense in general?]
+
+[# J: Too heavy on the egyptian stuff? Also, I drop off of it pretty early, think I need to tie it in more near the end, or not needed?]
+
+[# J: Too much comparison to Rust?]
+
+
 I've had some pretty surreal experiences while making Vale. [# And a lot of unexpected experiences. There was one time where I dove down an ancient history rabbit hole, just so I could add some flavor to an article about memory safety.] The weirdest was when I realized the hidden fundamental truth beneath a lot of the programming languages we use today.
 
 
@@ -44,6 +51,8 @@ Recently, I was making a sample program to show how Vale's [regions](/blog/zero-
 
 I was surprised to find that the sample program had almost _zero_ memory-safety overhead, except for a line in this ([paraphrased](https://github.com/Verdagon/RegionsBenchmarks/blob/main/cellular-automata/CellularAutomata.vale)) code:
 
+[# J: These examples clear enough? Trying to balance noisiness and explanation, so was sparse on comments.]
+
 ```
 func RandInt(rand &Random) i64 {
   x = rand.num;
@@ -76,6 +85,9 @@ func MakeBoard(
 
 Specifically, when `RandInt`'s `rand.num` dereferences the `rand` object, it does an implicit [generation check](/blog/generational-references) assertion to ensure the object is still alive.
 
+
+
+[# J: This paragraph is here because I'm trying to convey that generation checks _aren't_ expensive, and not really worth optimizing away much of the time, but we *can* if we want to.]
 
 Normally, I don't believe in chasing zero-cost memory safety. Playing overhead golf can often lead to chasing diminishing returns or prematurely optimizing. After all, a generation check is usually only expensive as a bounds check (in other words, usually negligible).
 
@@ -250,10 +262,10 @@ I imagine that Jean-Francois Champollion felt overwhelmed, discovering how to re
 That's how I felt in that moment, seeing that zero.
 
 
-Of course, I hadn't discovered anything new. I was discovering for myself the natural consequence of Vale's owned values being [linear](https://en.wikipedia.org/wiki/Substructural_type_system#Linear_type_systems), which is a distant cousin of Rust's affine types. Both are a kind of "[substructural type system](https://en.wikipedia.org/wiki/Substructural_type_system)". Apparently, people have been writing about substructural type systems' abilities for decades!
+Of course, I hadn't discovered anything new. I was discovering for myself the natural consequence of Vale's owned values being [linear](https://en.wikipedia.org/wiki/Substructural_type_system#Linear_type_systems), which is a distant cousin of Rust's affine types. Both are a kind of "[substructural type system](https://en.wikipedia.org/wiki/Substructural_type_system)". Apparently, people have been writing about substructural type systems' abilities for decades! [# There's also a very interesting language named [Austral](https://austral-lang.org/), based on linear types!]
 
 
-With this new understanding, I considered Rust from a different perspective. It led me to the eventual truth: their memory safety doesn't come from borrow checking, not exactly. It comes from their types being affine. In a way, `&mut` references are just syntactic sugar, [# "Syntactic sugar" is what we call features that just make the code a bit cleaner, but aren't really required to express a certain computation.] and *if you took `&mut` out of Rust, it would still be memory safe.*
+With this new understanding, I also considered Rust from a different perspective. It led me to the eventual truth: their memory safety doesn't come from borrow checking, not exactly. It comes from their types being affine. In a way, `&mut` references are just syntactic sugar, [# "Syntactic sugar" is what we call features that just make the code a bit cleaner, but aren't really required to express a certain computation.] and *you can take `&mut` out of Rust and not much would change semantically*.
 
 
 The same is true of Vale, apparently. If you program without making any references, your program becomes memory safe, and has no memory-safety related overhead!
@@ -264,10 +276,10 @@ I'm no type theorist. I vaguely knew that Vale's owned values were linear, but I
 
 # Necessary techniques
 
-In the two functions I showed above, it was pretty simple to do own-lending. Soon, I discovered that we need some other features to support own-lending fully.
+In the two functions I showed above, it was pretty simple to do own-lending.
 
 
-In particular, a language would need:
+Soon, I discovered that we need some other features to support own-lending fully. In particular, a language needs:
 
  * Struct "destructuring"
  * Array insert and extract
@@ -300,7 +312,7 @@ The compiler would give us an error, because taking that `Random` out of the `Ga
 Instead, we'll need to temporarily destroy the GameState and then recreate it.
 
 
-Instead of writing `MakeBoard(game.rand);`, we would:
+Instead of writing `MakeBoard(game.rand);`, we would write:
 
 ```
 [player_name, rand] = game;
@@ -332,12 +344,13 @@ arr.insert(3, rand);
 
 Depending on the implementation of `extract` and `insert`, this could be costly, up to O(n) time as it shifts all the subsequent elements by one.
 
-
 There are more efficient ways to implement it. Some options:
 
  * `extract` might swap the last element to this position, and `insert` might put it back at the end.
  * We could temporarily destroy the containing array to give us ownership, similar to what we did with structs above.
  * If we're using generational references like Vale is, we could temporarily change the object's generation number.
+
+We'll talk about that last one further below.
 
 
 ## Some Sugar [# Everything in this section is theoretical, we haven't decided on any particular sugar to add to Vale for this.]
@@ -423,6 +436,8 @@ func RandInt(rand inout Random) i64 {
 ```
 >>>>
 
+[# J: I used `inout` even though `borrow` would make more sense, because I wanted to equate it to Swift's/C#'s inout, and so the user wouldnt accidentally think it worked like a `&mut`... not sure I succeeded, especially since I mention `&mut` below. `&mut` is part of the type, this is part of the parameter/variable. Think its worth making it clearer, or is it fine?]
+
 
 This `inout` keyword would work exactly like Swift's or C#'s `inout` keyword, and like references in [Val](https://www.val-lang.dev/)'s [mutable value semantics](https://www.jot.fm/issues/issue_2022_02/article2.pdf). [# Val is a different language from Vale and Vala (we all have similarly great taste in naming!)] It's almost like Rust's `&mut`, but the user is also able to move out of it as long as they move something back into it before the function exits.
 
@@ -453,7 +468,7 @@ And they both have some drawbacks:
  1. We can't use certain patterns that decouple our code and make it more flexible, like [observers](https://www.reddit.com/r/rust/comments/pwqju6/is_there_an_underlying_reason_that_idiomatic_rust/), [back-references](https://users.rust-lang.org/t/back-reference-to-the-parent-struct/7413/2), [dependency references](https://en.wikipedia.org/wiki/Dependency_injection), [callbacks](https://news.ycombinator.com/item?id=12029238), and [delegates](https://medium.com/@nimjea/delegation-pattern-in-swift-4-2-f6aca61f4bf5).
 
 
-All of the above drawbacks exist because neither linear typing nor borrow checking have *shared mutability*. In other words, multiple mutable references to the same data.
+All of the above drawbacks exist because neither linear typing nor borrow checking can have *shared mutability*. In other words, multiple mutable references to the same data.
 
 
 
@@ -467,6 +482,8 @@ In other words, is there a way we can have linear types _and_ shared mutability?
 
 Adding borrow checking partially helps with drawback #1 [# Partially because borrow checking lets us have temporary references, not persistent ones. The borrow checker has a hard time putting references into data structures.] but it still has drawbacks #2, #3, and #4. Rust's `Rc` and `RefCell` helps with those, but they're incompatible with linear types' benefits [# We can't put a linear type into an `Rc` because `Rc` throws away its contents when the last alias disappears.], and have their own drawbacks (like forcing heap allocation and not having [higher RAII](https://verdagon.dev/blog/higher-raii-7drl)).
 
+
+[# J: How is this next part, where we blend gen refs back in? I tried to find an elegant way to build up to "the solution was with us all along".]
 
 The other solution, surprisingly, is to blend generational references back in.
 
@@ -510,6 +527,8 @@ Then I realized, they fit _perfectly_ together. We can use regions to look at a 
 
 I tried this out in a little [roguelike game](https://github.com/Verdagon/RegionsBenchmarks/blob/main/tiny-roguelike/roguelike.vale). The vast majority of generation checks were eliminated by regions, and the rest were eliminated by this new linear style.
 
+[# J: Should I go into more detail about this balance, or save it for a future article?]
+
 
 You can try this too! Just invoke the Vale compiler with the `--print_mem_overhead true` flag to make the program print out how many generation checks you can still eliminate (and if you want to use regions too, check out the experimental branch [described here](/blog/first-regions-prototype)).
 
@@ -524,14 +543,4 @@ But ironically, that's a small minority. For the vast majority of Vale programs,
 
 
 However, this does open up Vale to some new domains. Since we can program in a way that doesnt require generation checks, that means that Vale could be used in new niches, like embedded systems, operating system kernels, and safety-critical software. That's pretty exciting.
-
-
-
-
-# Scratch (ignore this)
-
-
-A language could go a step further and enable temporary read-only aliasing of the object. Vale would do this with [regions](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing), [# The user would need to make the field an [isolate](/blog/zero-cost-borrowing-regions-part-2-isolates), which ensures nobody else has a reference to this object.] and Rust would do this this with its shared references.
-
- * [Austral](https://austral-lang.org/) is based on linear types as well, and has a lot of the mechanisms we've been talking about.
 
