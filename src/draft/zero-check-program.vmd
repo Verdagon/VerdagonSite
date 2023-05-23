@@ -1,0 +1,128 @@
+
+
+
+In a couple articles, I mentioned that it was possible to make a memory-safe program in Vale without any borrow checking, reference counting, or garbage collection, or generation checks.
+
+
+I'm about to show you some wizardry, which serves as the foundation for Vale's entire memory safety approach.
+
+
+# Single Ownership and References
+
+Single ownership means that every object is "owned" by a single containing struct, array, or stack frame.
+
+
+<<<<
+In this example, the Spaceship is owned by its containing stack frame, and the Engine is owned by the Spaceship.
+////
+```vale
+struct Engine { fuel int; }
+struct Spaceship { engine Engine; }
+
+exported func main() {
+  ship = Spaceship(Engine(42));
+  println(ship.engine.fuel);
+}
+```
+>>>>
+
+
+<<<<
+If we want to make a reference to the ship, then it has to be a *reference*, like this `x`.
+////
+```vale
+struct Engine { fuel int; }
+struct Spaceship { engine Engine; }
+
+exported func main() {
+  ship = Spaceship(Engine(42));
+  x = &ship;
+  println(x.engine.fuel);
+}
+```
+>>>>
+
+
+However, using references has a slight downside: when we access one, we might incur a generation check, an implicit `assert` that makes sure the object is still alive. [# This is different from references in e.g. Rust. Rust references cause no assertions, but Vale references are able to do things like higher RAII, observers, graphs, dependency references, etc.]
+
+
+Can we make an entire program without references?
+
+
+Yes we can!
+
+
+# A Program Using Only Owned Values
+
+First, let's make a program that uses some references, and then we'll see how to convert it to not using any.
+
+
+<<<<
+Here we have a `printShip` function that takes a reference.
+////
+```vale
+struct Engine { fuel int; }
+struct Spaceship { engine Engine; }
+
+func printShip(x &Spaceship) {
+  println(x.engine.fuel);
+}
+exported func main() {
+  ship = Spaceship(Engine(42));
+  printShip(&ship);
+}
+```
+>>>>
+
+
+*Rule 1:* When a function takes a reference, instead make it take and return an owned value.
+
+
+<<<<
+Here's a version of that `printShip` function that takes and return the Spaceship itself instead of a reference.
+////
+```vale
+struct Engine { fuel int; }
+struct Spaceship { engine Engine; }
+
+func printShip(x &Spaceship) {
+  println(x.engine.fuel);
+}
+exported func main() {
+  ship = Spaceship(Engine(42));
+  printShip(&ship);
+}
+```
+>>>>
+
+
+
+A "linear type" is a type that can only ever have one reference to it.
+
+
+That reference exists only as long as the object does. In other words:
+
+ * When we create an object, we hold that single reference.
+ * When we destroy the object, that single reference disappears.
+
+
+It sounds restrictive, but it has one particular benefit: if we hold the reference, we know the object is still alive.
+
+
+If we want to dereference it, we know it's legal and we won't be doing a use-after-free.
+
+
+We can make an entire program using just linear types.
+
+
+# An Example
+
+Let's make a little program that takes an 
+
+
+
+
+
+
+only need a couple constructs: swap, destructure
+

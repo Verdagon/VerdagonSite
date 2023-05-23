@@ -425,10 +425,10 @@ if [ $TARGET == "making-regions-part-7-results" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
-if [ $TARGET == "regions-prototype" ] || [ $TARGET == "all" ] ; then
-  echo "Doing regions-prototype"
-  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/regions-prototype src/draft/making-regions/regions-prototype.vmd
-  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/regions-prototype src/draft/making-regions/regions-prototype.vmd
+if [ $TARGET == "first-regions-prototype" ] || [ $TARGET == "all" ] ; then
+  echo "Doing first-regions-prototype"
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/first-regions-prototype src/draft/making-regions/first-regions-prototype.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/first-regions-prototype src/draft/making-regions/first-regions-prototype.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -444,6 +444,19 @@ if [ $TARGET == "single-ownership-without-borrow-checking-rc-gc" ] || [ $TARGET 
     exit 1
   fi
 fi
+
+if [ $TARGET == "linear-types-borrowing" ] || [ $TARGET == "all" ] ; then
+  echo "Doing linear-types-borrowing"
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/linear-types-borrowing src/draft/linear-types-borrowing.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/linear-types-borrowing src/draft/linear-types-borrowing.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
+
+
 
 
 

@@ -1,0 +1,80 @@
+
+"Fuck You, Give Banana", or: Thoughts on Motivation and Burnout
+
+
+
+
+At my last job, we got a yearly "holiday gift". Let's say it was around $300 worth.
+
+
+Years later, they had stopped the holiday gifts completely. Of course, our average salary was _way_ higher by then, so I can't complain. It was an obviously better situation. Objectively better.
+
+
+Except it wasn't, because of a principle I like to call *fuck you, give banana.*
+
+
+# We evolved from monkeys
+
+And we have monkey brains still. Humanity is a flawed layer of cortex on top of faulty monkey-based hardware.
+
+
+(talk about hpmor scope insensitivity)
+
+
+
+Numbers don't matter. Abstract concepts don't matter. What matters is what we _feel_.
+
+
+Getting something physical meant a lot more than getting an abstract number. Even my team giving me a mere _banana_ would have been more meaningful than getting that $300.
+
+
+It's as if the monkey inside me takes the "You get more money" piece of paper, discards it, looks up, and screeches *"Fuck you, give banana!"*
+
+
+Getting that holiday gift made me _feel_ much better than having a lot more money.
+
+
+If I could go back and rewrite those policies, they best thing would have been $280 in cash for me, and a $20 piece of swag for the monkey brain.
+
+
+# Bananas When Coding
+
+When I'm adding a new feature to the Vale compiler, or working on a large refactor, I always start by making one simple test case, and then I run that test case until it passes. If the type system makes me write code that's not strictly necessary for this one test case, I stub it with a nice `assert(false)` [# Or actually, a function named `vimpl()` which throws an exception, which in Scala returns the `Nothing` type.], so I can get my thing working.
+
+
+When I finally get that test to pass, I:
+
+ * Bask in that sweet, sweet JUnit Green and eat a peanut butter cup. *Monkey likes peanut butter cup!*
+ * Add another test case.
+ * Add more `assert(false)`s and stubs where the type system makes me add code.
+ * Start fixing `assert(false)`s until the test passes.
+
+and repeat until done.
+
+
+Doing this ten times is good. *Monkey is ten times happy!*
+
+
+Sometimes, I deviate from this approach and I try to implement the entire feature all at once. But halfway through, I can feel the monkey inside me screeching, *"Fuck you, give banana!"* and after a couple months with no victories, the burnout starts to creep in.
+
+
+# Technical Debt
+
+Hating on tech debt is an engineer's favorite past time. 
+
+Those `assert(false)`s are *technical debt.* They're unfinished corners of the compiler, and they sometimes TALK ABOUT MORE HERE
+
+
+
+# The Human Brain Needs Rewards
+
+
+I've learned that this process is _incredibly important_ to me. I need *frequent small victories* to keep me going.
+
+
+Why? Because abstract concepts don't matter. What matters is what we _feel_.
+
+(add psychological reasons here)
+
+
+

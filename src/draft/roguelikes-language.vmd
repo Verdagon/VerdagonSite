@@ -1,0 +1,47 @@
+---
+title: What Would the Perfect Language for Roguelike Games Look Like?
+subtitle: And why we love it!
+realm: blog
+date: May X, 2023
+path: blog/roguelikes-language
+layout: annotated
+author: Evan Ovadia
+sponsor: me
+namespace: c-blog m-annotated
+---
+
+
+maybe say up front that this is a forward-looking article, almost a wish list.
+
+
+("but secretly, i'm totally skewing vale in this direction, because i love roguelikes. (link to yak shaving article))
+
+
+it led me to designing this crazy thing that literally has zero cost.
+
+
+i even made a tiny zero-cost roguelike game! (show it. maybe add color?)
+
+
+something with weak references. we had a great story for that, but unfortunately we had to break away from it.
+
+
+something that rewards functional-ness
+
+
+something that still lets us do OO-ish things. after all, ECS isnt always the best. (link to that factorio thing from reddit)
+
+
+linear types are _amazing_ for roguelikes. link to single ownership article and 7DRL article.
+
+
+i really want to nail the whole seamless concurrency thing. being able to easily split any calculation over multiple threads would be a godsend! imagine if we could do that for (name a bunch of things. sight maps? terrain generation on a background thread?)
+
+
+deterministic replayability!
+
+
+transactional regions!
+
+
+

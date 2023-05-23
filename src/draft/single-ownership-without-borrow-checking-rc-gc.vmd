@@ -1,9 +1,12 @@
 ---
-title: Single Ownership and Memory Safety, without Borrow Checking, RC, or GC
+title: Single Ownership and Memory Safety without Borrow Checking, Reference Counting, or Garbage Collection
 subtitle: And why we love it!
 realm: blog
-path: blog/single-ownership-c-perspective
+date: May X, 2023
+path: blog/single-ownership-without-borrow-checking-rc-gc
 layout: annotated
+author: Evan Ovadia
+sponsor: me
 namespace: c-blog m-annotated
 ---
 
@@ -11,34 +14,31 @@ namespace: c-blog m-annotated
 Single ownership is once of those concepts that's both easier and more powerful than we realize.
 
 
-Unfortunately, it's often seen as complex, because of the incidental complexity added by today's languages. However, single ownership doesn't need C++'s syntactical legacy or Rust's complexity difficulties.
+Alas, people often think single ownership is more complex than it really is, because it most often appears in languages that are already complex for separate reasons.
 
 
-Single ownership is actually really simple.
+I want to dispel that myth, and redesign it from first principles.
 
 
-When we dive into it, we discover some interesting surprises:
+Even if you already know what single ownership is, you'll probably find some interesting surprises:
 
  * You don't need a borrow checker for memory-safe single ownership.
  * You can use it to enforce all sorts of guarantees at compile time.
- * With generational references, you can safely use intrusive data structures.
+ * You can blend it with other memory management techniques!
 
 
-Below, I'll explain single ownership from a C foundation, and then build on it to show how.
+Below, I'll explain single ownership from a C foundation, and then we'll see the _weird_ things it can do.
 
 
 # We often track single ownership manually in C
 
-With manual memory management, we make it clear who's responsible for eventually freeing certain memory.
+With manual memory management, we usually make it clear who's responsible for eventually freeing certain memory, via documentation or naming.
 
 
-For example, `strdup` will return a heap-allocated buffer, which the caller then owns. GLib's `strdup` [documentation](https://docs.gtk.org/glib/func.strdup.html) says "The caller of the function takes ownership of the data, and is responsible for freeing it.""
+For example, `strdup` will return a heap-allocated buffer, which the caller then owns. GLib's `strdup` [documentation](https://docs.gtk.org/glib/func.strdup.html) says "The caller of the function takes ownership of the data, and is responsible for freeing it."
 
 
-It's not just pointers, we often receive opaque handles. For example, `pthread_create` create a handle that we're responsible for eventually freeing.
-
-
-We then make sure that we eventually deliver these "owned" data to another function that destroys them, such as `free` or `pthread_join` respectively.
+We then make sure that we eventually deliver these "owned" data to another function that destroys them.
 
 
 If we don't do that, we get a memory leak.
@@ -82,9 +82,14 @@ Of course, other pointers to the data can exist, they just down _own_ the data. 
 If you've ever implemented a balancing binary search tree like a [red-black tree](https://en.wikipedia.org/wiki/Red%E2%80%93black_tree) or an [AVL tree](https://en.wikipedia.org/wiki/AVL_tree), recall that a parent conceptually has "owning" pointers to its children, and its children have non-owning pointers back to their parents.
 
 
+Single ownership isn't just for pointers and `malloc` and `free`, it's to anything that we have a *future responsibility* for.
+
+For example, `pthread_create` creates a handle that we're responsible for eventually `pthread_destroy`ing. We generalize this a bit more later, but for now let's just think about heap allocations.
+
+
 # How might we track it?
 
-When I was a wee lad, I would suffix my owning pointers with `_owning` to keep things straight.
+When I was a wee lad, I would suffix my "owning" pointers with `_owning` to keep things straight.
 
 
 <<<<
@@ -98,7 +103,7 @@ struct Node {
 };
 ```
 ////
-...and here it is with some helpful `_owning`s added.
+...and here it is with some helpful `_owning`s added to the names.
 
 ```c
 struct Node {
@@ -110,7 +115,7 @@ struct Node {
 >>>>
 
 
-This came with some sensible guidelines:
+I had some sensible guidelines:
 
 *Rule 1:* Anything that comes from `malloc` must be put in a variable ending in `_owning`.
 
@@ -119,7 +124,7 @@ This came with some sensible guidelines:
 *Rule 3:* We can't use that variable after freeing it (or moving it).
 
 
-We could even make a linter to enforce this, and detect both memory leaks and double-frees:
+We could even make a linter or compiler to enforce this, and detect both memory leaks and double-frees:
 
 
 ```c
@@ -138,7 +143,8 @@ void main() {
 ```
 
 
-In a way, our it's *tracking responsibility for freeing the buffer*.
+
+In a way, we're *tracking responsibility for freeing the buffer*.
 
 
 Keep the phrase "tracking responsibility" in mind, we'll build on that later to make the system help us with much more than managing memory.
@@ -152,7 +158,7 @@ If we were to craft a C-like language, then instead of using a suffix like `char
 
 When you look at it that way, it's kind of like `char`, `char^`, and `char*` are all different types:
 
- * `char` is an *owned value*; it's owned by the stack, or inside the containing struct or array.
+ * `char` is an *owned value*, owned by the containing stack frame, struct, or array.
  * `char^` is an *owning pointer* to something in the heap.
  * `char*` is a *non-owning pointer*.
 
@@ -160,7 +166,7 @@ When you look at it that way, it's kind of like `char`, `char^`, and `char*` are
 The above `char* myBuffer_owning = ...` would become `char^ myBuffer = ...`.
 
 
-However, for the compiler to be able to keep things straight, we need to add the ability to `move` ownership from one variable into another variable or field:
+However, for the compiler to be able to keep things straight, we also need to add the ability to `move` ownership from one variable into another variable or field:
 
 
 ```c
@@ -187,7 +193,7 @@ This `move` keyword comes with a new rule.
 *Rule 4:* When we `move` out of a variable, we can't use it anymore.
 
 
-We would also use `move` to transfer ownership of some data to our caller, like so:
+We would also use this new `move` keyword to transfer ownership of some data to our caller, like so:
 
 ```
 Spaceship^ makeSpaceship() {
@@ -208,7 +214,7 @@ These rules are sometimes known as "move semantics".
 
 C++ and Rust also have move semantics, but ours is a little different so far:
 
- * C++ doesn't have rule 4, we might accidentally use the variable after we `move` out of it.
+ * C++ doesn't have rule 4, in C++ the compiler lets us accidentally use the variable after we `move` out of it.
  * Rust adds a borrow checker on top. We're going to do something else!
  * Both C++ and Rust will automatically `free` an owning pointer when it goes out of scope.
 
@@ -227,10 +233,9 @@ Recall Rule 2: We can't let an owning variable (or field) go out of scope, the o
 Because of this, if you accidentally let an owning pointer go out of scope, you'll get a compiler error.
 
 
-Instead, the compiler forces the programmer to _explicitly_ `move` or `free` it.
+You can use this to your advantage, using a technique called "Higher RAII". [# Higher RAII is similar to linear typing. An owning reference is a linear type, but when we can also make non-owning references to the same object, we get Higher RAII.]
 
-
-You can use this to your advantage, using a technique called "Higher RAII". Basically, if you want your caller to remember to do something later, give them ownership of a "reminder" object.
+Basically, if you want your caller to remember to do something later, give them ownership of a "reminder" object.
 
 
 This technique is incredibly powerful. With it, the compiler can enforce that you:
@@ -238,10 +243,10 @@ This technique is incredibly powerful. With it, the compiler can enforce that yo
  * Remember to `fulfill` a `Promise` [# A `Promise` is an object that will deliver a result to a corresponding `Future`, sometimes on a different thread.] exactly once.
  * Remember to remove something from a cache that you previously added to.
  * Remember to explicitly rollback or commit a transaction.
- * Remember to join a thread and do something with the thread's main function's result.
+ * Remember to join a thread and do something with the thread function's result.
 
 
-More generally, it means the compiler can *ensure you remember to do something in the future* and don't accidentally forget to.
+More generally, it means the compiler can *ensure you remember to do something in the future* and don't accidentally forget it.
 
 
 ## An Example
@@ -250,13 +255,15 @@ More generally, it means the compiler can *ensure you remember to do something i
 Lets say we have a spaceship game.
 
 
-All of our spaceships live in a central list, but we also need to have a separate cache for displaying them.
+Some facts about our game's code:
+
+ * All of our spaceships live in a central list.
+ * We _also_ need to have a separate cache for displaying them.
+ * Every ship needs to be in both the central list _and_ the display cache.
+ * When the ship dies, we need to remove it from both the central list _and_ the display cache.
 
 
-Every ship needs to be in both the central list _and_ the display cache.
-
-
-When the ship dies, we need to remove it from both the central list _and_ the display cache. If we forget to remove it from the display cache, we get odd bugs on the screen.
+If we forget to remove it from the display cache, we'd get an odd bug when displaying.
 
 
 Let's use single ownership to prevent this bug at compile-time.
@@ -272,7 +279,8 @@ void AddShipToDisplayCache(DisplayCache* cache, Ship* ship) {
 ```
 
 
-We're going to return a "reminder" object:
+
+Let's instead return a "reminder" object:
 
 
 ```
@@ -280,26 +288,29 @@ struct ShipInCacheReminder { };
 
 ShipInCacheReminder^ AddShipToDisplayCache(DisplayCache* cache, Ship* ship) {
   ... // Add to cache
-
   // Return a zero-sized reminder object
   return (ShipInCacheReminder^)malloc(sizeof(ShipInCacheReminder));
 }
 ```
 
 
-The compiler prevents us from accidentally dropping this object, and doesn't automatically `free` it. We must explicitly `move` or `free` it, which makes it a very effective reminder.
+
+The compiler prevents us from accidentally dropping this `ShipInCacheReminder^`; we must explicitly `move` or `free` it. That makes it a very effective reminder.
 
 
 The only place we'll ever `free` it is in the `RemoveShipFromDisplayCache` function:
 
 
 ```
-void RemoveShipFromDisplayCache(DisplayCache* cache, Ship* ship, ShipInCacheReminder^ reminder) {
+void RemoveShipFromDisplayCache(
+    DisplayCache* cache,
+    Ship* ship,
+    ShipInCacheReminder^ reminder) {
   free(move reminder);
-
   ... // Remove it from the cache
 }
 ```
+
 
 
 Voilà! The compiler now guarantees that we'll not forget to `RemoveShipFromDisplayCache`.
@@ -308,7 +319,7 @@ Voilà! The compiler now guarantees that we'll not forget to `RemoveShipFromDisp
 As a bonus, it prevents us from accidentally `RemoveShipFromDisplayCache` twice, because there's only one `reminder` object.
 
 
-They say the biggest two problems in computer science are off-by-one errors and cache invalidation. We just solved the latter.
+They say the biggest two problems in computer science are off-by-one errors and cache invalidation. We just solved the latter!
 
 
 If you want to learn more about this, check out [Vale's Higher RAII, the pattern that saved me a vital 5 hours in the 7DRL Challenge](/blog/higher-raii-7drl), where I used this exact technique to remember to remove things from a cache.
@@ -316,7 +327,11 @@ If you want to learn more about this, check out [Vale's Higher RAII, the pattern
 
 # Memory Safety
 
-With a few extra rules, something amazing happens.
+
+Let's make something else amazing happen.
+
+
+We can make our little C-like language *completely memory safe* with a few extra rules:
 
 *Rule 5:* Always bounds-check array accesses.
 
@@ -325,35 +340,27 @@ With a few extra rules, something amazing happens.
 *Rule 7:* Never use non-owning pointers. Each object only ever has one pointer to it, the owning pointer.
 
 
-Suddenly, our programs magically become *completely memory-safe*.
-
-
 You're probably thinking, "That's insane! How can you make a program without non-owning pointers? And how does that make our programs memory safe?"
 
 
 It does sound insane! But we can refactor any program to not use non-owning pointers, if we have these guidelines:
 
  1. Any function that receives a non-owning pointer would instead take (and return) ownership of data.
- 2. Any struct that stores a non-owning pointer would instead store an index (or ID) into some central data structure.
+ 1. Any struct that stores a non-owning pointer would instead store an index (or ID) into some central data structure.
 
 
-If you've ever used a language with a [linear type system](https://en.wikipedia.org/wiki/Substructural_type_system#Linear_type_systems), this will sound familiar.
+If you've ever used a language with a [linear type system](https://en.wikipedia.org/wiki/Substructural_type_system#Linear_type_systems) like [Austral](https://austral-lang.org/), this will sound familiar.
 
 
-After a few hours of using this "linear style", it actually feels pretty similar to Rust. The first point is semantically equivalent to passing an `&mut`, and we use the second gudeline all the time in Rust already.
+After a few hours of using this "linear style", it actually feels pretty similar to Rust. The first guideline is semantically equivalent to passing an `&mut`, and we use the second gudeline all the time in Rust already.
 
 
-At this point, we _could_ add non-owning pointers back in, if we use restrictive rules, akin to Rust's borrow checking.
+# Adding non-owning pointers back in safely
+
+If we want to add non-owning pointers back in while keeping our newfound memory safety, there are a few ways we can go about it.
 
 
-But let's do something more interesting! And after all, borrow checking means we can't use a lot of useful patterns, like graphs, observers, back-references, dependency-references, delegates, or intrusive data structures.
-
-
-
-# CHERI, Memory Tagging, Generational References
-
-There are three ways to make non-owning pointers safe enough to add back in.
-
+## Memory Tagging and CHERI
 
 [Memory tagging](https://source.android.com/docs/security/test/memory-safety/arm-mte) is when every 16-byte chunk of memory has a corresponding 4-bit "key" that goes with it. Every time we allocate or deallocate that chunk, we change the chunk's key.
 
@@ -362,21 +369,55 @@ Whenever we make a pointer to some data, we copy that key into the unused top bi
 When we attempt to dereference the pointer, the hardware will assert that the key in the chunk matches the key in the pointer.
 
 
-This has a 1/16 chance of a false positive, and there's also some ways around it. [CHERI](https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/) solves both of those problems, by making it so the key is unforgeable.
+Even though these asserts have a 1/16 chance of a false negative, this is great for detecting bugs in development and testing.
 
 
-[Vale](https://vale.dev/)'s [generational references](https://verdagon.dev/blog/generational-references) are similar to memory tagging, but with a 64-bit generation at the top of every allocation. It has a couple extra benefits:
-
- * It skips the assertions when we access an owning pointer. We can use the above "linear style" to eliminate all assertions in any program.
- * It skips the assertions when reading from an immutable [region](https://verdagon.dev/blog/zero-cost-borrowing-regions-overview).
+[CHERI](https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/) is still in the R&D phase, but it seems like it will solve a lot of memory tagging's downsides.
 
 
-Any of these three approaches will let us add non-owning pointers back to our language while still being memory safe.
+## Borrow Checking
+
+Of course, there's always Rust's borrow checking approach! It enforces that if someone has a mutable reference to an object, no other references can exist. This simple rule gives us non-owning pointers with full memory safety.
+
+
+It has some really nice benefits:
+
+ * With a little bit of function coloring and data coloring, we can temporarily share data with multiple threads, without risking data races!
+ * It doesn't have the run-time cost of memory tagging or CHERI (about [6.8%](https://lobste.rs/s/nw7hsd/how_memory_safe_is_zig_updated#c_tyzbaf)).
+
+
+But also some drawbacks:
+
+ * It can be difficult for time management and [development velocity](/blog/when-to-use-memory-safe-part-2).
+ * It doesn't let us use common patterns like observers, graphs, back-references, dependency references, intrusive data structures, delegates, and struggles with certain kinds of RAII and interconnected data.
+ * It doesn't let us use Higher RAII. [# This is because the borrow checker often forces non-owning reference fields to be function parameters instead, but destructors can't take in parameters.]
+
+
+## Generational References
+
+[Vale](https://vale.dev/)'s [generational references](/blog/generational-references) is like a 64-bit memory tagging system, but it uses the language's semantics to skip as many assertions as the user wants.
+
+
+It has a some benefits:
+
+ * It skips the assertions when we access an owning pointer, or when reading from an immutable [region](/blog/zero-cost-borrowing-regions-overview). Between these, one can eliminate every single assertion in a program if they want.
+ * Its owning references are regular thin 64-bit pointers, as opposed to CHERI's 128-bit ones.
+ * It's easy, and lets us use whatever patterns we want.
+ * It can be used with [regions](/blog/zero-cost-borrowing-regions-overview) to eliminate data races.
+
+
+It has its drawbacks too, of course:
+
+ * It has a "key" at the top of every allocation, though structs and enums share the key of the containing struct, array, or stack frame to save space.
+ * Its non-owning references are 128 bits (like CHERI's), though they can be avoided with the above linear style.
+
+
+This combination of generational references and regions is my favorite approach, especially since it still lets us use Higher RAII.
 
 
 # What does it all mean?
 
-Single ownership is a _lot_ more powerful than we thought. Even without borrow checking, we can do everything we used to, but with extra compiler guarantees, and not just about memory safety.
+Single ownership is a _lot_ more powerful than we thought. Even without reference counting, garbage collection, or borrow checking, we can use it for memory safety _and_ extra guarantees at compile-time.
 
 
 
@@ -393,8 +434,6 @@ If you're impressed with our [track record](https://vale.dev/roadmap#recent-addi
      Sponsor us on GitHub!
   </a>
 </center>
-
-With your support, we can bring regions to programmers worldwide.
 
 
 See you next time!
@@ -432,7 +471,7 @@ These techniques have also opened up some new emergent possibilities, which we h
 
  * [Region Borrow Checking](/blog/zero-cost-borrowing-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
  * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
- * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
+ * [Seamless concurrency](/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
  * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
 
 

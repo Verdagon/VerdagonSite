@@ -1,8 +1,8 @@
 ---
-title: Zero-Cost Borrowing with Vale Regions, Part 1: Immutable Region Borrowing (Preview)
+title: Zero-Cost Borrowing with Vale Regions, Part 1: Immutable Region Borrowing
 subtitle: Watch regions eliminate memory safety overhead!
 author: Evan Ovadia
-date: Preview
+date: Apr 28, 2023
 realm: blog
 path: blog/zero-cost-borrowing-regions-part-1-immutable-borrowing
 layout: annotated
@@ -11,7 +11,7 @@ sponsor: us
 ---
 
 
-! Note: Regions are still a work-in-progress. *This is only a preview* describing how we expect them to work in practice, to show where we're headed and what we're aiming for. They could surpass our wildest expectations, or they could shatter and implode into a glorious fireball, who knows! Follow along as we [implement all this](/blog/making-regions-part-1-human-factor), and reach out if anything isn't clear! [# If anything isn't clear, feel free to reach out via [discord](https://discord.gg/SNB8yGH), [twitter](https://twitter.com/vale_pl), or the [subreddit](https://reddit.com/r/vale)! We love answering questions, and it helps us know how to improve our explanations.] [# We're aiming to complete regions by early 2024, check out the [roadmap](https://vale.dev/roadmap) for more details.]
+! Note: Regions as a whole are still a work-in-progress, but part 1 has been [successfully prototyped](https://verdagon.dev/blog/regions-prototype)!
 
 
 Vale has an ambitious goal: to be fast, safe, _and_ easy. There are a lot of stellar languages that have two, and we suspect it's possible to really maximize all three using a new approach for memory safety called *regions*.

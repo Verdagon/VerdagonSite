@@ -1,16 +1,537 @@
+---
+title: What Vale Taught Me About Linear Types, Borrowing, and Memory Safety
+subtitle: And some ancient egyptian hieroglyphic slates!
+realm: blog
+date: May X, 2023
+path: blog/linear-types-borrowing
+layout: annotated
+author: Evan Ovadia
+sponsor: me
+namespace: c-blog m-annotated
+---
 
-What Vale Taught Us About Linear Types and Borrowing
+
+I've had some pretty surreal experiences while making Vale. [# And a lot of unexpected experiences. There was one time where I dove down an ancient history rabbit hole, just so I could add some flavor to an article about memory safety.] The weirdest was when I realized the hidden fundamental truth beneath a lot of the programming languages we use today.
+
+
+# The ancient writings that lit up a new field
+
+
+In July of 1799, a soldier was digging some foundations to expand a fortress in the Egyptian town of Rashid, when he stumbled upon an ancient-looking slate. He took it to his commanding officer, who realised that it could be important, or at the very least, valuable.
+
+
+<div><center><img src="/images/rosetta.jpg" style="max-height: 400px;"/><span style="opacity: .8"></span></center></div>
+
+
+The slate had writings in three languages, including ancient Egyptian hieroglyphs. Nobody knew how to read hieroglyphs yet, except for some oval shapes which are known to contain the names of kings and queens.
+
+The other two languages say the same thing as each other, and also mention those same kings and queens.
+
+
+The scholar Jean-Francois Champollion used these clues to eventually decipher the entire stone, and enabled us to finally understand ancient Egyptian hieroglyphs.
+
+
+I wonder what Champollion felt in that moment, when he had that entire slate translated for the first time.
+
+
+I'm no scholar, and I certainly didn't discover anything new. But I think I felt like Champollion did, when Vale showed me the hidden truth about how we can use linear types to completely eliminate Vale's memory safety costs.
+
+
+# A different way to get memory safety
+
+Recently, I was making a sample program to show how Vale's [regions](/blog/zero-cost-borrowing-regions-overview) can blend borrowing with shared mutability.
+
+
+I was surprised to find that the sample program had almost _zero_ memory-safety overhead, except for a line in this ([paraphrased](https://github.com/Verdagon/RegionsBenchmarks/blob/main/cellular-automata/CellularAutomata.vale)) code:
+
+```
+func RandInt(rand &Random) i64 {
+  x = rand.num;
+  set x = x + (x / 200096i64);
+  set x = x - (x * 33554432i64);
+  set x = x + (x / 134217728i64);
+  set rand.num = x;
+  return x;
+}
+
+// Returns a 2D array of random bools.
+func MakeBoard(
+    rand &Random,
+    num_rows int,
+    num_cols int)
+[][]bool {
+  rows = [][]bool(num_rows);
+  foreach row_i in 0..num_rows {
+    row = []bool(num_cols);
+    foreach col_i in 0..num_cols {
+      r = RandInt(rand);
+      row.push((r mod 2) == 0);
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+```
+
+
+Specifically, when `RandInt`'s `rand.num` dereferences the `rand` object, it does an implicit [generation check](/blog/generational-references) assertion to ensure the object is still alive.
+
+
+Normally, I don't believe in chasing zero-cost memory safety. Playing overhead golf can often lead to chasing diminishing returns or prematurely optimizing. After all, a generation check is usually only expensive as a bounds check (in other words, usually negligible).
+
+
+But still, I wondered if it _could_ be done. Could we get rid of that last little bit of overhead?
+
+
+A few weeks later, I discovered the solution.
+
+
+# Moving into and out of functions
+
+<<<<
+Instead of taking a `&Random` reference parameter like this:
+
+```
+func RandInt(rand &Random) i64 {
+  x = rand.num;
+  set x = x + (x / 200096i64);
+  set x = x - (x * 33554432i64);
+  set x = x + (x / 134217728i64);
+  set rand.num = x;
+  return x;
+}
+```
+////
+`RandInt` could take (and return) an owned `Random`, like this:
+```
+func RandInt(rand Random) (i64, Random) {
+  x = rand.num;
+  set x = x + (x / 200096i64);
+  set x = x - (x * 33554432i64);
+  set x = x + (x / 134217728i64);
+  set rand.num = x;
+  return (x, rand);
+}
+```
+>>>>
+
+
+Here's what we changed:
+
+ * `rand &Random` became `rand Random`. Instead of taking a reference, the caller moves the actual Random instance itself.
+ * `return x` became `return (x, rand);` which returns a two-element tuple, which also has the Random instance.
+ * The return type `i64` became `(i64, Random)` accordingly.
+
+
+Now, `rand.num` isn't dereferencing a reference, it's accessing a field of an owned value.
+
+Vale's compiler sees this, and doesn't insert a generation check, because it knows the object is alive.
+
+
+Of course, that requires we change how `MakeBoard` calls `RandInt`.
+
+
+<<<<
+It goes from this:
+
+```
+r = RandInt(rand);
+```
+
+where `rand` is a `&Random` reference...
+////
+...to this:
+
+```
+[r, set rand] = RandInt(rand);
+```
+
+where `rand` is an actual `Random`, not just a reference.
+>>>>
+
+
+Now, that line:
+
+ * Moves the `rand` instance into the `RandInt` call.
+ * Uses the square braces to break apart the returned tuple into its two elements:
+    * The `i64` part assigned to the local variable `r`.
+    * The `Random` part is put into the `rand` variable via `set rand`.
+
+
+Here's the rest of `MakeBoard`, for context.
+
+
+<<<<
+It went from this:
+
+```
+// Returns a 2D array of random bools.
+func MakeBoard(
+    rand &Random,
+    num_rows int,
+    num_cols int)
+[][]bool {
+  rows = [][]bool(num_rows);
+  foreach row_i in 0..num_rows {
+    row = []bool(num_cols);
+    foreach col_i in 0..num_cols {
+      r = RandInt(rand);
+      row.push((r mod 2) == 0);
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+```
+////
+...to this:
+```
+// Returns a 2D array of random bools.
+func MakeBoard(
+   rand Random,
+   num_rows int,
+   num_cols int)
+([][]bool, Random) {
+  rows = [][]bool(num_rows);
+  foreach row_i in 0..num_rows {
+    row = []bool(num_cols);
+    foreach col_i in 0..num_cols {
+      [r, set rand] = RandInt(rand);
+      row.push((r mod 2) == 0);
+    }
+    rows.push(row);
+  }
+  return (rows, rand);
+}
+```
+>>>>
+
+
+Let's break that down:
+
+ * The `rand &Random` parameter became `rand Random`, to take an actual `Random` instance instead of a reference.
+ * The return type `[][]bool` became `([][]bool, Random)`, so we can later return the `Random` instance.
+ * The `[r, set rand] = RandInt(rand);` line changed, as explained above.
+ * `return (rows, rand)` returns the new board and the `Random` instance to the caller.
+
+
+
+Instead of passing a reference, it's like we're "lending" an owned value to a function, which then returns it to us. For now, let's call this maneuver *own-lending*.
+
+
+If you've used a language like [Rust](https://www.rust-lang.org/) before, this might feel familiar: own-lending is semantically equivalent to borrowing a `&mut Random` and passing it around.
+
+
+Just for fun, I tried applying own-lending to the entire program. Sure enough, the `--print_mem_overhead` flag reported that I reduced generation checks down to *zero.*
+
+
+# Wait, zero?!
+
+This _blew_ my _mind_. That shouldn't be possible. I've never seen `--print_mem_overhead` print zero before!
+
+
+Yet there it was.
+
+
+I sat back from my desk, and got up for a walk. After ten minutes, I realized I'd just been staring at a wall, and hadn't actually walked anywhere.
+
+
+It slowly sank in over the next few days.
+
+
+*Using own-lending, we can completely eliminate every single generation check in a program, to get memory safety without borrow checking, reference counting, or tracing garbage collection.*
+
+
+# Discovering Linear Types
+
+I imagine that Jean-Francois Champollion felt overwhelmed, discovering how to read ancient Egyptian hieroglyphs. He had found the secret to exploring an ancient culture in a way nobody ever has before.
+
+
+That's how I felt in that moment, seeing that zero.
+
+
+Of course, I hadn't discovered anything new. I was discovering for myself the natural consequence of Vale's owned values being [linear](https://en.wikipedia.org/wiki/Substructural_type_system#Linear_type_systems), which is a distant cousin of Rust's affine types. Both are a kind of "[substructural type system](https://en.wikipedia.org/wiki/Substructural_type_system)". Apparently, people have been writing about substructural type systems' abilities for decades!
+
+
+With this new understanding, I considered Rust from a different perspective. It led me to the eventual truth: their memory safety doesn't come from borrow checking, not exactly. It comes from their types being affine. In a way, `&mut` references are just syntactic sugar, [# "Syntactic sugar" is what we call features that just make the code a bit cleaner, but aren't really required to express a certain computation.] and *if you took `&mut` out of Rust, it would still be memory safe.*
+
+
+The same is true of Vale, apparently. If you program without making any references, your program becomes memory safe, and has no memory-safety related overhead!
+
+
+I'm no type theorist. I vaguely knew that Vale's owned values were linear, but I had no idea they could do so much. This came as a huge surprise to me.
+
+
+# Necessary techniques
+
+In the two functions I showed above, it was pretty simple to do own-lending. Soon, I discovered that we need some other features to support own-lending fully.
+
+
+In particular, a language would need:
+
+ * Struct "destructuring"
+ * Array insert and extract
+
+
+## Destructuring
+
+We destructured a tuple in the above example, and we'd need to do it again if we want to take ownership of something from a containing struct.
+
+
+Let's say that `Random` instance was already owned by a `GameState` struct like this:
+
+```
+struct GameState {
+  player_name str;
+  rand Random;
+}
+exported func main() {
+  game = GameState("Vast", Random(42));
+  // Error!
+  MakeBoard(game.rand);
+  ...
+}
+```
+
+
+
+The compiler would give us an error, because taking that `Random` out of the `GameState` would leave the `GameState` struct in an invalid state.
+
+Instead, we'll need to temporarily destroy the GameState and then recreate it.
+
+
+Instead of writing `MakeBoard(game.rand);`, we would:
+
+```
+[player_name, rand] = game;
+set rand = MakeBoard(rand);
+set game = GameState(player_name, rand);
+```
+
+
+
+It's verbose, but it works!
+
+
+A language could make this less verbose with a few different approaches, which I'll talk about further below. First, let's make this work with arrays!
+
+
+## Array Extract
+
+If the `Random` was in an array, we can take it out using an `extract` method, and put it back in using an `insert` method.
+
+
+```
+arr []Random = …;
+...
+rand = arr.extract(3);
+set rand = MakeBoard(rand);
+arr.insert(3, rand);
+```
+
+
+Depending on the implementation of `extract` and `insert`, this could be costly, up to O(n) time as it shifts all the subsequent elements by one.
+
+
+There are more efficient ways to implement it. Some options:
+
+ * `extract` might swap the last element to this position, and `insert` might put it back at the end.
+ * We could temporarily destroy the containing array to give us ownership, similar to what we did with structs above.
+ * If we're using generational references like Vale is, we could temporarily change the object's generation number.
+
+
+## Some Sugar [# Everything in this section is theoretical, we haven't decided on any particular sugar to add to Vale for this.]
+
+We could add some syntactic sugar [# "Syntactic sugar" is what we call features that just make the code a bit cleaner, but aren't really required to express a certain computation.] to temporarily destroy an array or a struct, so we can take ownership of the contained data.
+
+<<<<
+Recall this code from above:
+```
+// Create a GameState struct
+game = GameState("Vast", Random(42));
+...
+[name, rand] = game;
+set rand = MakeBoard(rand);
+set game = GameState(name, rand);
+```
+////
+Those last three lines could conceptually become this:
+```
+borrow game.rand as rand;
+set rand = MakeBoard(rand);
+```
+or this alternative syntax:
+```
+rand = borrow game.rand;
+set rand = MakeBoard(rand);
+```
+>>>>
+
+
+At the end of the scope, the language would use `rand` to reconstruct a `GameState` to put in `game`.
+
+
+<<<<
+Recall the code with the array:
+```
+arr []Random = …;
+...
+rand = arr.extract(3);
+set rand = MakeBoard(rand);
+arr.insert(3, rand);
+```
+////
+Those last three lines could conceptually become this:
+```
+borrow arr[3] as rand;
+set rand = MakeBoard(rand);
+```
+or this alternative syntax:
+```
+rand = borrow arr[3];
+set rand = MakeBoard(rand);
+```
+>>>>
+
+
+And instead of a function taking and returning an owned value, we can add some syntactic sugar to do that for us.
+
+
+<<<<
+Instead of:
+```
+func RandInt(rand Random) (i64, Random) {
+  x = rand.num;
+  set x = x + (x / 200096i64);
+  set x = x - (x * 33554432i64);
+  set x = x + (x / 134217728i64);
+  set rand.num = x;
+  return (x, rand);
+}
+```
+////
+...we could add a `inout` keyword:
+```
+func RandInt(rand inout Random) i64 {
+  x = rand.num;
+  set x = x + (x / 200096i64);
+  set x = x - (x * 33554432i64);
+  set x = x + (x / 134217728i64);
+  set rand.num = x;
+  return x;
+}
+```
+>>>>
+
+
+This `inout` keyword would work exactly like Swift's or C#'s `inout` keyword, and like references in [Val](https://www.val-lang.dev/)'s [mutable value semantics](https://www.jot.fm/issues/issue_2022_02/article2.pdf). [# Val is a different language from Vale and Vala (we all have similarly great taste in naming!)] It's almost like Rust's `&mut`, but the user is also able to move out of it as long as they move something back into it before the function exits.
+
+
+As a bonus, this makes it easier for the compiler to optimize out any destroying/recreating structs, or shifting around array elements. In Vale, we would just temporarily change the containing struct's/array's generation.
+
+
+It's unclear whether we'll add this sugar in Vale. If you have any opinions on the matter, make an [issue](https://github.com/ValeLang/Vale/issues) or join the [discord server](https://discord.gg/SNB8yGH)!
+
+
+# Benefits and Drawbacks
+
+
+To get a sense of this "linear style", I like to compare it to Rust's borrow checking, because they're surprisingly similar.
+
+
+They both have some benefits:
+
+ * Memory safety with no direct extra costs. [# I say "direct" because it does have some indirect overhead; guideline #2 leads us to put more objects into arrays and hash maps, which leads to more bounds checking and hashing. Sometimes we also get more cache misses, though sometimes we get less.]
+ * Safety from data races; data races happen when two threads use references to access the same object, but we only ever allow one reference.
+
+
+And they both have some drawbacks:
+
+ 1. We often can't have multiple references to some data (except temporarily with borrow checking [# "Shared" references in Rust parlance, and they're read-only unless we use them to get to a `Cell`, `RefCell`, `Mutex`, etc.] [# Though, in both linear typing and borrow checking, long-lived references to the same data will still need to be made into indices or IDs into a central collection which holds the data.]).
+ 1. When we would otherwise have multiple references, we instead sometimes need to "slice" our data in unintuitive ways, which can cause some extra refactoring.
+ 1. We can't use optimal patterns like [intrusive data structures](https://lwn.net/Articles/907876/) and [graphs](https://news.ycombinator.com/item?id=24996001) which are sometimes faster in certain situations.
+ 1. We can't use certain patterns that decouple our code and make it more flexible, like [observers](https://www.reddit.com/r/rust/comments/pwqju6/is_there_an_underlying_reason_that_idiomatic_rust/), [back-references](https://users.rust-lang.org/t/back-reference-to-the-parent-struct/7413/2), [dependency references](https://en.wikipedia.org/wiki/Dependency_injection), [callbacks](https://news.ycombinator.com/item?id=12029238), and [delegates](https://medium.com/@nimjea/delegation-pattern-in-swift-4-2-f6aca61f4bf5).
+
+
+All of the above drawbacks exist because neither linear typing nor borrow checking have *shared mutability*. In other words, multiple mutable references to the same data.
+
+
+
+# Addressing the Drawbacks
+
+Are there any ways we can address those downsides without sacrificing the benefits?
+
+
+In other words, is there a way we can have linear types _and_ shared mutability?
+
+
+Adding borrow checking partially helps with drawback #1 [# Partially because borrow checking lets us have temporary references, not persistent ones. The borrow checker has a hard time putting references into data structures.] but it still has drawbacks #2, #3, and #4. Rust's `Rc` and `RefCell` helps with those, but they're incompatible with linear types' benefits [# We can't put a linear type into an `Rc` because `Rc` throws away its contents when the last alias disappears.], and have their own drawbacks (like forcing heap allocation and not having [higher RAII](https://verdagon.dev/blog/higher-raii-7drl)).
+
+
+The other solution, surprisingly, is to blend generational references back in.
+
+Each object is still owned linearly; only one place can own an object at a time. But we'll also allow a generational reference to point at the object.
+
+With this, we can address a lot of the drawbacks:
+
+ 1. We can have as many references to data as we want, though there is still only one owner.
+ 1. We don't need to restructure our program to accommodate them.
+ 1. We can use patterns like intrusive data structures and graphs. [# In Vale, we would still have all nodes owned by a central collection, but we could still have references between nodes just fine.]
+ 1. We can use observers, back-references, dependency references, callbacks, delegates, whatever we want.
+ 1. We still don't have data races, because Vale changes the generations of any objects that cross region boundaries (unless we safely avoid that with [isolates](/blog/zero-cost-borrowing-regions-part-2-isolates)).
+
+
+Generational references seem to occupy a sweet spot because they allow objects to be linear (they're owned by only one place), yet allow shared mutability in a way that doesn't artificially extend the lifetime of the object.
+
+
+The mark of a good language is when its features compose well and don't conflict with each other. It seems we're on the right track with generational references, as they compose linear types with shared mutability pretty well.
+
+
+# Matches Made in Heaven
+
+A pleasant surprise, we're back to where we started!
+
+
+But we arrive with a new understanding:
+
+ * We can code in a "linear-first" fashion, and then only add references if we want some extra flexibility.
+ * Alternatively, we can code with a lot of references, and then bring them down to *zero* where we want some more speed.
+
+In other words, we now have complete control over the flexibility vs. performance tradeoff, something I've never seen a language do well.
+
+
+It was quite a shock, realizing that Vale could do this the entire time.
+
+
+And it made me wonder, what does this mean for [regions](/blog/zero-cost-borrowing-regions-overview), Vale's other mechanism for eliminating generation checks?
+
+
+Then I realized, they fit _perfectly_ together. We can use regions to look at a function's inputs in a zero-cost way, and use this "linear style" for any new data the function creates.
+
+I tried this out in a little [roguelike game](https://github.com/Verdagon/RegionsBenchmarks/blob/main/tiny-roguelike/roguelike.vale). The vast majority of generation checks were eliminated by regions, and the rest were eliminated by this new linear style.
+
+
+You can try this too! Just invoke the Vale compiler with the `--print_mem_overhead true` flag to make the program print out how many generation checks you can still eliminate (and if you want to use regions too, check out the experimental branch [described here](/blog/first-regions-prototype)).
+
+
+
+# Conclusion and Next Steps
+
+For those of us that like to squeeze every little last drop of performance out of our programs, this is a pretty amazing realization.
+
+
+But ironically, that's a small minority. For the vast majority of Vale programs, generational references aren't a noticeable source of overhead, and none of this will matter. And that's a good thing; one of Vale's main strengths is that you can just make your program, and things will just work and will be fast.
+
+
+However, this does open up Vale to some new domains. Since we can program in a way that doesnt require generation checks, that means that Vale could be used in new niches, like embedded systems, operating system kernels, and safety-critical software. That's pretty exciting.
 
 
 
 
-one of the best benefits of using a new language is seeing new ways of thinking.
+# Scratch (ignore this)
 
-i mostly design vale, but sometimes, it designs itself.
 
-talk about how we dont need borrow checkers or GC or RC for memory safety. we just need one thing: single ownership.
+A language could go a step further and enable temporary read-only aliasing of the object. Vale would do this with [regions](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing), [# The user would need to make the field an [isolate](/blog/zero-cost-borrowing-regions-part-2-isolates), which ensures nobody else has a reference to this object.] and Rust would do this this with its shared references.
 
-single ownership first came from c++ blah blah blah
-
-only need a couple constructs: swap, destructure
+ * [Austral](https://austral-lang.org/) is based on linear types as well, and has a lot of the mechanisms we've been talking about.
 

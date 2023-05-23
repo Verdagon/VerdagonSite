@@ -1,0 +1,210 @@
+
+
+
+The last one, 100,000 lines, was about some technical tips and tricks for surviving. This one is going to be about how to survive mentally.
+
+
+
+
+
+Like I said in part 1, use *intermediate, useful, cohesive goals*.
+
+
+- forgive yourself for being exhausted and adding some tech debt, but remember, pay it down before the next feature. know your own track record and be honest with yourself.
+- do all the tips in the 100k article
+- know which principles apply to small projects and which apply to large ones. for small, GC > BC, integration > unit.
+- use vimpl.
+
+
+
+# Don't Blindly Follow Best Practices
+
+When I was at Google, we had some accepted best practices:
+
+ * A/B test everything.
+ * Have everything reviewed by someone else. 
+ * Add a _lot_ of unit tests.
+ * Focus on scalability and reliability before doing _anything_.
+
+
+All of these best practices are, of course, complete nonsense when you're working on a solo team. These techniques will slow you down, in the early stages when productivity is one of the most important things.
+
+
+Every approach has situations where it shouldn't be applied. The mark of a good architect is knowing _when_ to use which best practices.
+
+
+When someone tells you about some new best practice, ask them when it's the wrong decision. If they can't come up with one, or give you a non-answer, [# I once asked someone to name one drawback of their favorite language. They answered, "that's it not used in more places." That's a non-answer.] they haven't thought hard enough.
+
+
+# Manage Your Burnout
+
+There are a lot of cures to burnout. cure to burnout is doing something that excites you.
+
+It can sometimes be a good idea to stay a couple months ahead of what you've revealed to anyone, and have some articles ready to go. That way, if you need to take a vacation, you can.
+
+I did that after completing Vale's regions prototype. It was such a monumental struggle that my brain was _destroyed_ afterward.
+
+
+One of the best techniques is in the next section.
+
+
+
+
+
+Adding technical debt to your project can be a good thing. It can help you throttle the amount of work you're tackling at any given time.
+
+
+The Vale compiler's biggest challenge, by far, was transitioning from templates to generics. It took DAYS HERE days, LINES HERE lines of code, and it was _exhausting_.
+
+
+Luckily, I had some techniques to get to the end:
+
+ * A function called `vimpl()` that simply threw 
+
+
+
+
+
+Forgive yourself for adding that technical debt.
+
+
+
+
+
+# Don't Listen to Spectators
+
+[Monday morning quarterback](https://www.dictionary.com/browse/monday-morning-quarterback). [Captain hindsight](https://southpark.fandom.com/wiki/Captain_Hindsight)s. [Armchair general](https://en.wikipedia.org/wiki/Armchair_general). _Spectators._
+
+
+One of my friends once played in a Starcraft tournament. For those unfamiliar, Starcraft is a game where you can only see a certain distance from your soldiers and bases, and you need to explicitly send units out to scout the enemy to know what they're doing, and when they might attack. This is the "fog of war", the lack of information about things happening far away.
+
+
+In the audience however, we were watching a screen that showed the entire battlefield; we spectators had no fog of war.
+
+
+My friend launched three attacks on the enemy's economy. Two failed because of the enemy's defenses. The person next to me said "Oh, that was a mistake. He shouldn't have attacked, there were defenses there!"
+
+
+Nonsense! Given the information he had, it made sense to attempt those attacks. The truth of this was shown when his third attack happened to land where the enemy had no defenses, and it _absolutely crippled_ the enemy for the rest of the game.
+
+Spectators often don't understand these *high-risk high-reward* maneuvers. What looks like a silly mistake to a spectator is often a calculated risk by the player.
+
+A spectator will look at you doing something new, and think you're stupidly wasting your time.
+
+Don't listen to spectators.
+
+
+In another game, my friend knew he had a smaller army than his opponent, yet launched an attack anyway. Despite some masterful hit-and-run tactics, he lost most of that army, and did little damage to the opponent.
+
+Someone said, "Ohhhh, that was a bad decision. He shouldn't have attacked."
+
+Of course, by attacking and losing these low-level units, he freed up capacity for building larger units, and also distracted his enemy for enough time to build a new secret base. These advantages caused his eventual victory.
+
+Spectators *can't see your long term plan.* [# Someone once said generational references were a waste of time compared to `unsafe` + borrow checking. Generational references eventually led to [higher RAII](/blog/higher-raii-7drl), [safer dependencies](/blog/fearless-ffi), [perfect replayability](/blog/perfect-replayability-prototyped), [seamless concurrency](/blog/seamless-fearless-structured-concurrency), and so on. Stick to the plan, and don't listen to spectators!]
+
+Don't listen to spectators. They aren't bad people, they just don't have the same information you do. They don't see the tradeoffs you're making.
+
+
+In RACE HERE, an Australian runner named NAME HERE was the slowest out of the gate, just shuffling along. It turns out, his slow-and-steady approach was a much more calorie-efficient way to run. He not only won the race, he _destroyed_ everyone else. [#loser]
+
+
+<slice>
+#loser: From Garfunkel and Oates:
+
+"At least you’re not that guy watching from the side /
+
+Who thinks he’s doing better ’cause he wasn’t defeated /
+
+When he’s just a non-entity who never competed /
+
+You’re the one who’s out there reaching for something greater /
+
+And you know / It’s better to be a loser / Than a spectator"
+</slice>
+
+
+
+# Be Honest
+
+There was a language once that promised the best of all worlds... but they gave no plans and eventually delivered nothing. Years passed with nothing to show for it. Worse, they accepted donations the whole time.
+
+
+They also had a habit of advertising their language's plans and intentions as if it was already created. Their site was very unclear about what was fact and what was ambition.
+
+
+I imagine that that situation would have been _stressful_. That person would constantly be wondering if this is the day that someone found out they were a charlatan. That day eventually did come, and nobody really talks about them anymore.
+
+
+The better approach, obviously, is to be honest. When I posted [Vale's First Regions Prototype](/blog/first-regions-prototype), I had a choice. Rather than painting the rosiest picture possible to stoke hype and get more people to send me more money, I presented just the facts, as well as a lengthy list of findings' caveats and weaknesses.
+
+
+Vale still doesn't have as many sponsors as that other project, but Vale's reputation is intact, and that's more important.
+
+
+# Don't Compare Beginnings and Ends
+
+In the novelist world, we have a saying: "Don't compare your beginnings with others' ends."
+
+It's tempting to read what your own book and say, "Wow, my writing is nowhere near as good as that New York Times #1 Bestselling Author." But you're likely comparing your first book to that author's tenth book, which is already polished and edited too.
+
+
+
+
+
+Vale stands on many ideas that were discarded:
+
+ * Constraint references, where we checked at run-time that no references to an object existed 
+ * The first version of generational references needed all objects on the heap.
+ * HGM went through _twenty three_ iterations before it was perfected (it's now part of regions).
+ * Regions themselves had to go through three or four iterations themselves, to hammer out the kinks.
+
+
+In the music world, they have the saying "You'll write 50 bad songs before you write a good one, so get started!"
+
+
+Stay positive and optimistic. Your thing might not work well now, but you might later realize something that makes it better.
+
+
+# Surround Yourself With Positive People
+
+Jon, Razz, Veim, Blake.
+
+Look for people who admit they could be wrong. 
+
+
+
+# Sponsors
+
+Depending on your mental state, sponsors can be good and/or bad for your project.
+
+
+For me, they're a huge benefit. The money is good (and helps me justify continuing this a little bit longer) but the morale boost of seeing that others believe in what you're doing is very useful.
+
+
+However, it's sometimes tempting to think that you _owe_ them something. It can be helpful to keep in mind that they're paying you for the previous 6 months of progress. If they're not impressed they can un-sponsor at any time.
+
+
+Don't take sponsorships from friends unless you know you can handle it. Personally, I know I wouldn't be able to compartmentalize it; every future interaction would be a bit tainted by it. This is the same reason I never lend money to family, but rather gift it. [# I acknowledge that not every family can work this way. I'm particularly lucky and blessed to have the family I do.]
+
+
+# Bug reports
+
+
+Every bug report is two things:
+
+ * An issue that someone says you need to fix.
+ * A helpful offering highlighting something that can be improved.
+
+
+See bug reports as the latter.
+
+
+Of course, some bug reports are rather hostile, and can be seen as the former. Ignore those bug reports. They don't own you.
+
+
+# Volunteers
+
+
+- dont open things up to volunteers too early. there is a _huge_ coordination and ramp-up cost, and it's _rarely_ worth it for volunteers.
+
+- that said, look for slices of the project where you can write something up and hand it to volunteers. it means you dont have to spend time explaining a potential project to someone. the vast majority of volunteers will fade away, which is understandable, most projects sound fun until reality reveals itself.

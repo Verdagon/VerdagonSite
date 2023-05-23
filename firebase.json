@@ -71,6 +71,11 @@
         "regex": "/blog/zero-cost-memory-safety-(regions-)?(part-)?5-region-scoped-data",
         "destination": "/blog/zero-cost-borrowing-regions-part-5-region-scoped-data",
         "type": 302
+      },
+      {
+        "regex": "/blog/regions-prototype",
+        "destination": "/blog/first-regions-prototype",
+        "type": 302
       }
     ]
   }
