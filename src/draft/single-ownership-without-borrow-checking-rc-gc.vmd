@@ -355,6 +355,9 @@ If you've ever used a language with a [linear type system](https://en.wikipedia.
 After a few hours of using this "linear style", it actually feels pretty similar to Rust. The first guideline is semantically equivalent to passing an `&mut`, and we use the second gudeline all the time in Rust already.
 
 
+If you want to learn more about this, check out [What Vale Taught Me About Linear Types, Borrowing, and Memory Safety](/blog/linear-types-borrowing)!
+
+
 # Adding non-owning pointers back in safely
 
 If we want to add non-owning pointers back in while keeping our newfound memory safety, there are a few ways we can go about it.
