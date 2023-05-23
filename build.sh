@@ -447,8 +447,8 @@ fi
 
 if [ $TARGET == "linear-types-borrowing" ] || [ $TARGET == "all" ] ; then
   echo "Doing linear-types-borrowing"
-  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/linear-types-borrowing src/draft/linear-types-borrowing.vmd
-  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/linear-types-borrowing src/draft/linear-types-borrowing.vmd
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/linear-types-borrowing src/blog/0.3/linear-types-borrowing.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/linear-types-borrowing src/blog/0.3/linear-types-borrowing.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
