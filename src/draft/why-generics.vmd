@@ -9,16 +9,19 @@ namespace: c-blog m-annotated
 ---
 
 
-At long last, after a mighty months-long struggle, we've finished transitioning Vale from *templates* to *generics!*
+In the [Unexpected quest](/blog/making-regions-part-2-generics) post, I talked about how we had to transition Vale's templates to full generics in order to implement Vale's [region borrowing](/blog/zero-cost-borrowing-regions-overview) feature which blends borrowing with shared mutability.
 
 
-This may seem like an arcane detail to most, but it's secretly the key to unlocking s of Vale's superpowers: *faster compile times* and *faster run-time speed.*
+The hardest thing about that post is that I couldn't fit in anything about our master plan with generics. There is _so much_ potential with generics that nobody has realized!
 
 
-Here's how!
+Now pull up a tree stump and listen, for I am about to enlighten you on how generics can actually make compile times faster, enable much better "cloud building", and drastically reduce compile times.
 
 
-# Wait, what's a template?
+First, let's see what the difference is, so we can really understand their potential.
+
+
+# What's a template?
 
 In Vale, when a can receive any type, it's a _template_.
 
@@ -86,19 +89,86 @@ Looks a lot like generics! What's the difference?
 # The Difference
 
 
-A [generic function](https://docs.oracle.com/javase/tutorial/extra/generics/methods.html) is almost the same as a template function, it does those same two things.
+A [generic function](https://docs.oracle.com/javase/tutorial/extra/generics/methods.html) is almost the same as a template function. It does those same two things.
 
 
 However, it does them in the reverse order:
 
  * Compile the PrintEqual function first.
- * Later, make a copy for every type we use it with.
+ * Later, "monomorphize"; make a copy for every type we use it with.
 
 
 It turns out, this is way faster, because we only compile a function once (`PrintEqual<T>`) ahead of time instead of three separate times (`PrintEqual<int>`, `PrintEqual<bool>`, `PrintEqual<str>`).
 
 
-# Compile Speed
+# Compile Speed via Type Erasure
+
+
+In 1995, a guy named James Gosling made a language, and it didn't have templates or generics or anything. You've probably never heard of it, but I'll say it's name anyway: Java!
+
+
+To accomplish the same thing as generics, the user would need to do a lot of type-casting.
+
+
+Instead of having a `Map<Integer, String>`, they would simply have a `Map`.
+
+
+<<<<
+To pull out a string like this:
+
+```
+String x = map.get(6);
+```
+////
+...people wrote:
+
+```
+String x = (String)map.get(6);
+```
+>>>>
+
+...because `Map`'s method `get` returned an `Object`.
+
+
+Everything returned an `Object`. There were no generics. It's similar to how we always cast to and from `void*` in C, and similar to how we often cast to and from `interface{}` in Go.
+
+
+Later on, Java wanted to add generics. However, they couldn't build generics into the JVM (the interpreter that ran all their compiled java code) because backwards compatibility was sacrosanct. They also didn't want to force anyone to recompile their code to run on any new JVMs.
+
+
+Instead, they *implemented generics half-way*. The compiler knew about generics, but under the hood, the JVM still treated everything as an object.
+
+
+This is familiar to anyone who has used Typescript or mypy in Python. Generics are simply a compile-time abstraction; the VM in the end doesn't care about silly frivoloties like _types_. It just calls functions on `Object`s.
+
+
+This is a technique known as *type erasure*.
+
+
+Type erasure has a hidden benefit: the compiler *only needs to compile every function once*. The compiler doesn't have a monomorphization step. [# Though, these languages do some monomorphization at run-time with a technique known as "Just In Time" compilation.]
+
+
+# Native Compiler Bottleneck
+
+Every native language with templates or generics like C++, Rust, etc. will have a monomorphization step, which creates many copies of generic functions, each with the right types substituted in.
+
+
+These copies then go to LLVM, which takes a *really, really long time*.
+
+
+LLVM is the bottleneck for any compiler. See THIS ARTICLE where jon says that LLVM is 90% of compile time.
+
+And THIS ARTICLE that talks about Rust.
+
+
+
+ They had to somehow add 
+
+One of Java's top priorities was backwards compa
+
+
+
+
 
 
 Generics' main benefit is that we only have to compile each function once, but there are a lot of ways we can push that benefit even further.

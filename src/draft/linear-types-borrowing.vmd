@@ -44,6 +44,8 @@ I wonder what Champollion felt in that moment, when he had that entire slate tra
 I'm no scholar, and I certainly didn't discover anything new. But I think I felt like Champollion did, when Vale showed me the hidden truth about how we can use linear types to completely eliminate Vale's memory safety costs.
 
 
+<slice/>
+
 # A different way to get memory safety
 
 Recently, I was making a sample program to show how Vale's [regions](/blog/zero-cost-borrowing-regions-overview) can blend borrowing with shared mutability.
@@ -97,6 +99,8 @@ But still, I wondered if it _could_ be done. Could we get rid of that last littl
 
 A few weeks later, I discovered the solution.
 
+
+<slice/>
 
 # Moving into and out of functions
 
@@ -239,6 +243,8 @@ If you've used a language like [Rust](https://www.rust-lang.org/) before, this m
 Just for fun, I tried applying own-lending to the entire program. Sure enough, the `--print_mem_overhead` flag reported that I reduced generation checks down to *zero.*
 
 
+<slice/>
+
 # Wait, zero?!
 
 This _blew_ my _mind_. That shouldn't be possible. I've never seen `--print_mem_overhead` print zero before!
@@ -255,6 +261,8 @@ It slowly sank in over the next few days.
 
 *Using own-lending, we can completely eliminate every single generation check in a program, to get memory safety without borrow checking, reference counting, or tracing garbage collection.*
 
+
+<slice/>
 
 # Discovering Linear Types
 
@@ -276,6 +284,8 @@ The same is true of Vale, apparently. If you program without making any referenc
 I'm no type theorist. I vaguely knew that Vale's owned values were linear, but I had no idea they could do so much. This came as a huge surprise to me.
 
 
+<slice/>
+
 # Necessary techniques
 
 In the two functions I showed above, it was pretty simple to do own-lending.
@@ -286,6 +296,8 @@ Soon, I discovered that we need some other features to support own-lending fully
  * Struct "destructuring"
  * Array insert and extract
 
+
+<slice/>
 
 ## Destructuring
 
@@ -330,6 +342,8 @@ It's verbose, but it works!
 A language could make this less verbose with a few different approaches, which I'll talk about further below. First, let's make this work with arrays!
 
 
+<slice/>
+
 ## Array Extract
 
 If the `Random` was in an array, we can take it out using an `extract` method, and put it back in using an `insert` method.
@@ -354,6 +368,8 @@ There are more efficient ways to implement it. Some options:
 
 We'll talk about that last one further below.
 
+
+<slice/>
 
 ## Some Sugar [# Everything in this section is theoretical, we haven't decided on any particular sugar to add to Vale for this.]
 
@@ -460,6 +476,8 @@ As a bonus, this makes it easier for the compiler to optimize out any destroying
 It's unclear whether we'll add this sugar in Vale. If you have any opinions on the matter, make an [issue](https://github.com/ValeLang/Vale/issues) or join the [discord server](https://discord.gg/SNB8yGH)!
 
 
+<slice/>
+
 # Benefits and Drawbacks
 
 
@@ -483,6 +501,7 @@ And they both have some drawbacks:
 All of the above drawbacks exist because neither linear typing nor borrow checking can have *shared mutability*. In other words, multiple mutable references to the same data.
 
 
+<slice/>
 
 # Addressing the Drawbacks
 
@@ -516,6 +535,8 @@ Generational references seem to occupy a sweet spot because they allow objects t
 The mark of a good language is when its features compose well and don't conflict with each other. It seems we're on the right track with generational references, as they compose linear types with shared mutability pretty well.
 
 
+<slice/>
+
 # Matches Made in Heaven
 
 A pleasant surprise, we're back to where we started!
@@ -545,6 +566,8 @@ I tried this out in a little [roguelike game](https://github.com/Verdagon/Region
 You can try this too! Just invoke the Vale compiler with the `--print_mem_overhead true` flag to make the program print out how many generation checks you can still eliminate (and if you want to use regions too, check out the experimental branch [described here](/blog/first-regions-prototype)).
 
 
+
+<slice/>
 
 # Conclusion and Next Steps
 
