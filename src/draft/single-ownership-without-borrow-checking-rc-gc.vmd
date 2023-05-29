@@ -195,13 +195,15 @@ This `move` keyword comes with a new rule.
 
 We would also use this new `move` keyword to transfer ownership of some data to our caller, like so:
 
-```
+```c
 Spaceship^ makeSpaceship() {
   Spaceship^ ship = (Spaceship^)malloc(sizeof(Spaceship));
   ship->fuel = 42;
   return move ship;
 }
 ```
+
+<center><span style="opacity: 0.6;">(now watch as this new syntax completely confuses the site's code highlighter)</span></center>
 
 
 
@@ -283,7 +285,7 @@ void AddShipToDisplayCache(DisplayCache* cache, Ship* ship) {
 Let's instead return a "reminder" object:
 
 
-```
+```c
 struct ShipInCacheReminder { };
 
 ShipInCacheReminder^ AddShipToDisplayCache(DisplayCache* cache, Ship* ship) {
@@ -301,7 +303,7 @@ The compiler prevents us from accidentally dropping this `ShipInCacheReminder^`;
 The only place we'll ever `free` it is in the `RemoveShipFromDisplayCache` function:
 
 
-```
+```c
 void RemoveShipFromDisplayCache(
     DisplayCache* cache,
     Ship* ship,
@@ -313,10 +315,85 @@ void RemoveShipFromDisplayCache(
 
 
 
-Voilà! The compiler now guarantees that we'll not forget to `RemoveShipFromDisplayCache`.
+Voilà! The compiler now guarantees that we'll not forget to `RemoveShipFromDisplayCache`. Let's see what happens if we forget, and how the compiler protects us.
 
 
-As a bonus, it prevents us from accidentally `RemoveShipFromDisplayCache` twice, because there's only one `reminder` object.
+<<<<
+Personally, I prefer storing the reminder next to the `Ship` itself. For example, instead of a central list of `Ship`, we might have a central list of `ShipAndMetadata` which contains a `Ship` and all the reminder objects for it.
+////
+```c
+struct ShipAndMetadata {
+  Ship^ ship;
+  ShipInCacheReminder^ shipInCache;
+};
+```
+>>>>
+
+
+That way, when we take apart the `ShipAndMetadata` struct to get to the `Ship` we want to destroy, we're naturally left holding a `ShipInCacheReminder`.
+
+
+<<<<
+Here, we try to delete the `shipAndMetadata` directly, and justifiably get an error.
+////
+```c
+void DestroyShip(
+    ShipAndMetadata^ shipAndMetadata) {
+  // Error: freed a struct without
+  //   moving data from it
+  free(move shipAndMetadata);
+}
+```
+>>>>
+
+<<<<
+To fix that error, we move things out first. The compiler knows that we'll need to `move` things out and then immediately `free` them. [# This is so common thing that languages like Vale can just "move-destructure" to do this, e.g. `[ship, shipInCache] = shipAndMetadata;`.]
+
+
+We also free `ship` here. However, the `shipInCache` was not dealt with, so the compiler notices that and throws an error.
+////
+```c
+void DestroyShip(
+    ShipAndMetadata^ shipAndMetadata) {
+  Ship^ ship = move shipAndMetadata.ship;
+  ShipInCacheReminder^ shipInCache =
+      move shipAndMetadata.shipInCache;
+  free(move shipAndMetadata);
+
+  free(move ship);
+  // Error: Un-destroyed data:
+  //   ShipInCacheReminder^ shipInCache
+}
+```
+>>>>
+
+
+That's good! We don't want the compiler to leak or even `free` that reminder automatically, that would defeat the purpose.
+
+
+<<<<
+To fix it, we'll call `RemoveShipFromDisplayCache`.
+////
+```c
+void DestroyShip(
+    DisplayCache* cache,
+    ShipAndMetadata^ shipAndMetadata) {
+  Ship^ ship = move shipAndMetadata.ship;
+  ShipInCacheReminder^ shipInCache =
+      move shipAndMetadata.shipInCache;
+  free(move shipAndMetadata);
+
+  RemoveShipFromDisplayCache(
+      cache, &ship, move shipInCache);
+  free(move ship);
+
+  // No errors!
+}
+```
+>>>>
+
+
+As a bonus, this technique prevents us from accidentally doing `RemoveShipFromDisplayCache` twice, because there's only one reminder object instance. [# So far, this technique doesn't prevent us from removing the wrong `Ship`. If it turns out to be a problem in practice, we could put the `Ship`'s ID into the `ShipInCacheReminder`, though it would take some space.]
 
 
 They say the biggest two problems in computer science are off-by-one errors and cache invalidation. We just solved the latter!
@@ -349,13 +426,13 @@ It does sound insane! But we can refactor any program to not use non-owning poin
  1. Any struct that stores a non-owning pointer would instead store an index (or ID) into some central data structure.
 
 
+I go into this "linear style" a bit more in [What Vale Taught Me About Linear Types, Borrowing, and Memory Safety](/blog/linear-types-borrowing), check it out!
+
+
 If you've ever used a language with a [linear type system](https://en.wikipedia.org/wiki/Substructural_type_system#Linear_type_systems) like [Austral](https://austral-lang.org/), this will sound familiar.
 
 
-After a few hours of using this "linear style", it actually feels pretty similar to Rust. The first guideline is semantically equivalent to passing an `&mut`, and we use the second gudeline all the time in Rust already.
-
-
-If you want to learn more about this, check out [What Vale Taught Me About Linear Types, Borrowing, and Memory Safety](/blog/linear-types-borrowing)!
+After a few hours of using this style, it actually feels pretty similar to Rust. The first guideline is semantically equivalent to passing an `&mut`, and we use the second gudeline all the time in Rust already.
 
 
 # Adding non-owning pointers back in safely
@@ -427,99 +504,96 @@ Single ownership is a _lot_ more powerful than we thought. Even without referenc
 *That's all for now!* I hope you enjoyed this article. Keep an eye out for the next one on our [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), [discord server](https://discord.gg/SNB8yGH), or [subreddit](https://reddit.com/r/vale)!
 
 
-If you're impressed with our [track record](https://vale.dev/roadmap#recent-additions) and believe in the [direction we're heading](https://vale.dev/roadmap), please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
-
-<center>
-  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
-     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
-        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
-     </svg>
-     Sponsor us on GitHub!
-  </a>
-</center>
-
-
 See you next time!
+
 
 - Evan Ovadia
 
 
 <slice new-color="afterword"/>
 
-# Vale's Vision
-
-Vale aims to bring a new way of programming into the world that offers *speed*, *safety*, and *ease of use.*
+# Vale needs your help!
 
 
-*The world needs something like this!* Currently, most programming language work is in:
-
- * High-overhead languages involving reference counting and tracing garbage collection.
- * Complex languages (Ada/Spark, Coq, Rust, Haskell, etc.) which impose higher complexity burden and mental overhead on the programmer.
-
-These are useful, but there is a *vast field of possibilities* in between, waiting to be explored!
+With your help, we can bring a new language into the world that focuses on *speed*, *safety*, *flexibility*, and *ease of use.*
 
 
-Our aim is to explore that space, discover what it has to offer, and make *speed and safety easier than ever before.*
-
-
-In this quest, we've discovered and implemented a lot of new techniques:
-
- * [Generational Memory](/blog/generational-references), for a language to ensure an object still exists at the time of dereferencing.
- * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
- * [Fearless FFI](/blog/fearless-ffi), which allows us to call into C without risk of accidentally corrupting Vale objects.
- * [Perfect Replayability](/blog/perfect-replayability-prototyped), to record all inputs and replay execution, and completely solve heisenbugs and race bugs.
-
-
-These techniques have also opened up some new emergent possibilities, which we hope to implement:
-
- * [Region Borrow Checking](/blog/zero-cost-borrowing-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
- * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
- * [Seamless concurrency](/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
- * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
-
-
-We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
-
- * We can mix an `unsafe` block with Fearless FFI to make a much safer systems programming language!
- * We can mix Erlang's isolation benefits with functional reactive programming to make much more resilient programs!
- * We can mix region borrow checking with Pony's `iso` to support shared mutability.
-
-...plus a lot more interesting ideas to explore!
-
-
-The Vale programming language is a novel combination of ideas from the research world and original innovations. Our goal is to publish our techniques, even the ones that couldn't fit in Vale, so that the world as a whole can benefit from our work here, not just those who use Vale.
-
-
-Our medium-term goals:
-
- * Finish the Region Borrow Checker, to show the world that shared mutability can work with borrow checking!
- * Prototype Hybrid-Generational Memory in Vale, to see how fast and easy we can make single ownership.
- * Publish the Language Simplicity Manifesto, a collection of principles to keep programming languages' learning curves down.
- * Publish the Memory Safety Grimoire, a collection of "memory safety building blocks" that languages can potentially use to make new memory models, just like Vale combined generational references and scope tethering.
-
-
-We aim to publish articles biweekly on all of these topics, and create and inspire the next generation of fast, safe, and easy programming languages.
+We’re a very small team of passionate individuals, working on this on our own and not backed by any corporation.
 
 
 If you want to support our work, please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
 
-With enough sponsorship, we can:
-
- * Work on this full-time.
- * Turn the Vale Language Project into a 501(c)(3) non-profit organization.
- * Make Vale into a production-ready language, and push it into the mainstream!
 
 <center>
   <a href="https://github.com/sponsors/ValeLang" class="donate-button">
      <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
         <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
      </svg>
-     Sponsor us on GitHub!
+     Sponsor us on GitHub
   </a>
 </center>
 
 
+Those who sponsor us also get extra benefits, including:
+
+ * Early access to all of our articles!
+ * A sneak peek at some of our more ambitious designs, such as memory-safe allocators based on algebraic effects, an async/await/goroutine hybrid that works without data coloring or function coloring, and more.
+ * Your name on the [vale.dev](https://vale.dev/) home page!
+
+
+With enough sponsorship, we can:
+
+ * Start a a 501(c)(3) non-profit organization to hold ownership of Vale. [# Tentatively name the Vale Software Foundation.]
+ * Buy the necessary computers to support more architectures.
+ * Work on this full-time.
+ * Make Vale into a production-ready language, and push it into the mainstream!
+
+
+We have a strong [track record](https://vale.dev/roadmap), and during this quest we've discovered and implemented a lot of completely new techniques: 
+
+ * The [Linear-Aliasing Model](/blog/linear-types-borrowing) that eliminates memory safety overhead, yet still has the flexibility of shared mutability via [generational references](/blog/generational-references).
+ * [Region Borrowing](/blog/first-regions-prototype), which makes it easier to write efficient code by composing shared mutability with the ability to temporarily freeze data.
+ * [Higher RAII](/blog/single-ownership-without-borrow-checking-rc-gc), where the language adds logic safety by enforcing that we eventually perform a specific future operation.
+ * [Perfect Replayability](/blog/perfect-replayability-prototyped) makes debugging race conditions obsolete  by recording all inputs and replaying execution exactly.
+
+
+These have been successfully prototyped. With your sponsorship we can polish them, integrate them, and bring these techniques into the mainstream. [#prototypes]
+
+
+Our next steps are focused on making Vale more user-friendly by:
+
+ 1. Finalizing the compiler's error messages and improving compile speeds.
+ 1. Polishing interop with other languages.
+ 1. Growing the standard library and ecosystem!
 
 
 
+We aim to combine and add to the benefits of our favorite languages:
 
+ * The scalability of [Go](https://go.dev/) and ergonomics of [Scala](https://scala-lang.org/), but using Vale's [linear-aliasing model](/blog/linear-types-borrowing) instead of garbage collection.
+ * C++'s single-ownership shared-mutability abilities with more [memory safety](/blog/single-ownership-without-borrow-checking-rc-gc), without sacrificing its flexibility.
+ * The speed and safety of [Rust](https://www.rust-lang.org/), but with [easier borrowing rules](/blog/zero-cost-borrowing-regions-overview), more [compile time guarantees](/blog/higher-raii-7drl), and better compatibility with [shared mutability](/blog/linear-types-borrowing).
+
+
+
+*We need your help to make this happen!*
+
+
+If you're impressed by our [track record](https://vale.dev/roadmap) and believe in the direction we're heading, please consider sponsoring us:
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub
+  </a>
+</center>
+
+
+(And if you don't feel like sponsoring yet, please consider donating to the [Red Cross](https://www.redcross.org/) or the [Kākāpō Recovery](https://www.doc.govt.nz/our-work/kakapo-recovery/get-involved/donate/)! [# Anyone who sends confirmation will get an honorary Vale Sponsor status!])
+
+
+<slice>
+#prototypes: [Generational references](/blog/generational-references), the [linear-aliasing model](/blog/linear-types-borrowing), and [higher RAII](/blog/single-ownership-without-borrow-checking-rc-gc) are all complete, and [Region borrowing](/blog/first-regions-prototype), [fearless FFI](/blog/fearless-ffi), and [perfect replayability](/blog/perfect-replayability-prototyped) have been successfully prototyped. Be sure to check out the experimental version of the compiler!
+</slice>
