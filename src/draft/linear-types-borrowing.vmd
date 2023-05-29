@@ -11,11 +11,11 @@ namespace: c-blog m-annotated
 ---
 
 
-[# J: Make sense in general?]
+[# E: Make sense in general?]
 
-[# J: Too heavy on the egyptian stuff? Also, I drop off of it pretty early, think I need to tie it in more near the end, or not needed?]
+[# E: Too heavy on the egyptian stuff? Also, I drop off of it pretty early, think I need to tie it in more near the end, or not needed?]
 
-[# J: Too much comparison to Rust?]
+[# E: Too much comparison to Rust?]
 
 
 I've had some pretty surreal experiences while making Vale. [# And a lot of unexpected experiences. There was one time where I dove down an ancient history rabbit hole, just so I could add some flavor to an article about memory safety.] The weirdest was when I realized the hidden fundamental truth beneath a lot of the programming languages we use today.
@@ -41,7 +41,7 @@ The scholar Jean-Francois Champollion used these clues to eventually decipher th
 I wonder what Champollion felt in that moment, when he had that entire slate translated for the first time.
 
 
-I'm no scholar, and I certainly didn't discover anything new. But I think I felt like Champollion did, when Vale showed me the hidden truth about how we can use linear types to completely eliminate Vale's memory safety costs.
+I'm no scholar, and I certainly didn't discover anything new. But I think I felt like Champollion did, when Vale showed me the hidden truth about how we can use linear types to completely eliminate Vale's memory safety costs, and led to the creation of the *linear-aliasing model*.
 
 
 <slice/>
@@ -53,7 +53,7 @@ Recently, I was making a sample program to show how Vale's [regions](/blog/zero-
 
 I was surprised to find that the sample program had almost _zero_ memory-safety overhead, except for a line in this ([paraphrased](https://github.com/Verdagon/RegionsBenchmarks/blob/main/cellular-automata/CellularAutomata.vale)) code:
 
-[# J: These examples clear enough? Trying to balance noisiness and explanation, so was sparse on comments.]
+[# E: These examples clear enough? Trying to balance noisiness and explanation, so was sparse on comments.]
 
 ```
 func RandInt(rand &Random) i64 {
@@ -89,7 +89,7 @@ Specifically, when `RandInt`'s `rand.num` dereferences the `rand` object, it doe
 
 
 
-[# J: This paragraph is here because I'm trying to convey that generation checks _aren't_ expensive, and not really worth optimizing away much of the time, but we *can* if we want to.]
+[# E: This paragraph is here because I'm trying to convey that generation checks _aren't_ expensive, and not really worth optimizing away much of the time, but we *can* if we want to.]
 
 Normally, I don't believe in chasing zero-cost memory safety. Playing overhead golf can often lead to chasing diminishing returns or prematurely optimizing. After all, a generation check is usually only expensive as a bounds check (in other words, usually negligible).
 
@@ -464,10 +464,10 @@ func RandInt(rand inout Random) i64 {
 ```
 >>>>
 
-[# J: I used `inout` even though `borrow` would make more sense, because I wanted to equate it to Swift's/C#'s inout, and so the user wouldnt accidentally think it worked like a `&mut`... not sure I succeeded, especially since I mention `&mut` below. `&mut` is part of the type, this is part of the parameter/variable. Think its worth making it clearer, or is it fine?]
+[# E: I used `inout` even though `borrow` would make more sense, because I wanted to equate it to Swift's/C#'s inout, and so the user wouldnt accidentally think it worked like a `&mut`... not sure I succeeded, especially since I mention `&mut` below. `&mut` is part of the type, this is part of the parameter/variable. Think its worth making it clearer, or is it fine?]
 
 
-This `inout` keyword would work exactly like Swift's or C#'s `inout` keyword, and like references in [Val](https://www.val-lang.dev/)'s [mutable value semantics](https://www.jot.fm/issues/issue_2022_02/article2.pdf). [# Val is a different language from Vale and Vala (we all have similarly great taste in naming!)] It's almost like Rust's `&mut`, but the user is also able to move out of it as long as they move something back into it before the function exits.
+This `inout` keyword would work exactly like Swift's or C#'s `inout` keyword, and like references in [Val](https://www.val-lang.dev/)'s [mutable value semantics](https://www.jot.fm/issues/issue_2022_02/article2.pdf). [# Val is a different language from Vale and Vala (we all have similarly great taste in naming!)] It's also [similar](https://doc.rust-lang.org/stable/book/ch04-01-what-is-ownership.html#return-values-and-scope) to Rust's `&mut`, but this is part of the variable/parameter, not part of its type.
 
 
 As a bonus, this makes it easier for the compiler to optimize out any destroying/recreating structs, or shifting around array elements. In Vale, we would just temporarily change the containing struct's/array's generation.
@@ -514,7 +514,7 @@ In other words, is there a way we can have linear types _and_ shared mutability?
 Adding borrow checking partially helps with drawback #1 [# Partially because borrow checking lets us have temporary references, not persistent ones. The borrow checker has a hard time putting references into data structures.] but it still has drawbacks #2, #3, and #4. Rust's `Rc` and `RefCell` helps with those, but they're incompatible with linear types' benefits [# We can't put a linear type into an `Rc` because `Rc` throws away its contents when the last alias disappears.], and have their own drawbacks (like forcing heap allocation and not having [higher RAII](https://verdagon.dev/blog/higher-raii-7drl)).
 
 
-[# J: How is this next part, where we blend gen refs back in? I tried to find an elegant way to build up to "the solution was with us all along".]
+[# E: How is this next part, where we blend gen refs back in? I tried to find an elegant way to build up to "the solution was with us all along".]
 
 The other solution, surprisingly, is to blend generational references back in.
 
@@ -532,7 +532,10 @@ With this, we can address a lot of the drawbacks:
 Generational references seem to occupy a sweet spot because they allow objects to be linear (they're owned by only one place), yet allow shared mutability in a way that doesn't artificially extend the lifetime of the object.
 
 
-The mark of a good language is when its features compose well and don't conflict with each other. It seems we're on the right track with generational references, as they compose linear types with shared mutability pretty well.
+Since we're combining linear types with aliasing, we'll call this the *linear-aliasing model*.
+
+
+The mark of a good language is when its features compose well and don't conflict with each other. It seems we're on the right track with this model, as it composes linear types with shared mutability pretty well.
 
 
 <slice/>
@@ -560,7 +563,7 @@ Then I realized, they fit _perfectly_ together. We can use regions to look at a 
 
 I tried this out in a little [roguelike game](https://github.com/Verdagon/RegionsBenchmarks/blob/main/tiny-roguelike/roguelike.vale). The vast majority of generation checks were eliminated by regions, and the rest were eliminated by this new linear style.
 
-[# J: Should I go into more detail about this balance, or save it for a future article?]
+[# E: Should I go into more detail about this balance, or save it for a future article?]
 
 
 You can try this too! Just invoke the Vale compiler with the `--print_mem_overhead true` flag to make the program print out how many generation checks you can still eliminate (and if you want to use regions too, check out the experimental branch [described here](/blog/first-regions-prototype)).

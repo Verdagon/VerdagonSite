@@ -9,13 +9,13 @@ namespace: c-blog m-annotated
 ---
 
 
-In the [Unexpected quest](/blog/making-regions-part-2-generics) post, I talked about how we had to transition Vale's templates to full generics in order to implement Vale's [region borrowing](/blog/zero-cost-borrowing-regions-overview) feature which blends borrowing with shared mutability.
+In the [Unexpected Quest](/blog/making-regions-part-2-generics) post, I talked about how we had to transition Vale's templates to full generics in order to implement Vale's [region borrowing](/blog/zero-cost-borrowing-regions-overview) feature which blends borrowing with shared mutability.
 
 
 The hardest thing about that post is that I couldn't fit in anything about our master plan with generics. There is _so much_ potential with generics that nobody has realized!
 
 
-Now pull up a tree stump and listen, for I am about to enlighten you on how generics can actually make compile times faster, enable much better "cloud building", and drastically reduce compile times.
+Now pull up a tree stump and listen, for I am about to enlighten you on how generics can actually make compile times faster, enable much better cloud building, and maybe even enable hot-patching.
 
 
 First, let's see what the difference is, so we can really understand their potential.
@@ -148,7 +148,8 @@ This is a technique known as *type erasure*.
 Type erasure has a hidden benefit: the compiler *only needs to compile every function once*. The compiler doesn't have a monomorphization step. [# Though, these languages do some monomorphization at run-time with a technique known as "Just In Time" compilation.]
 
 
-# Native Compiler Bottleneck
+# Type Erasure to Reduce LLVM's Work
+
 
 Every native language with templates or generics like C++, Rust, etc. will have a monomorphization step, which creates many copies of generic functions, each with the right types substituted in.
 
@@ -156,31 +157,87 @@ Every native language with templates or generics like C++, Rust, etc. will have 
 These copies then go to LLVM, which takes a *really, really long time*.
 
 
-LLVM is the bottleneck for any compiler. See THIS ARTICLE where jon says that LLVM is 90% of compile time.
-
-And THIS ARTICLE that talks about Rust.
+LLVM takes up a huge portion of a compiler's time. For example, Cone's compiler spends [99.3% of its time in LLVM](https://pling.jondgoodwin.com/post/compiler-performance/).
 
 
-
- They had to somehow add 
-
-One of Java's top priorities was backwards compa
+Could we use type erasure to make it so LLVM has less functions to compile?
 
 
+Yes we can!
+
+
+<<<<
+For example, this program involves some functions:
+
+ * `func main()`
+ * `func List<T>() List<T>`
+ * `func add<T>(self List<T>, elem T)`
+ * `func get<T>(self List<T>, index int) T`
+ * (plus a few more) [# Specifically, `func println(x int)`, `func println(x bool)`, and `drop<T>(self List<T>)`]
+////
+```vale
+import stdlib.collections.list.*;
+
+exported func main() {
+  int_list = List<int>();
+  int_list.Add(7);
+  bool_list = List<bool>();
+  bool_list.Add(true);
+  println(int_list.Get(0));
+  println(bool_list.Get(0));
+}
+```stdout
+7
+true
+```
+>>>>
+
+
+And when the compiler monomorphizes the various generic functions, we end up with more functions:
+
+ * `func main()`
+ * `func List<T>() List<T>` becomes:
+    * `func List<int>() List<int>`
+    * `func List<bool>() List<bool>`
+ * `func add<T>(self List<T>, elem T)` becomes:
+    * `func add<int>(self &List<int>, elem int)`
+    * `func add<bool>(self &List<bool>, elem bool)`
+ * `func get<T>(self List<T>, index int) T` becomes:
+    * `func get<int>(self &List<int>, index int) int`
+    * `func get<bool>(self &List<bool>, index int) bool`
+ * (plus a few more) [# Specifically, `func println(x int)`, `func println(x bool)`, `drop<int>(self List<int>)`, and `drop<int>(self List<int>)`]
+
+
+But instead of monomorphizing, we could do something like Java does, and end up with:
+
+ * `func main()`
+ * `func List() List<Object>`
+ * `func add(self List<Object>, elem Object)`
+ * `func get(self List<Object>, index int) Object`
+ * (plus a few more) [# Specifically, `func println(x int)`, `func println(x bool)`, and `drop(self List<Object>)`]
+
+
+If we do this, then LLVM only has to compile these few functions.
 
 
 
 
-Generics' main benefit is that we only have to compile each function once, but there are a lot of ways we can push that benefit even further.
-
-
-With generics and some clever language design, we can:
-
- * Forego the copying in dev mode, so that there's only `PrintEqual<T>` in the resulting binary.
 
 
 
-However, there are a 
+
+
+Currently, Vale asks LLVM to compile a separate e.g. `get<bool>(&List<bool>, int)bool`, `get<str>(&List<str>, int)str`, and `get<float>(&List<float>, int)float`.
+
+
+If it could instead ask LLVM to compile a single `get<Object>(&List<Object>, int)Object`, LLVM would only take one third of the time.
+
+
+Of course, this would run slower than having the three separate versions. But it would _compile_ faster. So the conclusion is obvious: we should *use the Object version for development mode*, and monomorphize for release mode.
+
+
+
+
 
 
 
