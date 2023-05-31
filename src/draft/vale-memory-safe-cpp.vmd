@@ -97,13 +97,7 @@ In this example, a `Ship` contains a `unique_ptr<Engine>`.
 
 
 We remove the `unique_ptr<Engine>` from the containing `Ship`, and then destroy the `Ship`.
-
-
-This is such a common operation that other single-ownership based languages have syntax for destroying a struct and extracting its members.
-
-Vale's *move-destructuring* does this, e.g. `[engine] = ship;` but we can do it manually for C++. [# Ironically, we can't do it at all in Rust, because Rust doesn't let us move out of fields. It's needed much less in Rust though.]
 ////
-
 ```cpp
 struct Engine {
   int fuel;
@@ -128,6 +122,10 @@ void main() {
   // ... do something with Engine
 }
 ```
+\\\\
+This is such a common operation that other single-ownership based languages have syntax for destroying a struct and extracting its members.
+
+Vale's *move-destructuring* does this, e.g. `[engine] = ship;` but we can do it manually for C++. [# Ironically, we can't do it at all in Rust, because Rust doesn't let us move out of fields. It's needed much less in Rust though.]
 >>>>
 
 

@@ -102,7 +102,7 @@ For this reason, we also scatter *clues* around, like the below `see SAIRFU`.
 
 "See (acronym)" means to search our internal docs for more explanations and discussion. In this case, the documentation's SAIRFU section says:
 
-```
+```md
 # Send and Impl Rules For Upcasts (SAIRFU)
 
 For this snippet:
@@ -119,7 +119,6 @@ because it can't figure out what X should be.
 
 ...
 ```
-
 
 
 This is good for many reasons:
