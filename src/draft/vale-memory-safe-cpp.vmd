@@ -10,59 +10,51 @@ sponsor: me
 namespace: c-blog m-annotated
 ---
 
-My favorite thing about C++ is that, once you know how to navigate its surface-level trickiness, it's a beautiful language at its heart.
+! This article is still in early access for friends and sponsors, thank you so much to everyone who has helped Vale come this far!
 
 
-[Bjarne](https://www.stroustrup.com/quotes.html) once said, "Within C++, there is a much smaller and cleaner language struggling to get out."
+Even though I spend most of my time writing in Vale, Rust, and Scala, I am a C++ programmer at heart.
 
 
-I've always felt this, but I didn't see the truth until I embarked on a quest to discover better ways to do memory safety, which eventually led me to discover [Vale](https://vale.dev/)'s [linear-aliasing model](https://vale.dev/linear-aliasing-model).
+It has a combination of speed and flexibility that no other mainstream language has really nailed.
 
 
-For the last decade, the world has largely thought that borrow checking, reference counting, and tracing garbage collection were the only ways to make our code memory safe.
+This combination even inspired me make [Vale](https://vale.dev/), to see if we could make a high-performance language that has memory safety, but also still has that C++ flexibility and spirit. And in that quest, I've discovered some *surprising truths.*
 
 
-In my years of searching however, I've found *nine* more. [# One day I'd love to write a series called The Memory Safety Grimoire where I talk about all of these. One day!]
+The world largely believes that reference counting, tracing garbage collection, and borrow checking are the only ways to make code memory safe.
 
 
-Vale has a lot of these techniques, but let's revisit C++ and see what we can do!
+I've found eleven more approaches, and I'm about to show you *how they can make C++ memory-safe.* [# One day I'd love to write a series called The Memory Safety Grimoire where I talk about all of these.] [# For a sneak peek, here they are: generational references, vale references, constraint references, regions, arenas, mutable value semantics, interaction nets, basil memory stacks, CHERI capabilities, neverfree, MMM++, SPARK, and linear types. More than eleven really, but there is some overlap.]
 
 
-These techniques are great tools to have in the toolbox, to use where they make sense (as is the C++ way!). My goal here isn't to propose some sort of grand new direction for C++, it's just to enlighten.
+These techniques are great tools for the toolbox, to use where they make sense. [# As is the C++ way!] My goal here isn't to propose some sort of grand new direction for C++, it's just to enlighten. [# There is no silver bullet, and these techniques have their tradeoffs, but I hope this will show C++'s potential and inspire others to take these ideas and run with them.]
 
 
-There is no silver bullet, and these techniques have their tradeoffs, but I hope this will show C++'s potential and inspire others to take these ideas and run with them.
-
-
-Buckle up, because we're about to design a whole new memory safety model for C++! [# It won't be the same as Vale's, which makes this much more interesting. If I had to come up with a name for this C++ memory safety approach, I might call it the affine-aliasing model or something.]
+Buckle up, because we're about to design a whole new memory safety model for C++! [# It won't be the same as Vale's, which makes this a much more fun experiment. If I had to come up with a name for this C++ memory safety approach, I might call it the "affine-aliasing model" or something.]
 
 
 
-# `unique_ptr`
+# unique_ptr
 
 C++11's `unique_ptr` is a class that tracks who has sole responsibility for destroying an object.
 
 This one little class singlehandedly brought the concepts of single ownership and move semantics into the mainstream, and it will serve as the starting point for our memory safety.
 
 
-Our first principle is that *dereferencing a unique_ptr is safe*.
+Our first principle is that *dereferencing a unique_ptr is safe*, as long as we follow these two rules:
+
+*Rule 1:* Always initialize a `unique_ptr` to contain something. [# If you want a nullable unique_ptr, consider wrapping it in an `optional`.]
+
+*Rule 2:* Don't use a `unique_ptr` local variable after moving from it. [# Linters enforce this for local variables, but not for fields. We'll have another rule to address that below.]
 
 
-"But that's not true!" I can hear you say. Indeed, it's normally undefined behavior to dereference a unique_ptr if it's empty.
+Some linters even enforce that second one already.
 
 
-Because of that, I introduce to you the first two rules:
+So far, this is pretty obvious. A lot of us follow these rules already in our codebases.
 
-*Rule 1:* Always initialize a `unique_ptr` to contain something. [# If you want a nullable unique_ptr, consider wrapping it in an `std::optional`.]
-
-*Rule 2:* Destroy the `unique_ptr` after moving from it.
-
-
-If you follow these rules, then you can always safely dereference a `unique_ptr`.
-
-
-So far, this is pretty obvious. And the next one will be too, but after that things get more interesting.
-
+The next part will be obvious too, and after that things get more interesting.
 
 
 # Stack objects are safe
@@ -71,17 +63,19 @@ So far, this is pretty obvious. And the next one will be too, but after that thi
 Our next principle is that, of course, accessing the fields of an object on the stack is safe too.
 
 
-That _doesn't_ include making a pointer to a stack-allocated object and then dereferencing. Only accessing a field _directly_ is safe.
+That _doesn't_ include making a pointer to a stack-allocated object and then dereferencing. [# Technically, the compiler might produce a temporary reference when we say the name of a variable. That's fine, as long as we don't make references or pointers directly.] Only accessing a field _directly_ is safe.
 ////
 ```cpp
 struct Ship { int fuel; };
 void main() {
   Ship ship{ 42 };
   // Safe to access ship's fields.
-  std::cout << ship.fuel << std::endl;
+  cout << ship.fuel << endl;
 }
 ```
 >>>>
+
+
 
 Now that the more obvious principles are out of the way, let's get to the interesting stuff.
 
@@ -89,37 +83,94 @@ Now that the more obvious principles are out of the way, let's get to the intere
 
 # Move-destructuring
 
-That second rule is pretty easy for local variables, but tracking whether we've moved out of a struct's field can be a bit tricky. Luckily, there's a couple rules that help us with that.
+This next rule helps keep us from risking accessing any fields that have been invalidated.
 
 
-*Rule 3:* Only move out of a `unique_ptr` field if we then destroy the containing struct.
-
-By destroying the containing struct, we remove the opportunity to use that unique_ptr.
+*Rule 3:* We can only move out of a field if we swap something into its place or destroy the containing struct.
 
 
-If the containing struct was in a `unique_ptr` local variable, this will be easy.
-(show example)
+By destroying the containing struct, we remove the opportunity to ever use that (invalid) field.
 
 
-It could be a bit trickier if we don't have its containing struct in a `unique_ptr` local variable.
+<<<<
+In this example, a `Ship` contains a `unique_ptr<Engine>`.
 
 
-Of course, this has some knock-on effects. To destroy this struct, we need _its_ unique_ptr.
+We remove the `unique_ptr<Engine>` from the containing `Ship`, and then destroy the `Ship`.
+////
+```cpp
+struct Engine {
+  int fuel;
+  Engine(int fuel_) : fuel(fuel_) {}
+};
+
+struct Ship {
+  unique_ptr<Engine> engine;
+  Ship(unique_ptr<Engine> engine_) :
+      engine(move(engine_)) {}
+};
+
+void main() {
+  auto ship =
+      make_unique<Ship>(
+          make_unique<Engine>(42));
+
+  auto engine = move(ship->engine);
+  ship = nullptr;
+  // Can't use ship again, per rule 2
+
+  // ... do something with Engine
+}
+```
+\\\\
+This is such a common operation that other single-ownership based languages have syntax for destroying a struct and extracting its members.
+
+Vale's *move-destructuring* does this, e.g. `[engine] = ship;` but we can do it manually for C++. [# Ironically, we can't do it at all in Rust, because Rust doesn't let us move out of fields. It's needed much less in Rust though.]
+>>>>
 
 
+The above example is fairly simple, but it could get a bit more difficult if we don't have ownership of the containing struct conveniently nearby.
 
-# We can make anything with stack objects and `unique_ptr`
-
-
-In other words, we can make anything, without using raw pointers or references _at all_. [# We'll still be using them indirectly of course; dereferencing a `unique_ptr` produces a temporary reference. But we won't be using raw pointers or references directly.]
+We may need to refactor and pipe ownership of the containing struct all the way to here. Further below, we'll talk about this drawback and ways to address it.
 
 
-I know, that sounds impossible _and_ ridiculous. We're about to take two steps backward, and later we'll break the rules to take two steps forward again.
+# Resizable Collections
+
+*Rule 4:* Only use std::array and resizable collections, don't use raw arrays directly.
+
+This is because raw arrays temporarily risk some unsafety when we first make them and when we're destroying them.
 
 
-To help code with these restrictions, here are some helpful rules:
+There are a lot of ways we can relax these restrictions.
 
-*Rule 4:* When you want to take a pointer or a reference as a parameter, instead take (and return) a unique_ptr or a stack object.
+
+For example, we could have a runtime-sized array where we construct it with a size `N` and a closure, and the library (or language) will invoke that closure `N` times, filling the array's elements with the closure calls' results.
+
+
+Or we can make something halfway between `std::array` and `std::vector`, which doesn't resize past its initial capacity, but still has `size` and `capacity` fields and methods like `push`, `pop` etc.
+
+
+Vale's arrays are like that, and they're used to implement the standard library's array list, hash map, etc.
+
+
+Bounds-checked array slices could also make life easier, so that functions could take in an arbitrary range of elements.
+
+
+# Avoid raw pointers and references [# We'll still be using them indirectly of course; dereferencing a `unique_ptr` produces a temporary reference. But we won't be using raw pointers or references directly.]
+
+I know, that sounds impossible _and_ ridiculous.
+
+
+"How in the world would we get anything done without raw pointers and references?" I can hear you say.
+
+But I assure you, it is possible. And don't worry, we'll be *adding aliasing back in later*.
+
+
+But for now, here are some rules to understand how to make programs without aliasing.
+
+
+*Rule 5:* When you want to take a pointer or a reference as a parameter, instead take (and return) a unique_ptr or a stack object.
+
 
 <<<<
 Instead of taking a `Ship` pointer like this:
@@ -127,32 +178,33 @@ Instead of taking a `Ship` pointer like this:
 ```cpp
 struct Ship { int fuel; };
 void print(Ship* ship) {
-  std::cout << ship.fuel << std::endl;
+  cout << ship.fuel << endl;
 }
 ```
 ////
-`print` would take (and return) a `Ship`, like this:
+...`print` would take (and return) it:
 
 ```cpp
 struct Ship { int fuel; };
 Ship print(Ship ship) {
-  std::cout << ship.fuel << std::endl;
+  cout << ship.fuel << endl;
   return ship;
 }
 ```
 >>>>
 
 
-*Rule 5:* When you want a pointer as a field, use an index or an ID instead.
+*Rule 6:* When you want a raw pointer as a field, use an index or an ID instead.
+
 
 Instead of a `Ship` having a `Port*` like this...
 
 ```cpp
-struct Port { std::string name; };
+struct Port { string name; };
 struct Ship { Port* port; };
 
 Ship print(Ship ship) {
-  std::cout << ship.port->name << std::endl;
+  cout << ship.port->name << endl;
   return ship;
 }
 ```
@@ -160,30 +212,34 @@ Ship print(Ship ship) {
 ...we would do something conceptually similar to this, where `print` uses the `portId` to read the `Port` from a map.
 
 ```cpp
-struct Port { std::string name; };
+struct Port { string name; };
 struct Ship { int portId; };
 
-Ship print(std::unordered_map<Port>* ports, Ship ship) {
-  std::cout << ports[ship.portId].name << std::endl;
+Ship print(unordered_map<Port>* ports, Ship ship) {
+  cout << ports[ship.portId].name << endl;
   return ship;
 }
 ```
 
-Of course, we'll need to change that pointer parameter according to rule 2. We'll instead take and return the vector directly:
+
+
+Of course, we'll need to change that pointer parameter according to rule 5. We'll instead take and return the vector directly:
 
 ```cpp
-struct Port { std::string name; };
+struct Port { string name; };
 struct Ship { int portId; };
 
-std::tuple<std::unordered_map<Port>, Ship> print(
-    std::unordered_map<Port> ports,
+tuple<unordered_map<Port>, Ship> print(
+    unordered_map<Port> ports,
     Ship ship) {
-  std::cout << ports[ship.portId].name << std::endl;
-  return std::make_tuple(ports, ship);
+  cout << ports[ship.portId].name << endl;
+  return make_tuple(ports, ship);
 }
 ```
 
-It's pretty verbose, but it works. We'll see some ways to make it less verbose further below.
+
+
+That's pretty verbose! We'll see some ways to make it less verbose further below.
 
 
 These two rules may seem familiar to those who have used Rust; taking and returning a `Ship` is semantically equivalent to taking an `&mut Ship`, and the borrow checker often makes reference struct fields into indices/IDs as well.
@@ -194,34 +250,204 @@ However, we'll be deviating from Rust's direction pretty sharply.
 
 # The approach so far
 
-Now that we have the foundational principles, let's take a step back and recognize its drawbacks, so that we can address them.
+The foundational rules above have achieved their goal: *we now have a memory-safe subset of C++.*
 
 
-*Drawback 1:* It's very verbose!
+But let's take a step back and recognize its drawbacks, and see how we might address them.
 
-*Drawback 2:* Since Rule 4 requires us to change our function signature (by borrowing the `vector<Ship>`), and all of our callers' callers' callers, this technique has become a *viral leaky abstraction*, similar to Rust's `&mut`.
+
+Besides being verbose, there are also some architectural consequences:
+
+
+*Drawback 1:* Since Rule 5 requires us to change our function signature (by borrowing the `vector<Ship>`), and all of our callers' callers' callers, this technique has become a *viral leaky abstraction*.
+
+
+*Drawback 2:* Rule 6 puts a lot of our objects into collections, making our program almost similar to a relational database.
+
 
 *Drawback 3:* Since we can't use raw pointers and references, we effectively cut ourselves off from mutable aliasing. This is a problem, because it means we can't use fast approaches like intrusive data structures and graphs, and we can't use useful patterns like observers, back-references, dependency references, callbacks, delegates and many forms of RAII.
 
 
-Those last two drawbacks are familiar to Rust users, and Rust tries to solve them by adding `Rc` and `RefCell`.
+These are familiar to Rust users; `&mut` is semantically equivalent to everything we're doing here and has the same drawbacks. This is the downside of eliminating mutable aliasing. Luckily, Rust partially resolves them with `Rc` and `RefCell`, for those willing to use them.
 
 
-We can do something similar to that. For us, it would be something like `std::shared_ptr<std::optional<T>>` which I'll explain further below.
+So should we do something like `shared_ptr<optional<T>>` then, or are there any other options?
 
 
-Are there any other options though?
+There are! Let's talk about *generational references*, *vale references*, and *constraint references*.
 
 
-Yes there are, *Generational references* and *constraint references*!
+# Generational References
+
+A *generational reference* is where each object has a current "generation number".
+
+ * When we want to point to an object, we remember its address and its generation.
+ * When we free an object, we increment its generation number.
+ * To get access to an object, we first assert ("generation check") that the current generation number matches the remembered generation number.
+
+It's equivalent to the generational indices method, but applied to a heap.
 
 
-# Constraint references
-
-And we all love `Rc<RefCell<T>>`, but it has a few downsides, the biggest one being that it forces its contents onto the heap. [# It's also incompatible with many kinds of RAII.]
+To learn more, check out [this article](https://verdagon.dev/blog/generational-references) which talks about how we added them to Vale (though, the next section talks about an improved version).
 
 
-Instead, we can use something called a *constraint reference*, which allows for memory-safe mutable aliasing, while allowing objects to live on the stack or directly inside another object.
+In Vale the entire language uses generational references, which simplifies some things. For C++, we'll need to add something extra.
+
+
+Above, when I mentioned we can "get access to an object", I didn't actually mean dereferencing. We'll need an extra step of "checking out" the contents to take ownership of it from the original owner. Before the end of the scope, we're required to put something back into that spot. [# This is basically the same thing as Rust's `RefCell`.] [# We might also need `enable_genref_from_this`, for the same reasons `enable_shared_from_this` exists.]
+
+
+<<<<
+Using a generational reference would look something like this snippet. [# Let me know if you want some example code for this and I can dig it up from the Vale histories.]
+
+
+An object lives inside a `gowned` wrapper.
+
+
+We use its `ref()` method to make a `gref` to it. [# We can also just copy an existing `gref`.]
+
+
+We can `open` a `gref`, which does a generation check and gives us something we can dereference.
+////
+```cpp
+// Makes an object
+gowned<Ship> ship =
+    make_gowned<Ship>(42);
+
+// Makes a generational reference to it
+gref<Ship> shipRef = ship.ref();
+
+// Does a generation check
+auto shipHandle = shipRef.open();
+
+// Prints 42
+cout << shipHandle->fuel << endl;
+```
+>>>>
+
+
+There's a couple downsides to this approach.
+
+ * It forces objects onto the heap, like `Rc` and `shared_ptr`.
+ * It uses an allocator which segregates by size class and never releases memory back to the OS, to ensure that nobody messes with the generation number of the object and there is no reusing of numbers.
+
+Both of these are addressed by the next approach.
+
+
+# Vale References
+
+Previously known as "generational references V2", a vale reference is a generational reference with one adjustment: it uses a *pseudo-random generation number* for every object.
+
+
+It's better in that it doesn't use a special allocator, and objects can live on the stack and inside other objects.
+
+
+The drawback, of course, is that the generation check can have a false negative in theory, depending on the width of the generation number.
+
+
+Usage would be the same as the above generational references, and a simple C++ implementation would look roughly like the below code (also available [here](https://github.com/Verdagon/ValeanCpp/blob/main/vref.h)).
+
+
+```cpp
+extern size_t vrefNextKey;
+
+template<typename T>
+class vref {
+public:
+  vref(vowned<T>* own_) :
+    own(own_),
+    rememberedKey(own_->currentKey) {}
+  ~vref() {}
+
+  vref_guard<T> open() {
+    return vref_guard<T>(own, rememberedKey);
+  }
+
+private:
+  size_t rememberedKey;
+  vowned<T>* own;
+};
+
+template<typename T>
+class vref_guard {
+public:
+  vref_guard(vowned<T>* own_, size_t rememberedKey) :
+      own(own_) {
+    assert(rememberedKey == own->currentKey);
+    assert(own->present);
+    own->present = false;
+  }
+  ~vref_guard() {
+    own->present = true;
+  }
+
+  T* operator->() { return &own->contents; }
+  const T* operator->() const { return &own->contents; }
+
+private:
+  vowned<T>* own;
+};
+
+template<typename T>
+class vowned {
+public:
+  vowned(T contents_) :
+      present(true),
+      currentKey(vrefNextKey++),
+      contents(std::move(contents_)) {}
+  ~vowned() {
+    assert(present);
+  }
+
+  vref<T> ref() {
+    return vref<T>(this);
+  }
+
+private:
+  friend class vref<T>;
+  friend class vref_guard<T>;
+
+  bool present : 1;
+  size_t currentKey : 63;
+  T contents;
+};
+
+template<typename T, typename... P>
+vowned<T> make_vowned(P&&... params) {
+  return vowned<T>(T(std::forward<P>(params)...));
+}
+```
+
+
+
+This simple implementation uses:
+
+ * A monotonically incrementing `vrefNextKey` integer as its pseudo-random number generator.
+ * A 63 bit generation (so we can use 1 bit for the `present` boolean), making the odds of a false negative about 1/2^63.
+
+
+If you've ever heard of Arm's [memory tagging](https://source.android.com/docs/security/test/memory-safety/arm-mte), this is like that but with a wider tag.
+
+
+Depending on the size of your generation/tag, you can make this robust enough to detect bugs in development and testing (1/16 like memory tagging) or robust enough for use in security purposes.
+
+
+This approach has one additional benefit. For domains where its appropriate, it can be turned completely off for production code, and it would be as efficient as normal C++. This can be a pretty stellar tradeoff for single player games, compilers, or sandboxed situations like webassembly modules or apps.
+
+
+There are some other downsides in theory:
+
+ * If we access memory already freed to the operating system, instead of an assertion failure we'd get a segmentation fault.
+    * If we're on a devices with no segmentation faults nor virtual memory, this might not be a good approach. [# In those cases, a Vale program might balance a linear style with immutable region borrowing for aliasing.]
+ * We can contrive some cases where a sufficiently intelligent optimizer can detect that we're accessing already-destroyed objects, and consider it undefined behavior.
+
+
+Still, for the vast majority of use cases, this is a great tradeoff.
+
+
+# Constraint References
+
+Another option is to use something called a *constraint reference*, which allows for memory-safe mutable aliasing, while allowing objects to live on the stack or directly inside another object.
 
 
 Basically, we:
@@ -231,7 +457,7 @@ Basically, we:
  * When the object goes out of scope, it asserts that the count is zero, that no objects point to it any more.
 
 
-It would look something like this (also available [here](https://github.com/Verdagon/ValeanCpp/blob/main/cref.h)):
+A simplified implementation would look something like this (also available [here](https://github.com/Verdagon/ValeanCpp/blob/main/cref.h)):
 
 ```cpp
 template<typename T>
@@ -269,7 +495,7 @@ public:
   cowned(T contents_) :
       present(true),
       refCount(0),
-      contents(std::move(contents_)) {}
+      contents(move(contents_)) {}
   ~cowned() {
   	assert(present);
   	assert(refCount == 0);
@@ -297,705 +523,138 @@ This was also explored by Adam Dingle and David Bacon in their paper [Ownership 
 A Hybrid Approach to Safe Explicit Memory Management](https://web.archive.org/web/20220111001720/https://researcher.watson.ibm.com/researcher/files/us-bacon/Dingle07Ownership.pdf), who made an entire C# variant using this. This is also one of the mechanisms behind the language [Inko](https://inko-lang.org/), as described in the article [Friendship ended with the garbage collector](https://yorickpeterse.com/articles/friendship-ended-with-the-garbage-collector/).
 
 
-To get the object from the `constraint_ref`, we "check out" the contents and take ownership of it from the original owner. Before the end of the scope, we're required to put something back into that spot, via a `constraint_guard` object. [# This is basically the same thing as Rust's `RefCell`.] [# We might also need `enable_constraint_from_this`, for the same reasons `std::enable_shared_from_this` exists.]
+To get the object from the `constraint_ref`, we "check out" the contents and take ownership of it from the original owner. Before the end of the scope, we're required to put something back into that spot, via a `constraint_guard` object. [# This is basically the same thing as Rust's `RefCell`.] [# We might also need `enable_constraint_from_this`, for the same reasons `enable_shared_from_this` exists.]
 
 
-Benefits:
-
- * We can disable this for prod, for no overhead
- * It's compatible with RAII
- * It doesn't force things onto the heap.
-
-
-[# E: the major benefit of this over Rc<RefCell<T>> and shared_ptr is that it's completely compatible with higher RAII. this is a form of shared mutability that composes well with single ownership.]
+Similar to vale references, this can be turned off in production and be as efficient as normal C++ code.
 
 
 The obvious downside, of course, is that if you violate the constraint, your entire program halts. This makes it unusable in a lot of cases.
 
 
+# Whether to add shared ownership
+
+Before we add something like Rust's `Rc<RefCell<T>>`, let's ask the question: how much do we really need it?
 
 
-START HERE
+This is a familiar question to anyone who has used Rust. One of my favorite things to do in Rust is to see how far we can get by just using the borrow checker, and not using `Rc<RefCell<T>>`.
 
 
+  However, such a style can have the three drawbacks we mentioned above:
+
+ * When we need a `&mut`, we're required to change the signature of the containing function, its callers, its callers' callers and so on, becoming a *viral leaky abstraction*.
+ * When we need to mutate something, we often need to put a lot of our objects into collections, making our program almost similar to a relational database.
+ * Since we don't have mutable aliasing, we can't use fast approaches like [intrusive data structures](https://lwn.net/Articles/907876/), [observers](https://www.reddit.com/r/rust/comments/pwqju6/is_there_an_underlying_reason_that_idiomatic_rust/) and [graphs](https://news.ycombinator.com/item?id=24996001), and we can't use useful patterns like [observers](https://www.reddit.com/r/rust/comments/pwqju6/is_there_an_underlying_reason_that_idiomatic_rust/), [back-references](https://users.rust-lang.org/t/back-reference-to-the-parent-struct/7413/2), [dependency references](https://en.wikipedia.org/wiki/Dependency_injection), [callbacks](https://news.ycombinator.com/item?id=12029238), [delegates](https://medium.com/@nimjea/delegation-pattern-in-swift-4-2-f6aca61f4bf5) and many forms of RAII [# RAII is about automatically affecting the world outside our object. To affect the outside world, the borrow checker often requires us to take a `&mut` parameter or return a value, but we can't change `drop`'s signature. To see this in action, try to make a handle that automatically removes something from a central collection. Under the hood we usually use `unsafe` mechanisms, including FFI.].
 
 
-There are some cases where you can just have this in development and testing, and turn it off for release mode because the situation doesn't require absolute memory safety.
-
-I did roguelike games a lot. Also client-side wasm things. And compilers. All of these have a lot less drastic outcomes if there's some memory unsafety. So skipping that in release mode is fine. I definitely wouldn't recommend this for servers that handle any kind of user data, especially ones exposed to the public.
+In my opinion, this shows the wisdom of the Rust language designers in adding `Rc` and `RefCell` to the standard library.
 
 
-
-# Adding generational references
-
-
-However, it forces things onto the heap.
-
-...unless we're fine with probabilistic.
-
-We can even just turn the entire thing off in production, if we're fine with that.
-
-You can have something called a generational heap which has sacred numbers. Makes for nice weak refs too.
-
-If you're fine with more probabilistic safety, you can put it on the stack too.
-
-Depending on the size of your generation, you can make this robust enough to detect bugs in development and testing (1/16, like memory tagging) or robust enough for use in security purposes (1/2^64). It doesn't have that theoretical perfection that constraint refs do, so if you need absolute theoretical safety, using linear_ptr with the occasional constraint reference might be the way to go.
+So does all this mean we should add something like `Rc<RefCell<T>>`? Perhaps.
 
 
+Some considerations about adding shared ownership:
 
-# Clasps
-
-Basically, a clasp is a bidirectional reference.
-
-
-Two mutual constraint refs can help you out. Take ownership of the target thing temporarily.
+ * It would force objects onto the heap.
+ * It would interfere with RAII; logic bugs might cause destructors to fire later than we intend.
+ * We already have `gref`, `vref`, and `cref` above, which all add mutable aliasing, so it's unclear how much benefit we'd get.
 
 
-(make sure this works with an example)
+We also have some techniques available to us that borrow checking does not. For example, in cases where there would only be two people with references to an object, we could make a bidirectional optional reference, where if we destroy one side we null out the other. [# I even made a thread-safe version of these with two mutexes, when I was working on Earth.]
 
 
-This is great for delegates.
+These are all reasons we don't have any sort of shared ownership in Vale quite yet.
 
 
-You can even make a thread-safe version of this, I think.
+However, we likely will someday, because we can contrive a few situations where it might be beneficial. For example, we might want a `FileCache` object that counted how many classes had a file open for reading. If anyone knows of an alternative to that, let me know!
 
 
-
-# Shared references
-
-I mentioned above that we could have a `std::shared_ptr<std::optional<T>>`
-
-With clasp and constraint ref, you don't really need shared_ptr much. There are a few niche cases left. In a case like this, I think there's a way to blend shared ownership back in.
+So, all that said, let's talk about how we might add shared ownership in!
 
 
-# Comparison and Usage
+# Shared Ownership
+
+It would likely take the form of a `shared_ptr<optional<T>>`.
 
 
-
-# Borrowing
-
-We can have a `Spaceship&` mean a borrow. This is kind of like a 
+<<<<
+We would "check out" the value by using the `.value()` method.
 
 
-We can also do immutable borrows, but without lifetime annotations they can be somewhat limited. Instead of returning an immutable pointer, we need to return a copy, perhaps with an index or ID in it.
+After we're done using it, we would put the object back into the `shared_ptr`'s `optional`.
+////
+
+```cpp
+// Makes an object
+auto ship =
+    make_shared<optional<Ship>>(
+        make_optional<Ship>(42));
+
+// Makes another reference to it
+auto shipRef = ship;
+
+// Check it out.
+// This value() asserts it's present
+auto ship = shipRef->value()
+
+// Prints 42
+cout << ship.fuel << endl;
+
+// Put it back
+*shipRef = make_optional<Ship>(ship);
+```
+>>>>
 
 
-If we added just borrowing, and no constraint_ref, gen_ref, or shared_ptr, we would have something like Val.
+We could also make a "handle" object that uses RAII to ensure we put that `ship` back into the shared_ptr, similar to what we did with `gref`/`vref`/`cref`.
 
 
+# Simple Borrowing
 
-# Comparison
-
-(dont know if we actually want to talk about this here)
-
-
-Reference counting and garbage collection are flexible, and often fast _enough_, but they have a bit of a performance ceiling in some cases.
+The main reason C++ can't do borrow checking like Rust is because it doesn't have lifetimes and annotations.
 
 
-Things like borrow checking give us fast code (and the memory safety is great) but it also takes a step backwards in flexibility, for example by not allowing us to use [intrusive data structures](https://lwn.net/Articles/907876/), [observers](https://www.reddit.com/r/rust/comments/pwqju6/is_there_an_underlying_reason_that_idiomatic_rust/), [back-references](https://users.rust-lang.org/t/back-reference-to-the-parent-struct/7413/2), [dependency references](https://en.wikipedia.org/wiki/Dependency_injection), [callbacks](https://news.ycombinator.com/item?id=12029238), [delegates](https://medium.com/@nimjea/delegation-pattern-in-swift-4-2-f6aca61f4bf5) and many forms of RAII [# RAII is about automatically affecting the world outside our object. To affect the outside world, the borrow checker often requires us to take a `&mut` parameter or return a value, but we can't change `drop`'s signature. To see this in action, try to make a handle that automatically removes something from a central collection. Under the hood we usually use `unsafe` mechanisms, including FFI.]. `Rc` and `RefCell` partially solve this, but in a way that sacrifices the flexibility and benefits of having a single owner, which I'll get into more below.
+Is there perhaps a simple form of borrow checking it can do, which doesn't require those?
 
 
+Something like `&mut` wouldn't be hard. We just add pointers back in, with the rules that we don't access the original object while it exists, don't return them, don't store them in structs/arrays, and don't alias them. [# [Val](https://www.val-lang.dev/) does this with its [mutable value semantics](http://www.jot.fm/issues/issue_2022_02/article2.pdf).]
+
+
+I believe we can also add some form of immutable shared references too if we replace that last rule with "don't modify anything through them". [# I think this is what [Austral](https://austral-lang.org/) does with its [linear type checker](https://borretti.me/article/how-australs-linear-type-checker-works), but I could be wrong.]
+
+
+In other words, as long as we aren't returning or storing references, I think we don't really need lifetimes or annotations.
+
+
+# How might we make this happen?
+
+I'm not sure! That's a question involving committees, standards, backwards compatibility, and other big topics. And alas, Vale is keeping my hands full.
+
+
+But perhaps all of this has inspired someone out there to investigate these possibilities.
+
+
+I'd perhaps recommend them to start with some sort of linter. These are all pretty simple locally-verifiable rules. Perhaps it would only be enabled for certain types, or any types with a certain suffix.
+
+
+We can even imagine a future where there's some sort of "C++ safe mode" where the linter is enabled by default, and then we break out of it with `unsafe` blocks.
+
+
+Or perhaps a project like [Carbon](https://github.com/carbon-language/carbon-lang) or [CppFront](https://github.com/hsutter/cppfront) could have some sort of support for these approaches. [# To Herb and/or Chandler, let me know you ever want to talk memory safety over some cider!]
 
 
 # Conclusion
 
-And thats it!
+Thats it! I hope you enjoyed this whirlwind tour of the various ways we can add memory safety to C++.
 
-We have memory safety in C++, and as a bonus we also open the way towards higher RAII.
 
-If you're intere
+If you liked this article, please consider [sponsoring Vale on GitHub](https://github.com/sponsors/ValeLang)! Your sponsorships make it so I can keep writing articles like this.
 
 
+If you have any questions, message me on [twitter](https://twitter.com/verdagon), the [discord server](https://discord.gg/SNB8yGH), or [subreddit](https://reddit.com/r/vale).
 
 
-
-
-
-
-
-
-
-
-
-# Higher RAII
-
-What ultimately led me to discovering this memory-safe C++ is something called Higher RAII.
-
-(talk about linear_ptr, mention https://lifecs-static.likai.org/piled-higher-and-deeper.pdf, say that it only works at runtime which is a tad unfortunate)
-
-talk about the benefits of higher raii.
-
-Everything we've talked about so far is compatible with Higher RAII.
-
-
-_this_ is the true potential of C++'s unique_ptr.
-
-
-This might sound familiar to some of you: these are linear types!
-
-
-## Exceptions
-
-In Earth, and my roguelikes, and the Vale compiler, we didn't really use exceptions, so this wasn't much of a problem. However, in a codebase that does have exceptions, we could hit an assert and bring down the program pretty quickly, which defeats the benefits of exceptions in codebases that do choose to use them.
-
-I admit, I am not sure how to get this to work with exceptions. In Vale, we'd have a `__unwind` function that's invoked when we do unwinding.
-
-
-## Linear-Aliasing Model
-
-In a way, we have a model here that combines the benefits of linear typing (via linear_ptr) with the benefits of mutable aliasing (via constraint_ref or gen_ref).
-
-
-
-
-
-
-This is where Rust kind of missed the boat. You're not able to move out of structs _at all_. Once something's in a struct, it's in it forever. C++ lets you do this though.
-
-*Rule 4:* When destroying a containing struct, first move everything out of its fields.
-(not actually needed since we arent talking about linear types?)
-
-This is an easy rule to follow for `unique_ptr` local variables. It would be tricky to follow for structs, but we'll resolve that difficulty further below.
-
-
-
-
-
-
-I found these techniques through designing and using the language Vale, which was originally motivated by the question: Can we design a memory-safe C++ without sacrificing any of its speed or flexibility?
-
-
-[# E: "I had been using C++ for 13 or 14 years before Vale showed me these truths about C++, so some of it might come as a surprise to some of you as well."]
-
-
-somewhere: This isn't without some tradeoffs. But it's a nice tool to have in your toolbox, to use where it makes sense. And even if you don't use it directly, it can sometimes be nice to have another mode of thinking, to spur alternate solutions in your own codebase.
-
-
-
-
-
-
-if we want to get combative:
-
-memory safety is always a nice thing to have, as long as we don't give up too much to achieve it. the unfortunate truth about reference counting, garbage collection, and borrow checking is that they seem to be utterly pervasive.
-
-if your language forces you to use it where you don't necessarily need it, and it has some sort of complexity cost, then it can have some downsides.
-
-what we really want is a way to add a bit of memory safety
-
-i'm about to show you a method of memory safety that is a little more 
-
-
-
-
-
-
-
-
-Single ownership is once of those concepts that's both easier and more powerful than we realize.
-
-
-Alas, people often think single ownership is more complex than it really is, because it most often appears in languages that are already complex for separate reasons.
-
-
-I want to dispel that myth, and redesign it from first principles.
-
-
-Even if you already know what single ownership is, you'll probably find some interesting surprises:
-
- * You don't need a borrow checker for memory-safe single ownership.
- * You can use it to enforce all sorts of guarantees at compile time.
- * You can blend it with other memory management techniques!
-
-
-Below, I'll explain single ownership from a C foundation, and then we'll see the _weird_ things it can do.
-
-
-# We often track single ownership manually in C
-
-With manual memory management, we usually make it clear who's responsible for eventually freeing certain memory, via documentation or naming.
-
-
-For example, `strdup` will return a heap-allocated buffer, which the caller then owns. GLib's `strdup` [documentation](https://docs.gtk.org/glib/func.strdup.html) says "The caller of the function takes ownership of the data, and is responsible for freeing it."
-
-
-We then make sure that we eventually deliver these "owned" data to another function that destroys them.
-
-
-If we don't do that, we get a memory leak.
-
-```c
-void main() {
-  char* myBuffer = GetRealPath("./myfile.txt");
-
-  // prints: /Users/Valerian/Bogglewoggle/myfile.txt
-  printf("Real path: %s\n", myBuffer);
-
-  // uh oh, we forgot to free(myBuffer)!
-}
-```
-
-If we accidentally do it multiple times, the program might crash or exhibit undefined behavior.
-
-```c
-void main() {
-  char* myBuffer = GetRealPath("./myfile.txt");
-
-  // prints: /Users/Valerian/Bogglewoggle/myfile.txt
-  printf("Real path: %s\n", myBuffer);
-
-  free(myBuffer);
-  // Shenanigans ensue!
-  free(myBuffer);
-}
-```
-
-
-As any C programmer knows, we *carefully track who owns the data*, all the way from when it's created, to when it's finally destroyed.
-
-
-At any given time in between, we can generally identify who conceptually "owns" certain data, whether it be a certain local variable or a field in some struct somewhere.
-
-
-Of course, other pointers to the data can exist, they just down _own_ the data. We have a *mental distinction* between owning pointers and non-owning pointers.
-
-
-If you've ever implemented a balancing binary search tree like a [red-black tree](https://en.wikipedia.org/wiki/Red%E2%80%93black_tree) or an [AVL tree](https://en.wikipedia.org/wiki/AVL_tree), recall that a parent conceptually has "owning" pointers to its children, and its children have non-owning pointers back to their parents.
-
-
-Single ownership isn't just for pointers and `malloc` and `free`, it's to anything that we have a *future responsibility* for.
-
-For example, `pthread_create` creates a handle that we're responsible for eventually `pthread_destroy`ing. We generalize this a bit more later, but for now let's just think about heap allocations.
-
-
-# How might we track it?
-
-When I was a wee lad, I would suffix my "owning" pointers with `_owning` to keep things straight.
-
-
-<<<<
-Here's a balancing binary search tree node in regular C...
-
-```c
-struct Node {
-  struct Node* parent;
-  struct Node* leftChild;
-  struct Node* rightChild;
-};
-```
-////
-...and here it is with some helpful `_owning`s added to the names.
-
-```c
-struct Node {
-  struct Node* parent;
-  struct Node* leftChild_owning;
-  struct Node* rightChild_owning;
-};
-```
->>>>
-
-
-I had some sensible guidelines:
-
-*Rule 1:* Anything that comes from `malloc` must be put in a variable ending in `_owning`.
-
-*Rule 2:* We can't let an `_owning` variable (or field) go out of scope, the only way to destroy it is to explicitly give it to `free` (or "move" it, which we'll talk about later).
-
-*Rule 3:* We can't use that variable after freeing it (or moving it).
-
-
-We could even make a linter or compiler to enforce this, and detect both memory leaks and double-frees:
-
-
-```c
-void main() {
-  char* myBuffer_owning = GetRealPath("./myfile.txt");
-
-  // prints: /Users/Valerian/Bogglewoggle/myfile.txt
-  printf("Real path: %s\n", myBuffer_owning);
-
-  // Take out this line for an error!
-  free(myBuffer_owning)
-
-  // Or add this bad line for a different error!
-  // printf("Freed: %s\n", myBuffer_owning);
-}
-```
-
-
-
-In a way, we're *tracking responsibility for freeing the buffer*.
-
-
-Keep the phrase "tracking responsibility" in mind, we'll build on that later to make the system help us with much more than managing memory.
-
-
-# How a compiler can track it
-
-
-If we were to craft a C-like language, then instead of using a suffix like `char* myBuffer_owning`, we might use a symbol on the type, like: `char^ myBuffer`.
-
-
-When you look at it that way, it's kind of like `char`, `char^`, and `char*` are all different types:
-
- * `char` is an *owned value*, owned by the containing stack frame, struct, or array.
- * `char^` is an *owning pointer* to something in the heap.
- * `char*` is a *non-owning pointer*.
-
-
-The above `char* myBuffer_owning = ...` would become `char^ myBuffer = ...`.
-
-
-However, for the compiler to be able to keep things straight, we also need to add the ability to `move` ownership from one variable into another variable or field:
-
-
-```c
-void main() {
-  char^ myBuffer = GetRealPath("./myfile.txt");
-
-  // prints: /Users/Valerian/Bogglewoggle/myfile.txt
-  printf("Real path: %s\n", myBuffer);
-
-  char^ otherVar = move myBuffer;
-  // Now, we can't access myBuffer.
-
-  free(move otherVar)
-}
-```
-
-
-
-Notice how we `move`d from `myBuffer` to `otherVar`. We also moved into the `free` call as well.
-
-
-This `move` keyword comes with a new rule.
-
-*Rule 4:* When we `move` out of a variable, we can't use it anymore.
-
-
-We would also use this new `move` keyword to transfer ownership of some data to our caller, like so:
-
-```c
-Spaceship^ makeSpaceship() {
-  Spaceship^ ship = (Spaceship^)malloc(sizeof(Spaceship));
-  ship->fuel = 42;
-  return move ship;
-}
-```
-
-<center><span style="opacity: 0.6;">(now watch as this new syntax completely confuses the site's code highlighter)</span></center>
-
-
-
-These rules are sometimes known as "move semantics".
-
-
-
-# Let's keep it weird
-
-
-C++ and Rust also have move semantics, but ours is a little different so far:
-
- * C++ doesn't have rule 4, in C++ the compiler lets us accidentally use the variable after we `move` out of it.
- * Rust adds a borrow checker on top. We're going to do something else!
- * Both C++ and Rust will automatically `free` an owning pointer when it goes out of scope.
-
-
-Of course, we're not doing any of that.
-
-
-Let's see what interesting things happen!
-
-
-# Higher RAII, and compile-time guarantees
-
-Recall Rule 2: We can't let an owning variable (or field) go out of scope, the only way to destroy it is to explicitly `move` it or give it to `free`.
-
-
-Because of this, if you accidentally let an owning pointer go out of scope, you'll get a compiler error.
-
-
-You can use this to your advantage, using a technique called "Higher RAII". [# Higher RAII is similar to linear typing. An owning reference is a linear type, but when we can also make non-owning references to the same object, we get Higher RAII.]
-
-Basically, if you want your caller to remember to do something later, give them ownership of a "reminder" object.
-
-
-This technique is incredibly powerful. With it, the compiler can enforce that you:
-
- * Remember to `fulfill` a `Promise` [# A `Promise` is an object that will deliver a result to a corresponding `Future`, sometimes on a different thread.] exactly once.
- * Remember to remove something from a cache that you previously added to.
- * Remember to explicitly rollback or commit a transaction.
- * Remember to join a thread and do something with the thread function's result.
-
-
-More generally, it means the compiler can *ensure you remember to do something in the future* and don't accidentally forget it.
-
-
-## An Example
-
-
-Lets say we have a spaceship game.
-
-
-Some facts about our game's code:
-
- * All of our spaceships live in a central list.
- * We _also_ need to have a separate cache for displaying them.
- * Every ship needs to be in both the central list _and_ the display cache.
- * When the ship dies, we need to remove it from both the central list _and_ the display cache.
-
-
-If we forget to remove it from the display cache, we'd get an odd bug when displaying.
-
-
-Let's use single ownership to prevent this bug at compile-time.
-
-
-We already have a function that will add the ship to the display cache, which looks like this:
-
-
-```c
-void AddShipToDisplayCache(DisplayCache* cache, Ship* ship) {
-  ... // Add to cache
-}
-```
-
-
-
-Let's instead return a "reminder" object:
-
-
-```c
-struct ShipInCacheReminder { };
-
-ShipInCacheReminder^ AddShipToDisplayCache(DisplayCache* cache, Ship* ship) {
-  ... // Add to cache
-  // Return a zero-sized reminder object
-  return (ShipInCacheReminder^)malloc(sizeof(ShipInCacheReminder));
-}
-```
-
-
-
-The compiler prevents us from accidentally dropping this `ShipInCacheReminder^`; we must explicitly `move` or `free` it. That makes it a very effective reminder.
-
-
-The only place we'll ever `free` it is in the `RemoveShipFromDisplayCache` function:
-
-
-```c
-void RemoveShipFromDisplayCache(
-    DisplayCache* cache,
-    Ship* ship,
-    ShipInCacheReminder^ reminder) {
-  free(move reminder);
-  ... // Remove it from the cache
-}
-```
-
-
-
-Voilà! The compiler now guarantees that we'll not forget to `RemoveShipFromDisplayCache`. Let's see what happens if we forget, and how the compiler protects us.
-
-
-<<<<
-Personally, I prefer storing the reminder next to the `Ship` itself. For example, instead of a central list of `Ship`, we might have a central list of `ShipAndMetadata` which contains a `Ship` and all the reminder objects for it.
-////
-```c
-struct ShipAndMetadata {
-  Ship^ ship;
-  ShipInCacheReminder^ shipInCache;
-};
-```
->>>>
-
-
-That way, when we take apart the `ShipAndMetadata` struct to get to the `Ship` we want to destroy, we're naturally left holding a `ShipInCacheReminder`.
-
-
-<<<<
-Here, we try to delete the `shipAndMetadata` directly, and justifiably get an error.
-////
-```c
-void DestroyShip(
-    ShipAndMetadata^ shipAndMetadata) {
-  // Error: freed a struct without
-  //   moving data from it
-  free(move shipAndMetadata);
-}
-```
->>>>
-
-<<<<
-To fix that error, we move things out first. The compiler knows that we'll need to `move` things out and then immediately `free` them. [# This is so common thing that languages like Vale can just "move-destructure" to do this, e.g. `[ship, shipInCache] = shipAndMetadata;`.]
-
-
-We also free `ship` here. However, the `shipInCache` was not dealt with, so the compiler notices that and throws an error.
-////
-```c
-void DestroyShip(
-    ShipAndMetadata^ shipAndMetadata) {
-  Ship^ ship = move shipAndMetadata.ship;
-  ShipInCacheReminder^ shipInCache =
-      move shipAndMetadata.shipInCache;
-  free(move shipAndMetadata);
-
-  free(move ship);
-  // Error: Un-destroyed data:
-  //   ShipInCacheReminder^ shipInCache
-}
-```
->>>>
-
-
-That's good! We don't want the compiler to leak or even `free` that reminder automatically, that would defeat the purpose.
-
-
-<<<<
-To fix it, we'll call `RemoveShipFromDisplayCache`.
-////
-```c
-void DestroyShip(
-    DisplayCache* cache,
-    ShipAndMetadata^ shipAndMetadata) {
-  Ship^ ship = move shipAndMetadata.ship;
-  ShipInCacheReminder^ shipInCache =
-      move shipAndMetadata.shipInCache;
-  free(move shipAndMetadata);
-
-  RemoveShipFromDisplayCache(
-      cache, &ship, move shipInCache);
-  free(move ship);
-
-  // No errors!
-}
-```
->>>>
-
-
-As a bonus, this technique prevents us from accidentally doing `RemoveShipFromDisplayCache` twice, because there's only one reminder object instance. [# So far, this technique doesn't prevent us from removing the wrong `Ship`. If it turns out to be a problem in practice, we could put the `Ship`'s ID into the `ShipInCacheReminder`, though it would take some space.]
-
-
-They say the biggest two problems in computer science are off-by-one errors and cache invalidation. We just solved the latter!
-
-
-If you want to learn more about this, check out [Vale's Higher RAII, the pattern that saved me a vital 5 hours in the 7DRL Challenge](/blog/higher-raii-7drl), where I used this exact technique to remember to remove things from a cache.
-
-
-# Memory Safety
-
-
-Let's make something else amazing happen.
-
-
-We can make our little C-like language *completely memory safe* with a few extra rules:
-
-*Rule 5:* Always bounds-check array accesses.
-
-*Rule 6:* No using pointer arithmetic.
-
-*Rule 7:* Never use non-owning pointers. Each object only ever has one pointer to it, the owning pointer.
-
-
-You're probably thinking, "That's insane! How can you make a program without non-owning pointers? And how does that make our programs memory safe?"
-
-
-It does sound insane! But we can refactor any program to not use non-owning pointers, if we have these guidelines:
-
- 1. Any function that receives a non-owning pointer would instead take (and return) ownership of data.
- 1. Any struct that stores a non-owning pointer would instead store an index (or ID) into some central data structure.
-
-
-I go into this "linear style" a bit more in [What Vale Taught Me About Linear Types, Borrowing, and Memory Safety](/blog/linear-types-borrowing), check it out!
-
-
-If you've ever used a language with a [linear type system](https://en.wikipedia.org/wiki/Substructural_type_system#Linear_type_systems) like [Austral](https://austral-lang.org/), this will sound familiar.
-
-
-After a few hours of using this style, it actually feels pretty similar to Rust. The first guideline is semantically equivalent to passing an `&mut`, and we use the second gudeline all the time in Rust already.
-
-
-# Adding non-owning pointers back in safely
-
-If we want to add non-owning pointers back in while keeping our newfound memory safety, there are a few ways we can go about it.
-
-
-## Memory Tagging and CHERI
-
-[Memory tagging](https://source.android.com/docs/security/test/memory-safety/arm-mte) is when every 16-byte chunk of memory has a corresponding 4-bit "key" that goes with it. Every time we allocate or deallocate that chunk, we change the chunk's key.
-
-Whenever we make a pointer to some data, we copy that key into the unused top bits of the pointer.
-
-When we attempt to dereference the pointer, the hardware will assert that the key in the chunk matches the key in the pointer.
-
-
-Even though these asserts have a 1/16 chance of a false negative, this is great for detecting bugs in development and testing.
-
-
-[CHERI](https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/) is still in the R&D phase, but it seems like it will solve a lot of memory tagging's downsides.
-
-
-## Borrow Checking
-
-Of course, there's always Rust's borrow checking approach! It enforces that if someone has a mutable reference to an object, no other references can exist. This simple rule gives us non-owning pointers with full memory safety.
-
-
-It has some really nice benefits:
-
- * With a little bit of function coloring and data coloring, we can temporarily share data with multiple threads, without risking data races!
- * It doesn't have the run-time cost of memory tagging or CHERI (about [6.8%](https://lobste.rs/s/nw7hsd/how_memory_safe_is_zig_updated#c_tyzbaf)).
-
-
-But also some drawbacks:
-
- * It can be difficult for time management and [development velocity](/blog/when-to-use-memory-safe-part-2).
- * It doesn't let us use common patterns like observers, graphs, back-references, dependency references, intrusive data structures, delegates, and struggles with certain kinds of RAII and interconnected data.
- * It doesn't let us use Higher RAII. [# This is because the borrow checker often forces non-owning reference fields to be function parameters instead, but destructors can't take in parameters.]
-
-
-## Generational References
-
-[Vale](https://vale.dev/)'s [generational references](/blog/generational-references) is like a 64-bit memory tagging system, but it uses the language's semantics to skip as many assertions as the user wants.
-
-
-It has a some benefits:
-
- * It skips the assertions when we access an owning pointer, or when reading from an immutable [region](/blog/zero-cost-borrowing-regions-overview). Between these, one can eliminate every single assertion in a program if they want.
- * Its owning references are regular thin 64-bit pointers, as opposed to CHERI's 128-bit ones.
- * It's easy, and lets us use whatever patterns we want.
- * It can be used with [regions](/blog/zero-cost-borrowing-regions-overview) to eliminate data races.
-
-
-It has its drawbacks too, of course:
-
- * It has a "key" at the top of every allocation, though structs and enums share the key of the containing struct, array, or stack frame to save space.
- * Its non-owning references are 128 bits (like CHERI's), though they can be avoided with the above linear style.
-
-
-This combination of generational references and regions is my favorite approach, especially since it still lets us use Higher RAII.
-
-
-# What does it all mean?
-
-Single ownership is a _lot_ more powerful than we thought. Even without reference counting, garbage collection, or borrow checking, we can use it for memory safety _and_ extra guarantees at compile-time.
-
-
-
-*That's all for now!* I hope you enjoyed this article. Keep an eye out for the next one on our [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), [discord server](https://discord.gg/SNB8yGH), or [subreddit](https://reddit.com/r/vale)!
-
-
-See you next time!
-
+Until next time!
 
 - Evan Ovadia
-
-
-<slice new-color="afterword"/>
-
-
-
-
-
-
 

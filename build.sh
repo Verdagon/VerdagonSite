@@ -455,6 +455,16 @@ if [ $TARGET == "linear-types-borrowing" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
+if [ $TARGET == "vale-memory-safe-cpp" ] || [ $TARGET == "all" ] ; then
+  echo "Doing vale-memory-safe-cpp"
+  echo $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/vale-memory-safe-cpp src/draft/vale-memory-safe-cpp.vmd
+  eval $VMD_SITE_GEN $MODE --compiler_dir $VALESTROM --out public/blog/vale-memory-safe-cpp src/draft/vale-memory-safe-cpp.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
 
 
 
