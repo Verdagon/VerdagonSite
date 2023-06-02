@@ -28,6 +28,16 @@
 
 
       <item>
+         <title>What Vale Taught Me About Linear Types, Borrowing, and Memory Safety</title>
+         <guid>https://verdagon.dev/blog/linear-types-borrowing</guid>
+         <link>https://verdagon.dev/blog/linear-types-borrowing</link>
+         <pubDate>Tue, 1 Jun 2023 11:04:00 -0500</pubDate>
+         <category>Programming Languages</category>
+         <category>Vale Programming Language</category>
+         <author>noreply@verdagon.dev (Evan Ovadia)</author>
+      </item>
+
+      <item>
          <title>An Unexpected Quest in Implementing Vale's Region Borrowing</title>
          <guid>https://verdagon.dev/blog/making-regions-part-2-generics</guid>
          <link>https://verdagon.dev/blog/making-regions-part-2-generics</link>

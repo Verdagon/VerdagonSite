@@ -2,7 +2,7 @@
 title: What Vale Taught Me About Linear Types, Borrowing, and Memory Safety
 subtitle: And some ancient egyptian hieroglyphic slates!
 realm: blog
-date: May Z, 2023
+date: June 1, 2023
 path: blog/linear-types-borrowing
 layout: annotated
 author: Evan Ovadia
@@ -11,14 +11,7 @@ namespace: c-blog m-annotated
 ---
 
 
-[# E: Make sense in general?]
-
-[# E: Too heavy on the egyptian stuff? Also, I drop off of it pretty early, think I need to tie it in more near the end, or not needed?]
-
-[# E: Too much comparison to Rust?]
-
-
-I've had some pretty surreal experiences while making Vale. [# And a lot of unexpected experiences. There was one time where I dove down an ancient history rabbit hole, just so I could add some flavor to an article about memory safety.] The weirdest was when I realized the hidden fundamental truth beneath a lot of the programming languages we use today.
+I've had some pretty surreal experiences while making Vale. [# And a lot of unexpected experiences! There was one time where I dove down an ancient history rabbit hole, just so I could add some flavor to an article about memory safety.] The weirdest was when I realized the hidden fundamental truth beneath a lot of the programming languages we use today.
 
 
 # The ancient writings that lit up a new field
@@ -38,30 +31,28 @@ The other two languages say the same thing as each other, and also mention those
 The scholar Jean-Francois Champollion used these clues to eventually decipher the entire stone, and enabled us to finally understand ancient Egyptian hieroglyphs.
 
 
-I wonder what Champollion felt in that moment, when he had that entire slate translated for the first time.
+I wonder what Champollion felt in that moment, when he had that entire slate translated for the first time. Probably overwhelmed and excited at the potential!
 
 
-I'm no scholar, and I certainly didn't discover anything new. But I think I felt like Champollion did, when Vale showed me the hidden truth about how we can use linear types to completely eliminate Vale's memory safety costs, and led to the creation of the *linear-aliasing model*.
+I'm no scholar, and I certainly didn't discover anything new. But I think I felt that same overwhelm and excitement when Vale showed me the hidden truths that led to the creation of our *linear-aliasing model*, which lets us use linear types to completely eliminate Vale's memory safety costs.
 
 
 <slice/>
 
 # A different way to get memory safety
 
-Recently, I was making a sample program to show how Vale's [regions](/blog/zero-cost-borrowing-regions-overview) can blend borrowing with shared mutability.
+Recently, I was making a sample program to show how Vale's [regions](/blog/zero-cost-borrowing-regions-overview) can blend borrowing [# "Borrowing" is how we can temporarily freeze data to make accessing it much more efficient. If the compiler knows some data won't change, then it doesn't have to incur any memory safety overhead. This was popularized by Rust, and we found a way to compose it with shared mutability via regions.] with shared mutability.
 
 
-I was surprised to find that the sample program had almost _zero_ memory-safety overhead, except for a line in this ([paraphrased](https://github.com/Verdagon/RegionsBenchmarks/blob/main/cellular-automata/CellularAutomata.vale)) code:
+I was surprised to find that the sample program had almost _zero_ memory-safety overhead, except for a tiny bit in this ([paraphrased](https://github.com/Verdagon/RegionsBenchmarks/blob/main/cellular-automata/CellularAutomata.vale)) code:
 
-[# E: These examples clear enough? Trying to balance noisiness and explanation, so was sparse on comments.]
-
-```
+```vale
 func RandInt(rand &Random) i64 {
-  x = rand.num;
-  set x = x + (x / 200096i64);
+  x = rand.num; // generation check, dereference
+  set x = x + (x / 200096i64); «set»
   set x = x - (x * 33554432i64);
   set x = x + (x / 134217728i64);
-  set rand.num = x;
+  set rand.num = x; «opt» // generation check, dereference
   return x;
 }
 
@@ -89,9 +80,7 @@ Specifically, when `RandInt`'s `rand.num` dereferences the `rand` object, it doe
 
 
 
-[# E: This paragraph is here because I'm trying to convey that generation checks _aren't_ expensive, and not really worth optimizing away much of the time, but we *can* if we want to.]
-
-Normally, I don't believe in chasing zero-cost memory safety. Playing overhead golf can often lead to chasing diminishing returns or prematurely optimizing. After all, a generation check is usually only expensive as a bounds check (in other words, usually negligible).
+Normally, I don't believe in chasing zero-cost memory safety. Playing overhead golf can often lead to chasing diminishing returns or prematurely optimizing. Besides, a generation check is usually only as expensive as a bounds check (in other words, usually negligible).
 
 
 But still, I wondered if it _could_ be done. Could we get rid of that last little bit of overhead?
@@ -100,14 +89,18 @@ But still, I wondered if it _could_ be done. Could we get rid of that last littl
 A few weeks later, I discovered the solution.
 
 
-<slice/>
+<slice>
+#set: The `set` statement, like `set x = 10;`, reassigns an existing variable, equivalent to C's `x = 10;`. Vale has a `set` keyword so that its declarations can be simpler, like `x = 4;`.
+
+#opt: The optimizer is actually smart enough to optimize this second generation check out on its own.
+</slice>
 
 # Moving into and out of functions
 
 <<<<
 Instead of taking a `&Random` reference parameter like this:
 
-```
+```vale
 func RandInt(rand &Random) i64 {
   x = rand.num;
   set x = x + (x / 200096i64);
@@ -118,9 +111,9 @@ func RandInt(rand &Random) i64 {
 }
 ```
 ////
-`RandInt` could take (and return) an owned `Random`, like this:
+...`RandInt` could take (and return) an owned `Random`, like this:
 
-```
+```vale
 func RandInt(rand Random) (i64, Random) {
   x = rand.num;
   set x = x + (x / 200096i64);
@@ -142,7 +135,7 @@ Here's what we changed:
 
 Now, `rand.num` isn't dereferencing a reference, it's accessing a field of an owned value.
 
-Vale's compiler sees this, and doesn't insert a generation check, because it knows the object is alive.
+Vale's compiler sees this, and doesn't insert a generation check, because any object that we own is still alive.
 
 
 Of course, that requires we change how `MakeBoard` calls `RandInt`.
@@ -167,7 +160,7 @@ where `rand` is an actual `Random`, not just a reference.
 >>>>
 
 
-Now, that line:
+This new line will:
 
  * Moves the `rand` instance into the `RandInt` call.
  * Uses the square braces to break apart the returned tuple into its two elements:
@@ -240,7 +233,7 @@ Instead of passing a reference, it's like we're "lending" an owned value to a fu
 If you've used a language like [Rust](https://www.rust-lang.org/) before, this might feel familiar: own-lending is semantically equivalent to borrowing a `&mut Random` and passing it around.
 
 
-Just for fun, I tried applying own-lending to the entire program. Sure enough, the `--print_mem_overhead` flag reported that I reduced generation checks down to *zero.*
+Just for fun, I tried applying own-lending to the entire program. Sure enough, the `--print_mem_overhead true` flag reported that I reduced generation checks down to *zero.*
 
 
 <slice/>
@@ -253,13 +246,13 @@ This _blew_ my _mind_. That shouldn't be possible. I've never seen `--print_mem_
 Yet there it was.
 
 
-I sat back from my desk, and got up for a walk. After ten minutes, I realized I'd just been staring at a wall, and hadn't actually walked anywhere.
+I sat back from my desk, and got up for a walk. After ten minutes, I realized I'd just been staring at a wall, and hadn't actually walked anywhere. [# This wall-staring happens more often than you might think. The same thing happened when I first realized that regions [could also eliminate memory safety costs](/blog/making-regions-part-1-human-factor).]
 
 
 It slowly sank in over the next few days.
 
 
-*Using own-lending, we can completely eliminate every single generation check in a program, to get memory safety without borrow checking, reference counting, or tracing garbage collection.*
+*Using own-lending, we can completely eliminate every single generation check in a program, to get memory safety without borrow checking, reference counting, or tracing garbage collection.* [# This was particularly surprising to me, since it meant that immutable borrowing wasn't strictly necessary for languages like [Rust](https://www.rust-lang.org/) and [Austral](https://austral-lang.org/). They're definitely nice usability improvements though, so it's good they added them.]
 
 
 <slice/>
@@ -269,13 +262,13 @@ It slowly sank in over the next few days.
 I imagine that Jean-Francois Champollion felt overwhelmed, discovering how to read ancient Egyptian hieroglyphs. He had found the secret to exploring an ancient culture in a way nobody ever has before.
 
 
-That's how I felt in that moment, seeing that zero.
+I didn't discover anything like what Champollion did, but I certainly felt overwhelmed when I saw that zero.
 
 
-Of course, I hadn't discovered anything new. I was discovering for myself the natural consequence of Vale's owned values being [linear](https://en.wikipedia.org/wiki/Substructural_type_system#Linear_type_systems), which is a distant cousin of Rust's affine types. Both are a kind of "[substructural type system](https://en.wikipedia.org/wiki/Substructural_type_system)". Apparently, people have been writing about substructural type systems' abilities for decades! [# There's also a very interesting language named [Austral](https://austral-lang.org/), based on linear types!]
+And I hadn't found anything new, of course. I was just learning the natural consequence of Vale's owned values being [linear types](https://en.wikipedia.org/wiki/Substructural_type_system#Linear_type_systems), which is a distant cousin of Rust's affine types. Both are a kind of "[substructural type system](https://en.wikipedia.org/wiki/Substructural_type_system)". Apparently, people have been writing about substructural type systems' abilities for decades! [# There's also a very interesting language named [Austral](https://austral-lang.org/), based on linear types!]
 
 
-With this new understanding, I also considered Rust from a different perspective. It led me to the eventual truth: their memory safety doesn't come from borrow checking, not exactly. It comes from their types being affine. In a way, `&mut` references are just syntactic sugar, [# "Syntactic sugar" is what we call features that just make the code a bit cleaner, but aren't really required to express a certain computation.] and *you can take `&mut` out of Rust and not much would change semantically*.
+With this new understanding, I also considered Rust from a different perspective. It led me to the eventual truth: their memory safety doesn't come from borrow checking, not exactly. It comes from their types being affine. In a way, `&mut` references are just syntactic sugar, [# "Syntactic sugar" is what we call features that just make the code a bit cleaner, but aren't really required to express a certain computation.] and [you can take `&mut` out of Rust and not much would change semantically](https://doc.rust-lang.org/stable/book/ch04-01-what-is-ownership.html#return-values-and-scope).
 
 
 The same is true of Vale, apparently. If you program without making any references, your program becomes memory safe, and has no memory-safety related overhead!
@@ -450,7 +443,7 @@ func RandInt(rand Random) (i64, Random) {
 }
 ```
 ////
-...we could add a `inout` keyword:
+...we could add an `inout` keyword:
 
 ```
 func RandInt(rand inout Random) i64 {
@@ -462,9 +455,9 @@ func RandInt(rand inout Random) i64 {
   return x;
 }
 ```
->>>>
 
-[# E: I used `inout` even though `borrow` would make more sense, because I wanted to equate it to Swift's/C#'s inout, and so the user wouldnt accidentally think it worked like a `&mut`... not sure I succeeded, especially since I mention `&mut` below. `&mut` is part of the type, this is part of the parameter/variable. Think its worth making it clearer, or is it fine?]
+...so that it could be called like `r = RandInt(borrow rand);`.
+>>>>
 
 
 This `inout` keyword would work exactly like Swift's or C#'s `inout` keyword, and like references in [Val](https://www.val-lang.dev/)'s [mutable value semantics](https://www.jot.fm/issues/issue_2022_02/article2.pdf). [# Val is a different language from Vale and Vala (we all have similarly great taste in naming!)] It's also [similar](https://doc.rust-lang.org/stable/book/ch04-01-what-is-ownership.html#return-values-and-scope) to Rust's `&mut`, but this is part of the variable/parameter, not part of its type.
@@ -514,8 +507,6 @@ In other words, is there a way we can have linear types _and_ shared mutability?
 Adding borrow checking partially helps with drawback #1 [# Partially because borrow checking lets us have temporary references, not persistent ones. The borrow checker has a hard time putting references into data structures.] but it still has drawbacks #2, #3, and #4. Rust's `Rc` and `RefCell` helps with those, but they're incompatible with linear types' benefits [# We can't put a linear type into an `Rc` because `Rc` throws away its contents when the last alias disappears.], and have their own drawbacks (like forcing heap allocation and not having [higher RAII](https://verdagon.dev/blog/higher-raii-7drl)).
 
 
-[# E: How is this next part, where we blend gen refs back in? I tried to find an elegant way to build up to "the solution was with us all along".]
-
 The other solution, surprisingly, is to blend generational references back in.
 
 Each object is still owned linearly; only one place can own an object at a time. But we'll also allow a generational reference to point at the object.
@@ -563,8 +554,6 @@ Then I realized, they fit _perfectly_ together. We can use regions to look at a 
 
 I tried this out in a little [roguelike game](https://github.com/Verdagon/RegionsBenchmarks/blob/main/tiny-roguelike/roguelike.vale). The vast majority of generation checks were eliminated by regions, and the rest were eliminated by this new linear style.
 
-[# E: Should I go into more detail about this balance, or save it for a future article?]
-
 
 You can try this too! Just invoke the Vale compiler with the `--print_mem_overhead true` flag to make the program print out how many generation checks you can still eliminate (and if you want to use regions too, check out the experimental branch [described here](/blog/first-regions-prototype)).
 
@@ -574,100 +563,21 @@ You can try this too! Just invoke the Vale compiler with the `--print_mem_overhe
 
 # Conclusion and Next Steps
 
-For those of us that like to squeeze every little last drop of performance out of our programs, this is a pretty amazing realization.
+For those of us that like to squeeze every little last drop of performance out of our programs, this is a pretty exciting realization.
 
 
 But ironically, that's a small minority. For the vast majority of Vale programs, generational references aren't a noticeable source of overhead, and none of this will matter. And that's a good thing; one of Vale's main strengths is that you can just make your program, and things will just work and will be fast.
 
 
-However, this does open up Vale to some new domains. Since we can program in a way that doesnt require generation checks, that means that Vale could be used in new niches, like embedded systems, operating system kernels, and safety-critical software. That's pretty exciting.
+However, this does open up Vale to some new domains. Since we can program in a way that doesnt require generation checks, that means that Vale could be used in new niches, like embedded systems, operating system kernels, and safety-critical software. That's pretty exciting, I think!
 
 
-Thanks for reading, I hope you enjoyed this article! And if you're impressed with our [track record](https://vale.dev/roadmap) and believe in the direction we're heading, please consider sponsoring me on github:
-
-<center>
-  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
-     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
-        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
-     </svg>
-     Sponsor us on GitHub!
-  </a>
-</center>
-
-With your support, we can bring weird memory safety paradigms to programmers worldwide!
+Thanks for reading, and I hope you enjoyed this article. If you have any questions, feel free to join the [discord](https://discord.gg/SNB8yGH) or [subreddit](https://reddit.com/r/vale) or reach out via [twitter](https://twitter.com/verdagon)!
 
 
-<slice new-color="afterword"/>
+Cheers,
 
-# Vale's Vision
-
-Vale aims to bring a new way of programming into the world that offers *speed*, *safety*, and *ease of use.*
+- Evan Ovadia
 
 
-*The world needs something like this!* Currently, most programming language work is in:
-
- * High-overhead languages involving reference counting and tracing garbage collection.
- * Complex languages (Ada/Spark, Coq, Rust, Haskell, etc.) which impose higher complexity burden and mental overhead on the programmer.
-
-These are useful, but there is a *vast field of possibilities* in between, waiting to be explored!
-
-
-Our aim is to explore that space, discover what it has to offer, and make *speed and safety easier than ever before.*
-
-
-In this quest, we've discovered and implemented a lot of new techniques:
-
- * [Generational Memory](/blog/generational-references), for a language to ensure an object still exists at the time of dereferencing.
- * [Higher RAII](/blog/raii-next-steps), a form of linear typing that enables destructors with parameters and returns.
- * [Fearless FFI](/blog/fearless-ffi), which allows us to call into C without risk of accidentally corrupting Vale objects.
- * [Perfect Replayability](/blog/perfect-replayability-prototyped), to record all inputs and replay execution, and completely solve heisenbugs and race bugs.
-
-
-These techniques have also opened up some new emergent possibilities, which we hope to implement:
-
- * [Region Borrow Checking](/blog/zero-cost-borrowing-regions-overview), which adds mutable aliasing support to a Rust-like borrow checker.
- * [Hybrid-Generational Memory](/blog/hybrid-generational-memory), which ensures that nobody destroys an object too early, for better optimizations.
- * [Seamless concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency), the ability to launch multiple threads that can access any pre-existing data without data races, without the need for refactoring the code or the data.
- * Object pools and bump-allocators that are memory-safe and decoupled, so no refactoring needed.
-
-
-We also gain a lot of inspiration from other languages, and are finding new ways to combine their techniques:
-
- * We can mix an `unsafe` block with Fearless FFI to make a much safer systems programming language!
- * We can mix Erlang's isolation benefits with functional reactive programming to make much more resilient programs!
- * We can mix region borrow checking with Pony's `iso` to support shared mutability.
-
-...plus a lot more interesting ideas to explore!
-
-
-The Vale programming language is a novel combination of ideas from the research world and original innovations. Our goal is to publish our techniques, even the ones that couldn't fit in Vale, so that the world as a whole can benefit from our work here, not just those who use Vale.
-
-
-Our medium-term goals:
-
- * Finish the Region Borrow Checker, to show the world that shared mutability can work with borrow checking!
- * Prototype Hybrid-Generational Memory in Vale, to see how fast and easy we can make single ownership.
- * Publish the Language Simplicity Manifesto, a collection of principles to keep programming languages' learning curves down.
- * Publish the Memory Safety Grimoire, a collection of "memory safety building blocks" that languages can potentially use to make new memory models, just like Vale combined generational references and scope tethering.
-
-
-We aim to publish articles biweekly on all of these topics, and create and inspire the next generation of fast, safe, and easy programming languages.
-
-
-If you want to support our work, please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
-
-With enough sponsorship, we can:
-
- * Work on this full-time.
- * Turn the Vale Language Project into a 501(c)(3) non-profit organization.
- * Make Vale into a production-ready language, and push it into the mainstream!
-
-<center>
-  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
-     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
-        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
-     </svg>
-     Sponsor us on GitHub!
-  </a>
-</center>
-
+<$include "/sponsoring.vmd"/>

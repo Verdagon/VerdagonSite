@@ -1,0 +1,88 @@
+
+<slice new-color="afterword"/>
+
+# Vale needs your help!
+
+
+With your help, we can bring a new language into the world that focuses on *speed*, *safety*, *flexibility*, and *ease of use.*
+
+
+We’re a very small team of passionate individuals, working on this on our own and not backed by any corporation.
+
+
+If you want to support our work, please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
+
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub
+  </a>
+</center>
+
+
+Those who sponsor us also get extra benefits, including:
+
+ * Early access to all of our articles!
+ * A sneak peek at some of our more ambitious designs, such as memory-safe allocators based on algebraic effects, an async/await/goroutine hybrid that works without data coloring or function coloring, and more.
+ * Your name on the [vale.dev](https://vale.dev/) home page!
+
+
+With enough sponsorship, we can:
+
+ * Start a a 501(c)(3) non-profit organization to hold ownership of Vale. [# Tentatively name the Vale Software Foundation.]
+ * Buy the necessary computers to support more architectures.
+ * Work on this full-time.
+ * Make Vale into a production-ready language, and push it into the mainstream!
+
+
+We have a strong [track record](https://vale.dev/roadmap), and during this quest we've discovered and implemented a lot of completely new techniques:
+
+ * The [Linear-Aliasing Model](/blog/linear-types-borrowing) that lets us use linear types where we need speed, and [generational references](/blog/generational-references) where we need the flexibility of shared mutability.
+ * [Region Borrowing](/blog/first-regions-prototype), which makes it easier to write efficient code by composing shared mutability with the ability to temporarily freeze data.
+ * [Higher RAII](/blog/single-ownership-without-borrow-checking-rc-gc), where the language adds logic safety by enforcing that we eventually perform a specific future operation.
+ * [Perfect Replayability](/blog/perfect-replayability-prototyped) makes debugging race conditions obsolete  by recording all inputs and replaying execution exactly.
+
+
+These have been successfully prototyped. With your sponsorship we can polish them, integrate them, and bring these techniques into the mainstream. [#prototypes]
+
+
+Our next steps are focused on making Vale more user-friendly by:
+
+ 1. Finalizing the compiler's error messages and improving compile speeds.
+ 1. Polishing interop with other languages.
+ 1. Growing the standard library and ecosystem!
+
+
+
+We aim to combine and add to the benefits of our favorite languages:
+
+ * The scalability of [Go](https://go.dev/) and ergonomics of [Scala](https://scala-lang.org/), but using Vale's [linear-aliasing model](/blog/linear-types-borrowing) instead of garbage collection.
+ * C++'s single-ownership shared-mutability abilities with more [memory safety](/blog/single-ownership-without-borrow-checking-rc-gc), without sacrificing its flexibility.
+ * The speed and safety of [Rust](https://www.rust-lang.org/), but with [easier borrowing rules](/blog/zero-cost-borrowing-regions-overview), more [compile time guarantees](/blog/higher-raii-7drl), and better compatibility with [shared mutability](/blog/linear-types-borrowing).
+
+
+
+*We need your help to make this happen!*
+
+
+If you're impressed by our [track record](https://vale.dev/roadmap) and believe in the direction we're heading, please consider sponsoring us:
+
+<center>
+  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
+     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
+        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
+     </svg>
+     Sponsor us on GitHub
+  </a>
+</center>
+
+
+If you have any questions, always feel free to reach out via [email](mailto:verdagon_epsa@verdagon.dev), [twitter](https://twitter.com/vale_pl), [discord](https://discord.gg/SNB8yGH), or the [subreddit](https://reddit.com/r/vale). Cheers!
+
+
+<slice>
+#prototypes: [Generational references](/blog/generational-references), the [linear-aliasing model](/blog/linear-types-borrowing), and [higher RAII](/blog/single-ownership-without-borrow-checking-rc-gc) are all complete, and [Region borrowing](/blog/first-regions-prototype), [fearless FFI](/blog/fearless-ffi), and [perfect replayability](/blog/perfect-replayability-prototyped) have been successfully prototyped. Be sure to check out the experimental version of the compiler!
+</slice>
