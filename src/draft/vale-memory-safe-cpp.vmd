@@ -1,6 +1,6 @@
 ---
-title: What Vale Taught Me About a Memory Safe C++
-subtitle: And why we love it!
+title: Making C++ Memory-Safe Without Borrow Checking, Reference Counting, or Tracing Garbage Collection
+subtitle: Glory to the grimoire!
 realm: blog
 date: May X, 2023
 path: blog/vale-memory-safe-cpp
@@ -13,29 +13,90 @@ namespace: c-blog m-annotated
 ! This article is still in early access for friends and sponsors, thank you so much to everyone who has helped Vale come this far!
 
 
-Even though I spend most of my time writing in Vale, Rust, and Scala, I am a C++ programmer at heart.
+Adding memory safety to C++ is a very difficult problem, to say the least.
 
 
-It has a combination of speed and flexibility that no other mainstream language has really nailed.
+I've spent most of the last decade exploring this area to design [Vale](https://vale.dev/)'s memory safety, and I've luckily discovered some *surprising things* which might make it a bit easier.
 
 
-This combination even inspired me make [Vale](https://vale.dev/), to see if we could make a high-performance language that has memory safety, but also still has that C++ flexibility and spirit. And in that quest, I've discovered some *surprising truths.*
+The world largely believes that the only ways to make code memory safe are through reference counting, tracing garbage collection, or borrow checking.
 
 
-The world largely believes that reference counting, tracing garbage collection, and borrow checking are the only ways to make code memory safe.
+It turns out, there's at least *eleven more methods,* with more being discovered all the time. [# For a sneak peek, here they are: generational references, random generational references, constraint references, regions, arenas, mutable value semantics, interaction nets, basil memory stacks, CHERI capabilities, neverfree, MMM++, SPARK, and linear types. More than eleven really, but there is some overlap.] [# One day, I want to write about all these methods, and call the book the "Memory Safety Grimoire". That'd be pretty sweet!]
 
 
-I've found eleven more approaches, and I'm about to show you *how they can make C++ memory-safe.* [# One day I'd love to write a series called The Memory Safety Grimoire where I talk about all of these.] [# For a sneak peek, here they are: generational references, vale references, constraint references, regions, arenas, mutable value semantics, interaction nets, basil memory stacks, CHERI capabilities, neverfree, MMM++, SPARK, and linear types. More than eleven really, but there is some overlap.]
+Someone asked me recently, can we use these techniques to add some memory safety to C++?
 
 
-These techniques are great tools for the toolbox, to use where they make sense. [# As is the C++ way!] My goal here isn't to propose some sort of grand new direction for C++, it's just to enlighten. [# There is no silver bullet, and these techniques have their tradeoffs, but I hope this will show C++'s potential and inspire others to take these ideas and run with them.]
+We can! It's something I've been thinking about for a while, and it's about time I write it all down.
 
 
-Buckle up, because we're about to design a whole new memory safety model for C++! [# It won't be the same as Vale's, which makes this a much more fun experiment. If I had to come up with a name for this C++ memory safety approach, I might call it the "affine-aliasing model" or something.]
+# The Challenges
+
+We're going to do this without borrow checking, reference counting, or tracing garbage collection.
 
 
+Not because they're bad, of course. They have some great benefits:
 
-# unique_ptr
+ * Tracing GC is the simplest model for the user, and helps with time management and development velocity, two very important aspects of software engineering.
+ * Reference counting is simple and allows for more predictable destruction of objects.
+ * Borrow checking is _very_ fast, and helps avoid data races.
+
+
+However, they each have their drawbacks too:
+
+ * Tracing GC can have some unpredictable pauses sometimes, while it stops the world to figure out which objects are still alive.
+ * Reference counting is often the slowest approach (though I think that will change in the next decade [#rcfast]).
+ * Borrow checking is incompatible with some useful patterns and optimizations (described later on), and its strict and infectious nature can have trouble coexisting with non-borrow-checked code.
+
+
+They also have their pragmatic limitations:
+
+ * Making tracing GC work well with C++ would be tricky, since the GC would need to find everywhere the normal C++ objects have references to garbage-collection-managed objects.
+ * Reference counting is pretty doable actually, as shown by `shared_ptr`.
+ * Borrow checking has a high complexity cost in the form of lifetimes, annotations, etc. and C++ is a very complex language already.
+
+
+I'm about to describe a different approach, with its own tradeoffs. It's no silver bullet, and I wouldn't claim that it's objectively the best way to do things. It's merely an interesting possibility.
+
+
+These techniques are all possible, as far as I know. Between Vale, Val, Austral, Rust, Inko, and a few others, these techniques have all been implemented one place or another. I think they'll be compatible with C++ and compose well with each other, but I could be wrong, and there could also be some obstacles in the way.
+
+
+And as a bonus, they're not only possible, they can probably be achieved with only static analysis, maybe even just a well-crafted linter. [# If anyone wants to actually attempt this, let me know!]
+
+
+<slice>
+#rcfast: I think a language will come along that blends reference counting with [regions](/blog/zero-cost-borrowing-regions-overview) and linear or unique types. That would eliminate the vast majority of reference counting operations, which might make RC competitive again.
+</slice>
+
+
+# The techniques
+
+We're going to blend *five main ingredients* to achieve our memory safety:
+
+ * Borrowless affine style, via `unique_ptr` and owned values (from Vale, Val, and Austral)
+ * Constraint references (from GelLLVM, Inko, and Vale)
+ * Generational references and random generational references (from Vale)
+ * Unique borrowing (from Austral, Val, and Rust)
+ * Simple immutable borrowing (from Austral)
+
+
+Each one is sufficient on its own actually, but I'll explain why it's good to have this particular blend's flexibility.
+
+
+# Borrowless Affine Style [# DRAFT: I'm thinking this entire aspect should perhaps be framed differently, or perhaps be reordered to after constraint refs / vale refs / gen refs. It seems like the reader is getting pretty and taking a lot of leaps of faith before we get to the payoff]
+
+This technique blew my mind [pretty spectacularly](/blog/linear-types-borrowing), especially when I realized that it was already hidden beneath the surface in languages like Vale, Austral, Val, and Rust.
+
+
+This technique shows that we don't need tracing GC, reference counting, borrow checking, or anything for memory safety. We just need to change the way we move data around.
+
+
+Let's start by adding some *arbitrary-sounding rules*, and then we'll tie them all together into something that makes sense.
+
+
+## unique_ptr
 
 C++11's `unique_ptr` is a class that tracks who has sole responsibility for destroying an object.
 
@@ -57,7 +118,7 @@ So far, this is pretty obvious. A lot of us follow these rules already in our co
 The next part will be obvious too, and after that things get more interesting.
 
 
-# Stack objects are safe
+## Stack objects are safe too
 
 <<<<
 Our next principle is that, of course, accessing the fields of an object on the stack is safe too.
@@ -81,7 +142,7 @@ Now that the more obvious principles are out of the way, let's get to the intere
 
 
 
-# Move-destructuring
+## Move-destructuring
 
 This next rule helps keep us from risking accessing any fields that have been invalidated.
 
@@ -134,14 +195,14 @@ The above example is fairly simple, but it could get a bit more difficult if we 
 We may need to refactor and pipe ownership of the containing struct all the way to here. Further below, we'll talk about this drawback and ways to address it.
 
 
-# Resizable Collections
+## Resizable Collections
 
 *Rule 4:* Only use std::array and resizable collections, don't use raw arrays directly.
 
 This is because raw arrays temporarily risk some unsafety when we first make them and when we're destroying them.
 
 
-There are a lot of ways we can relax these restrictions.
+There are a lot of ways we can later relax these restrictions.
 
 
 For example, we could have a runtime-sized array where we construct it with a size `N` and a closure, and the library (or language) will invoke that closure `N` times, filling the array's elements with the closure calls' results.
@@ -156,7 +217,7 @@ Vale's arrays are like that, and they're used to implement the standard library'
 Bounds-checked array slices could also make life easier, so that functions could take in an arbitrary range of elements.
 
 
-# Avoid raw pointers and references [# We'll still be using them indirectly of course; dereferencing a `unique_ptr` produces a temporary reference. But we won't be using raw pointers or references directly.]
+## Avoid raw pointers and references [# We'll still be using them indirectly of course; dereferencing a `unique_ptr` produces a temporary reference. But we won't be using raw pointers or references directly.]
 
 I know, that sounds impossible _and_ ridiculous.
 
@@ -250,10 +311,10 @@ However, we'll be deviating from Rust's direction pretty sharply.
 
 # The approach so far
 
-The foundational rules above have achieved their goal: *we now have a memory-safe subset of C++.*
+The foundational rules above form "borrowless affine style", and they've achieved their goal: *we now have a memory-safe subset of C++.*
 
 
-But let's take a step back and recognize its drawbacks, and see how we might address them.
+But let's take a step back and recognize its drawbacks, and see how we might address them by blending in some other techniques.
 
 
 Besides being verbose, there are also some architectural consequences:
@@ -274,7 +335,7 @@ These are familiar to Rust users; `&mut` is semantically equivalent to everythin
 So should we do something like `shared_ptr<optional<T>>` then, or are there any other options?
 
 
-There are! Let's talk about *generational references*, *vale references*, and *constraint references*.
+There are! Let's talk about *generational references*, *random generational references*, and *constraint references*.
 
 
 # Generational References
@@ -283,9 +344,9 @@ A *generational reference* is where each object has a current "generation number
 
  * When we want to point to an object, we remember its address and its generation.
  * When we free an object, we increment its generation number.
- * To get access to an object, we first assert ("generation check") that the current generation number matches the remembered generation number.
+ * To get access to an object, we first check ("generation check") that the current generation number matches the remembered generation number. If not, we safely signal a segmentation fault.
 
-It's equivalent to the generational indices method, but applied to a heap.
+It's equivalent to the generational indices [# DRAFT: link] method, but applied to a heap.
 
 
 To learn more, check out [this article](https://verdagon.dev/blog/generational-references) which talks about how we added them to Vale (though, the next section talks about an improved version).
@@ -334,15 +395,74 @@ There's a couple downsides to this approach.
 Both of these are addressed by the next approach.
 
 
-# Vale References
+# Random Generational References
 
-Previously known as "generational references V2", a vale reference is a generational reference with one adjustment: it uses a *pseudo-random generation number* for every object.
+A random generational reference is a generational reference with one adjustment: it uses a *pseudo-random generation number* for every object, or even a global monotonically increasing integer. [# It could also be thread-local. Vale actually has an implicit `restrict uint64_t*` parameter to every function, which optimizes very nicely.]
+
+Usage would be the same as the above generational references, and I include a sample implementation further below.
 
 
-It's better in that it doesn't use a special allocator, and objects can live on the stack and inside other objects.
+If you've ever heard of Arm's [memory tagging](https://source.android.com/docs/security/test/memory-safety/arm-mte), this is like that but with a wider tag.
 
 
-The drawback, of course, is that the generation check can have a false negative in theory, depending on the width of the generation number.
+*While this approach is promising, it's still ultimately unknown. I'd recommend waiting until it's studied more before using it.*
+
+
+This approach has a lot of benefits:
+
+ * The object can live on the stack, inside other objects, directly inside arrays, or even inside custom allocators.
+ * We can reuse a specific spot in memory as many times as we want.
+ * We're able to release memory back to the OS, in environments with virtual memory. [# This relies on the OS detecting accesses to released memory and raising segmentation faults.]
+
+
+There is a theoretical downside too.
+
+Specifically, if we ignore a failing generation check for about 10 million years [# DRAFT: use the actual number, get it from other article] and decide not to fix the problem in that time, there is a 1% chance of reusing the same generation as something that was there before. That itself isn't dangerous, but if we do use-after-free on the old object in that rare situation, it might not be detected.
+
+
+Those well-versed in statistics will understand that this isn't a problem, but let's explore it a little.
+
+
+The odds of a use-after-free slipping by is always `1/2^64` for a 64-bit generation.
+
+ * The odds don't change with the number of live objects.
+ * The odds don't change with the how long the program's been running. 
+ * The odds don't change with the the number of objects that have lived in that particular location.
+ * The odds don't change with the the number of previous generation check failures, because the first one brings down the entire process.
+
+
+It also helps to keep in mind that these probabilities only apply to the error detection mechanism, not to the program itself.
+
+
+One of my beta readers asks:
+
+> "How does this compare to Rust? It seems like the probabilistic behavior wouldn't be as good."
+
+That would be true, except that [most Rust programs](https://2020.icse-conferences.org/details/icse-2020-papers/68/Is-Rust-Used-Safely-by-Software-Developers-) use `unsafe` or have it in their dependencies, even when you don't count the stdlib.
+
+When someone uses `unsafe` to get around the borrow checker's restrictions, even if they think really hard about `unsafe`'s more arcane interactions, bugs can remain hidden for a long time, stealthily causing undefined behavior in the `unsafe` block and in the safe code around it.
+
+We'd similarly use random generational references to get around the restrictions of affine style, but fortunately, any use-after-frees are detected _very_ loudly as a check failure brings down the entire program. Bugs are discovered _very_ quickly, instead of causing mysterious behavior for years.
+
+So it's better in some ways, worse than others. It's just a different approach.
+
+
+Vale actually went one step further and replaced `unsafe` with a "skip-check dereference" operator to skip a generation check in release mode. The major benefit is that a compiler flag can ignore these in dependencies, so we no longer have to trust that our dependencies used unsafety well.
+
+
+Even without that, when we're interoperating with a large amount of existing unsafe C++ code, this seems like an improvement in a lot of ways.
+
+
+This approach is also customizable:
+
+ * We can fall back to regular generational references with a few `#define`s.
+ * We can `#define` it to normal objects and pointers, and it would be as efficient as normal C++.
+
+
+There are some extra details that could complicate implementation:
+
+ * By intentionally reading the generation number of freed memory, we are doing something the optimizer considers to be undefined behavior. We'd need to modify the optimizer or somehow communicate to it that this is fine.
+ * Regular generational references safely and manually raised segmentation faults, and this mechanism will also raise segmentation faults if we access memory already returned to the OS. This means that this technique won't be appropriate for environments which don't have virtual memory.
 
 
 Usage would be the same as the above generational references, and a simple C++ implementation would look roughly like the below code (also available [here](https://github.com/Verdagon/ValeanCpp/blob/main/vref.h)).
@@ -419,27 +539,13 @@ vowned<T> make_vowned(P&&... params) {
 ```
 
 
-
 This simple implementation uses:
 
  * A monotonically incrementing `vrefNextKey` integer as its pseudo-random number generator.
  * A 63 bit generation (so we can use 1 bit for the `present` boolean), making the odds of a false negative about 1/2^63.
 
 
-If you've ever heard of Arm's [memory tagging](https://source.android.com/docs/security/test/memory-safety/arm-mte), this is like that but with a wider tag.
-
-
-Depending on the size of your generation/tag, you can make this robust enough to detect bugs in development and testing (1/16 like memory tagging) or robust enough for use in security purposes.
-
-
 This approach has one additional benefit. For domains where its appropriate, it can be turned completely off for production code, and it would be as efficient as normal C++. This can be a pretty stellar tradeoff for single player games, compilers, or sandboxed situations like webassembly modules or apps.
-
-
-There are some other downsides in theory:
-
- * If we access memory already freed to the operating system, instead of an assertion failure we'd get a segmentation fault.
-    * If we're on a devices with no segmentation faults nor virtual memory, this might not be a good approach. [# In those cases, a Vale program might balance a linear style with immutable region borrowing for aliasing.]
- * We can contrive some cases where a sufficiently intelligent optimizer can detect that we're accessing already-destroyed objects, and consider it undefined behavior.
 
 
 Still, for the vast majority of use cases, this is a great tradeoff.
@@ -526,7 +632,7 @@ A Hybrid Approach to Safe Explicit Memory Management](https://web.archive.org/we
 To get the object from the `constraint_ref`, we "check out" the contents and take ownership of it from the original owner. Before the end of the scope, we're required to put something back into that spot, via a `constraint_guard` object. [# This is basically the same thing as Rust's `RefCell`.] [# We might also need `enable_constraint_from_this`, for the same reasons `enable_shared_from_this` exists.]
 
 
-Similar to vale references, this can be turned off in production and be as efficient as normal C++ code.
+Similar to collidable generational references, this can be turned off in production and be as efficient as normal C++ code.
 
 
 The obvious downside, of course, is that if you violate the constraint, your entire program halts. This makes it unusable in a lot of cases.
@@ -540,7 +646,7 @@ Before we add something like Rust's `Rc<RefCell<T>>`, let's ask the question: ho
 This is a familiar question to anyone who has used Rust. One of my favorite things to do in Rust is to see how far we can get by just using the borrow checker, and not using `Rc<RefCell<T>>`.
 
 
-  However, such a style can have the three drawbacks we mentioned above:
+However, such a style can have the three drawbacks we mentioned above:
 
  * When we need a `&mut`, we're required to change the signature of the containing function, its callers, its callers' callers and so on, becoming a *viral leaky abstraction*.
  * When we need to mutate something, we often need to put a lot of our objects into collections, making our program almost similar to a relational database.
@@ -628,7 +734,7 @@ In other words, as long as we aren't returning or storing references, I think we
 
 # How might we make this happen?
 
-I'm not sure! That's a question involving committees, standards, backwards compatibility, and other big topics. And alas, Vale is keeping my hands full.
+I'm not sure! That's a question involving committees, standards, backwards compatibility, and other big topics that won't fit in this small article.
 
 
 But perhaps all of this has inspired someone out there to investigate these possibilities.
@@ -640,7 +746,7 @@ I'd perhaps recommend them to start with some sort of linter. These are all pret
 We can even imagine a future where there's some sort of "C++ safe mode" where the linter is enabled by default, and then we break out of it with `unsafe` blocks.
 
 
-Or perhaps a project like [Carbon](https://github.com/carbon-language/carbon-lang) or [CppFront](https://github.com/hsutter/cppfront) could have some sort of support for these approaches. [# To Herb and/or Chandler, let me know you ever want to talk memory safety over some cider!]
+Or perhaps a project like [Carbon](https://github.com/carbon-language/carbon-lang) or [CppFront](https://github.com/hsutter/cppfront) could have some sort of support for these approaches. [# Herb/Chandler, let me know you ever want to talk memory safety over some cider!]
 
 
 # Conclusion
@@ -651,10 +757,21 @@ Thats it! I hope you enjoyed this whirlwind tour of the various ways we can add 
 If you liked this article, please consider [sponsoring Vale on GitHub](https://github.com/sponsors/ValeLang)! Your sponsorships make it so I can keep writing articles like this.
 
 
-If you have any questions, message me on [twitter](https://twitter.com/verdagon), the [discord server](https://discord.gg/SNB8yGH), or [subreddit](https://reddit.com/r/vale).
+If you have any questions, feel free to message me on [twitter](https://twitter.com/verdagon), the [discord server](https://discord.gg/SNB8yGH), or [subreddit](https://reddit.com/r/vale).
 
 
 Until next time!
 
 - Evan Ovadia
 
+
+<ignore>
+Even though I spend most of my time writing in Vale, Rust, and Scala, I'm a C++ programmer at heart. Once you look past the legacy nonsense, it has a really nice combination of speed and flexibility that no other mainstream language has really nailed.
+
+That combination inspired me make [Vale](https://vale.dev/), to see if we could make a high-performance language that has memory safety, but which also has that C++ flexibility and spirit. And in that quest, I've discovered some *surprising truths*.
+
+Languages like [Carbon](https://github.com/carbon-language/carbon-lang) and [CppFront](https://github.com/hsutter/cppfront) could even implement them as first-party concepts.
+</ignore>
+
+
+<$include "/sponsoring.vmd" />

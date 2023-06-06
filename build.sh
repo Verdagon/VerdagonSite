@@ -477,6 +477,16 @@ if [ $TARGET == "vale-memory-safe-cpp" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
+if [ $TARGET == "generics-compile-times" ] || [ $TARGET == "all" ] ; then
+  echo "Doing generics-compile-times"
+  echo $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/generics-compile-times src/draft/generics-compile-times.vmd
+  eval $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/generics-compile-times src/draft/generics-compile-times.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
 
 
 

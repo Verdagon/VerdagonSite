@@ -1,0 +1,356 @@
+---
+title: How Generics Could Affect Compilation Times
+author: Evan Ovadia
+date: June 7, 2023
+realm: blog
+path: blog/generics-compile-times
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+In the [Unexpected Quest](/blog/making-regions-part-2-generics) post, I talked about how we had to transition Vale's templates to full generics in order to implement Vale's [region borrowing](/blog/zero-cost-borrowing-regions-overview) feature which blends borrowing with shared mutability.
+
+
+I wanted _so badly_ to write more about generics in that article. There's so much weird potential in generics!
+
+
+Pull up a tree stump and listen, for I am about to enlighten you on how generics could actually make *compile times faster, enable much better cloud building, and maybe even help hot-code reloading.*
+
+
+<div><center><img src="/images/treestumpchair.jpg" style="max-height: 300px;"/><div style="opacity: .8">Pull up a chair!</div></center></div>
+
+
+# Development time is vital
+
+This is an important topic because *compile time is super important for a language.*
+
+
+When I can write changes, compile, and see the results within seconds, it's much easier to get immersed where I'm just thinking about the problem at hand.
+
+
+In that state of [flow](https://en.wikipedia.org/wiki/Flow_state), one looks up after a few minutes and it turns out _hours_ have passed. A ton of progress was made! When a language enables that, it's glorious.
+
+
+On other projects and languages, however, it might take an entire minute to compile. If it takes me ten compile-test cycles to solve a problem, then I've wasted ten minutes.
+
+
+Or if I'm unlucky, even more than that. I might get distracted, pull up reddit, check discord, or even play some [Pixel Dungeon](https://shatteredpixel.com/shatteredpd/) to my delightful detriment. Sometimes, I look up after twenty minutes and realize that it finished nineteen minutes ago.
+
+
+We've all been there. It's not just me, right?
+
+
+*Compile times are important.* So if we can make them faster, maybe distributed, and perhaps even make it so we can recompile a part of the program while it's still running, that'd be a *major win.*
+
+
+Let's see how generics can help us!
+
+
+<slice />
+
+# What's a template?
+
+Vale previously didn't have full generics, it had *templates*.
+
+
+<<<<
+Here's a function `PrintEqual` that will print "Equal!" if the two given things are equal.
+
+
+We're calling it with the `int` type, but we could also call it with `float`, `i32`, or anything with a `<` defined for it.
+
+
+We could even call `clamp` with a struct we make, such as a `MyFraction` struct. [# This would work only if we defined a `<` that takes `MyFraction`s, of course.]
+////
+
+```vale
+func PrintEqual<T>(a &T, b &T) {
+  if a == b {
+    println("Equal!");
+  } else {
+    println("Not equal!");
+  }
+}
+
+exported func main() {
+  PrintEqual(5, 5);
+  PrintEqual(5, 10);
+  PrintEqual(true, true); 
+  PrintEqual(true, false);
+  PrintEqual("hello", "world");
+}
+```stdout
+Equal!
+Not equal!
+Equal!
+Not equal!
+Not equal!
+```
+>>>>
+
+
+We're calling `PrintEqual` with three different types: `int`, `bool`, then `str`.
+
+
+Every time we call `PrintEqual` with a new type, it does two things:
+
+
+First, it copies the `PrintEqual` code, and substitute the right type in for `T`. For example, if `T` is `int`, we'd get:
+
+```vale
+func PrintEqual<int>(a int, b int) {
+  if a == b {
+    println("Equal!");
+  } else {
+    println("Not equal!");
+  }
+}
+```
+
+Second, it type-checks the resulting code.
+
+
+Looks a lot like generics! What's the difference?
+
+
+<slice />
+
+# The Difference
+
+A [generic function](https://docs.oracle.com/javase/tutorial/extra/generics/methods.html) is almost the same as a template function. It does those same two things.
+
+
+However, it does them in the reverse order. Specifically, it:
+
+ * Type-checks the PrintEqual function first.
+ * Later, "instantiate" (or "specialize" or "monomorphize"); *make a copy* for every type we use it with.
+
+
+You could say that it's a difference of when we type-check a function:
+
+ * With templates, we copy the un-typed AST, substitute something for `T`, then type-check.
+ * With generics, we type-check the AST, and for each type we copy the AST, substituting something for `T`.
+
+
+<slice />
+
+# Generics Can Be Faster
+
+
+For the above example, we only need to type-check a function once (`PrintEqual<T>`) with generics, instead of three separate times (`PrintEqual<int>`, `PrintEqual<bool>`, `PrintEqual<str>`) with templates.
+
+
+Type-checking can be pretty slow sometimes, so doing it once instead of three times is a nice win. Huzzah!
+
+
+Unfortunately, it doesn't help anything in later stages of compilation, when we still have to translate a function's three instantiations to machine code. Is there a way we can use generics to reduce that too?
+
+
+<slice />
+
+# Compile Speed via Type Erasure
+
+Yes there is! And it was beneath our noses the whole time.
+
+
+In 1995, a guy named James Gosling made an obscure little language name Java, and it didn't have templates or generics or anything.
+
+To accomplish the same thing as generics, the user would need to do a lot of type-casting.
+
+
+Instead of having a `Map<Integer, String>`, they would simply have a `Map`.
+
+
+<<<<
+To pull out a string like this:
+
+```
+String x = map.get(6);
+```
+////
+...people wrote:
+
+```
+String x = (String)map.get(6);
+```
+>>>>
+
+...because `Map`'s method `get` returned an `Object`.
+
+
+Everything returned an `Object`. There were no generics. It's similar to how we always cast to and from `void*` in C, and similar to how we often cast to and from `interface{}` in Go.
+
+
+Later on, Java wanted to add generics. However, to preserve backward-compatibility with existing JVMs, they made their generics a *compile-time concept*.
+
+The compiler knew about generics, but under the hood, the JVM still treated everything as an object.
+
+
+This is familiar to anyone who has used Typescript or mypy in Python. Generics are simply a compile-time abstraction; the VM in the end doesn't care about silly frivoloties like _types_. It just calls functions on `Object`s.
+
+
+This is a technique known as *type erasure*. After the typing phase, the compiler erases any information about generics, and reduces it to something that existing JVMs can understand.
+
+
+Type erasure has a hidden benefit: the compiler *doesn't need to instantiate generic functions*. [# Though, these languages do some instantiation at run-time with a technique known as "Just In Time" compilation.]
+
+Instead of translating a function's three instantiations to machine code, it *instantiates the original generic function directly to machine code.*
+
+Read on to see how that's possible!
+
+
+
+! Note that this is a post full of ideas, not live features. Generics are implemented in Vale, but it doesn't yet have type erasure, cloud compiling, or hot-code reloading.
+
+<slice />
+
+# Type Erasure to Reduce LLVM's Work
+
+
+Every native language with templates or generics like C++, Rust, etc. will have a monomorphization step, which creates many copies of generic functions, each with the right types substituted in.
+
+
+These copies then go to LLVM.
+
+
+LLVM is great, but as any compiler engineer knows, LLVM takes a *really, really long time*.
+
+
+For example, Cone's compiler spends [99.3% of its time in LLVM](https://pling.jondgoodwin.com/post/compiler-performance/).
+
+
+Here's why type-erasure is awesome: it means *our program contains less functions, which means LLVM doesn't have to do as much work.*
+
+
+<<<<
+For example, this program involves some functions:
+
+ * `func main()`
+ * `func List<T>() List<T>`
+ * `func add<T>(self List<T>, elem T)`
+ * `func get<T>(self List<T>, index int) T`
+ * (plus a few more) [# Specifically, `func println(x int)`, `func println(x bool)`, and `drop<T>(self List<T>)`]
+////
+```vale
+import stdlib.collections.list.*;
+
+exported func main() {
+  int_list = List<int>();
+  int_list.Add(7);
+  bool_list = List<bool>();
+  bool_list.Add(true);
+  println(int_list.Get(0));
+  println(bool_list.Get(0));
+}
+```stdout
+7
+true
+```
+>>>>
+
+
+And when the compiler monomorphizes the various generic functions, we end up with more functions:
+
+ * `func main()`
+ * `func List<T>() List<T>` becomes:
+    * `func List<int>() List<int>`
+    * `func List<bool>() List<bool>`
+ * `func add<T>(self List<T>, elem T)` becomes:
+    * `func add<int>(self &List<int>, elem int)`
+    * `func add<bool>(self &List<bool>, elem bool)`
+ * `func get<T>(self List<T>, index int) T` becomes:
+    * `func get<int>(self &List<int>, index int) int`
+    * `func get<bool>(self &List<bool>, index int) bool`
+ * (plus a few more) [# Specifically, `func println(x int)`, `func println(x bool)`, `drop<int>(self List<int>)`, and `drop<int>(self List<int>)`]
+
+
+But instead of monomorphizing, we could do something like Java does, and end up with:
+
+ * `func main()`
+ * `func List() List<Object>`
+ * `func add(self List<Object>, elem Object)`
+ * `func get(self List<Object>, index int) Object`
+ * (plus a few more) [# Specifically, `func println(x int)`, `func println(x bool)`, and `drop(self List<Object>)`]
+
+
+LLVM only has to compile these functions, instead of all the ones we saw before.
+
+
+Of course, type erasure can result in worse run-time speed, as it uses virtual calls instead of making multiple instantiations of functions. That's why this would all mainly be useful for *development mode* only.
+
+
+# Parallel compilation
+
+Without type erasure, we can't compile `func add<T>(self List<T>, elem T)` until we know what the `T` is.
+
+When we use type erasure, we eagerly compile it as `func add(self List<Object>, elem Object)`, we don't need to know what `T` is.
+
+
+This means that the compiler can compile `main` at the same time as it compiles `add`.
+
+
+Since our computers have multiple cores, we can compile these in parallel, and reduce our compilation times quite a bit.
+
+
+<slice />
+
+# Cloud compilation
+
+In fact, we could even compile `func add<T>(self List<T>, elem T)` once on some server somewhere, and translate it to machine code, in the form of a static library.
+
+
+When the user wants to depend on our `List` class, they can download the pre-compiled static library and just link with it, thus skipping the entire compilation step.
+
+
+There are some challenges here, of course.
+
+
+*Architecture:* The server might not know the end program's target achitecture.
+
+Perhaps the server could compile the most common ones (x86, Arm, etc.)? Or lazily compile and cache when a new architecture is requested.
+
+
+*Costs:* Vale is a completely free open-source language, and we don't have enough donations coming in to support cloud building.
+
+Perhaps we could just make the server a distributed cache, and have the users' machines do the compilation themselves. There might be some trust aspects to resolve there though.
+
+
+*Determinism:* This only works if the Vale compiler is completely deterministic.
+
+Luckily, determinism is [kind of Vale's thing](/blog/perfect-replayability-prototyped)!
+
+
+It's ideas like this that make me love compiler development. So many interesting challenges and solutions!
+
+
+<slice />
+
+# Hot-Code Reloading
+
+*Hot-code reloading* is where we can change the code while the program is running, and observe the changes without restarting the program.
+
+
+This is common for languages like Java and Kotlin whose runtime makes this much easier, but it's proven quite challenging for native languages. [# [Jakub Konka](http://www.jakubkonka.com/) has been making great strides here, he got [hot-code reloading on macOS/arm64 with Zig](http://www.jakubkonka.com/2022/03/16/hcs-zig.html)!]
+
+
+I think type erasure will make this easier, because when we change one function's source code, we only need to update one function in the (running) binary.
+
+
+# Conclusion
+
+With all this, I hope we can make Vale's compilation ridiculously fast, so we can all get into that nice state of flow when coding.
+
+
+Who would have guessed that generics could be the key?
+
+
+That's all, thanks for reading! I hope you enjoyed this article. If you have any questions, feel free to join the [discord](https://discord.gg/SNB8yGH) or [subreddit](https://reddit.com/r/vale) or reach out via [twitter](https://twitter.com/verdagon)!
+
+
+Cheers!
+
+- Evan Ovadia
+
+
+<$include "/sponsoring.vmd"/>
