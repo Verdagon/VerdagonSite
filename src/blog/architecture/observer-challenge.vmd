@@ -1,7 +1,7 @@
 ---
 title: The Zero-Cost Observer Challenge
 author: Evan Ovadia
-date: Apr 8, 2022
+date: June 6, 2023
 realm: blog
 path: blog/rust-observer-challenge
 layout: annotated
@@ -157,7 +157,10 @@ The rules of the challenge:
 This challenge may or may not have a solution.
 
 
-In doing this challenge, you will learn some important things about the borrow checker. When you think you have the answer, take a look at the [Observer Challenge Conclusion](/blog/observer-challenge-conclusions). *Before you look at the conclusion,* make sure you've read the above rules! It's easy to miss them.
+In doing this challenge, you will learn some important things about the borrow checker.
+
+
+<ignore>When you think you have the answer, take a look at the [Observer Challenge Conclusion](/blog/observer-challenge-conclusions). *Before you look at the conclusion,* make sure you've read the above rules! It's easy to miss them.</ignore>
 
 
 Good luck!

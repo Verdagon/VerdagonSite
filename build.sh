@@ -427,6 +427,16 @@ if [ $TARGET == "making-regions-part-2-generics" ] || [ $TARGET == "all" ] ; the
   fi
 fi
 
+if [ $TARGET == "making-regions-part-3-chasing-myths" ] || [ $TARGET == "all" ] ; then
+  echo "Doing making-regions-part-3-chasing-myths"
+  echo $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/making-regions-part-3-chasing-myths src/draft/making-regions/making-regions-part-3-chasing-myths.vmd
+  eval $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/making-regions-part-3-chasing-myths src/draft/making-regions/making-regions-part-3-chasing-myths.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
 if [ $TARGET == "making-regions-part-7-results" ] || [ $TARGET == "all" ] ; then
   echo "Doing making-regions-part-7-results"
   echo $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/making-regions-part-7-results src/draft/making-regions/making-regions-part-7-results.vmd

@@ -240,7 +240,7 @@ However, a real software engineer puts their bias aside, and strives to know _wh
 
 Sometimes, we need memory safety to protect against very real risks:
 
- * When working with untrusted input, it can help protect us against security breaches.
+ * When working with untrusted input (e.g. network-connected programs or drivers), it can help protect us against security breaches.
  * When working with multiple users' data, it can help protect their privacy from errant use-after-free reads.
  * When working on safety critical devices, it can protect our users from harm.
 
@@ -254,10 +254,16 @@ Let's talk more about these risks and when they occur.
 ### Memory Safety for Security-Sensitive Situations
 
 
-Some programs handle untrusted input, such as web servers. An attacker can carefully craft input that takes advantage of UB to gain access to sensitive data or take control of the system. Memory safety helps guard against that.
+Some programs handle untrusted input, such as web servers, certain drivers, etc. An attacker can carefully craft input that takes advantage of UB to gain access to sensitive data or take control of the system. Memory safety helps guard against that.
 
 
 For example, if working on a server or a multiplayer game, you're handling a lot of untrusted input and you'll want memory safety to help with that.
+
+
+Another example would be when writing a bluetooth driver. These radio waves could be coming from anywhere, and an attacker could craft an exactly right pattern to cause mischief and mayhem for the user.
+
+
+In cases like these, we need to be careful and use more memory safe approaches.
 
 
 However, not all programs handle untrusted input. [# "Untrusted input" can also be in the form of files. But if those files came with the program, such as assets for a game, then they are [trusted input and not as much of a problem](https://news.ycombinator.com/item?id=32879598).]
@@ -266,7 +272,7 @@ However, not all programs handle untrusted input. [# "Untrusted input" can also 
 For example, the [Google Earth](https://earth.google.com/web/) app is written in a non-memory-safe language but it only takes input from the user and from a trusted first-party server, which reduces the security risk. [# Its sandboxing also helps, whether from webassembly, iOS, or Android.]
 
 
-In cases like these, security doesn't need to be as much of a factor in language choice.
+In cases like those, security doesn't need to be as much of a factor in language choice.
 
 
 <slice />

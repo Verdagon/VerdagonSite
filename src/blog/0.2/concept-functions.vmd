@@ -50,7 +50,7 @@ func battle<T>(attacker T, defender T)
 
 
 
-The only existing language today which can accomplish something like this is C++, with its `requires requires` clause:
+The only mainstream language today which can accomplish something like this is C++, with its `requires requires` clause: [# Nim can do this too! See Nim's [concepts](https://nim-lang.org/docs/manual_experimental.html#concepts), plus an ongoing [redesign](https://github.com/nim-lang/RFCs/issues/168). Thank you [ZoomRmc](https://github.com/Verdagon/VerdagonSite/issues/17)!]
 
 ```c++
 template<typename T>

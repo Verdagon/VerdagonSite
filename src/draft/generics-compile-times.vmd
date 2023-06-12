@@ -1,5 +1,5 @@
 ---
-title: How Generics Could Affect Compilation Times
+title: The Link Between Generics, Compile Times, Type-Erasure, Cloud Building, and Hot-Code Reloading
 author: Evan Ovadia
 date: June 7, 2023
 realm: blog
@@ -182,7 +182,7 @@ String x = (String)map.get(6);
 Everything returned an `Object`. There were no generics. It's similar to how we always cast to and from `void*` in C, and similar to how we often cast to and from `interface{}` in Go.
 
 
-Later on, Java wanted to add generics. However, to preserve backward-compatibility with existing JVMs, they made their generics a *compile-time concept*.
+Later on, Java wanted to add generics. However, to preserve compatibility with existing JVMs, they made their generics a *compile-time concept*.
 
 The compiler knew about generics, but under the hood, the JVM still treated everything as an object.
 
@@ -201,7 +201,7 @@ Read on to see how that's possible!
 
 
 
-! Note that this is a post full of ideas, not live features. Generics are implemented in Vale, but it doesn't yet have type erasure, cloud compiling, or hot-code reloading.
+! Note that this is a post full of ideas, not live features. Generics are implemented in Vale now, but it doesn't yet have type erasure, cloud compiling, or hot-code reloading.
 
 <slice />
 
@@ -265,7 +265,7 @@ And when the compiler monomorphizes the various generic functions, we end up wit
  * (plus a few more) [# Specifically, `func println(x int)`, `func println(x bool)`, `drop<int>(self List<int>)`, and `drop<int>(self List<int>)`]
 
 
-But instead of monomorphizing, we could do something like Java does, and end up with:
+But instead of monomorphizing, we could do something like Java does, and end up with: [# We're not the first to think of this! [Inko](https://inko-lang.org/) has been [thinking about this for a while now](https://github.com/inko-lang/inko/issues/525).]
 
  * `func main()`
  * `func List() List<Object>`
@@ -282,12 +282,12 @@ Of course, type erasure can result in worse run-time speed, as it uses virtual c
 
 # Parallel compilation
 
-Without type erasure, we can't compile `func add<T>(self List<T>, elem T)` until we know what the `T` is.
+Without type erasure, we need to know `T` before we can compile `func&nbsp;add<T>(self&nbsp;List<T>,&nbsp;elem&nbsp;T)` to anything.
 
-When we use type erasure, we eagerly compile it as `func add(self List<Object>, elem Object)`, we don't need to know what `T` is.
+With type erasure, we can eagerly compile it to `func&nbsp;add(self&nbsp;List<Object>,&nbsp;elem&nbsp;Object)`, we don't need to know what `T` is.
 
 
-This means that the compiler can compile `main` at the same time as it compiles `add`.
+With type erasure, we can start compiling `add` right away. In fact, we could do it *at the same time* as `main`.
 
 
 Since our computers have multiple cores, we can compile these in parallel, and reduce our compilation times quite a bit.
@@ -312,6 +312,8 @@ Perhaps the server could compile the most common ones (x86, Arm, etc.)? Or lazil
 
 
 *Costs:* Vale is a completely free open-source language, and we don't have enough donations coming in to support cloud building.
+
+(By the way, you should totally [sponsor Vale](https://github.com/sponsors/ValeLang), I'd love to do this full-time!)
 
 Perhaps we could just make the server a distributed cache, and have the users' machines do the compilation themselves. There might be some trust aspects to resolve there though.
 
@@ -339,7 +341,10 @@ I think type erasure will make this easier, because when we change one function'
 
 # Conclusion
 
-With all this, I hope we can make Vale's compilation ridiculously fast, so we can all get into that nice state of flow when coding.
+These are all just crazy ideas, but I really want to make that first one happen. Type-erasure for faster compile times in development mode would be pretty incredible.
+
+
+With that, we can make Vale's compilation ridiculously fast, so we can all get into that nice state of flow when coding.
 
 
 Who would have guessed that generics could be the key?

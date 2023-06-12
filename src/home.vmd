@@ -16,6 +16,7 @@ I use this site to blog about my endeavors. Enjoy!
 
 # Recent posts:
 
+ * [The Link Between Generics, Compile Times, Type-Erasure, Cloud Building, and Hot-Code Reloading](/blog/generics-compile-times)
  * [What Vale Taught Me About Linear Types, Borrowing, and Memory Safety](/blog/linear-types-borrowing)
  * [Implementing Vale's Region Borrowing, and its Unexpected Quest](/blog/making-regions-part-2-generics)
  * [How To Survive Your Project's First 100,000 Lines](/blog/first-100k-lines)

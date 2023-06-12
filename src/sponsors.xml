@@ -25,6 +25,16 @@
       </image-->
 
       <item>
+         <title>The Link Between Generics, Compile Times, Type-Erasure, Cloud Building, and Hot-Code Reloading</title>
+         <guid>https://verdagon.dev/blog/generics-compile-times</guid>
+         <link>https://verdagon.dev/blog/generics-compile-times</link>
+         <pubDate>Sun, 6 Jun 2023 00:00:00 -0500</pubDate>
+         <category>Programming Languages</category>
+         <category>Vale Programming Language</category>
+         <author>noreply@verdagon.dev (Evan Ovadia)</author>
+      </item>
+
+      <item>
          <title>Vale's First Regions Prototype</title>
          <guid>https://verdagon.dev/blog/first-regions-prototype</guid>
          <link>https://verdagon.dev/blog/first-regions-prototype</link>

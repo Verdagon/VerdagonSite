@@ -14,17 +14,17 @@ namespace: c-blog m-annotated
 Single ownership is once of those concepts that's both easier and more powerful than we realize.
 
 
-Alas, people often think single ownership is more complex than it really is, because it most often appears in languages that are already complex for separate reasons.
+People often think it's complex, because it most often appears in languages that are already complex for separate reasons.
 
 
-I want to dispel that myth, and redesign it from first principles.
+Let's *dispel that myth*, and figure out what it really is!
 
 
 Even if you already know what single ownership is, you'll probably find some interesting surprises:
 
- * You don't need a borrow checker for memory-safe single ownership.
- * You can use it to enforce all sorts of guarantees at compile time.
- * You can blend it with other memory management techniques!
+ * You *don't need a borrow checker* for memory-safe single ownership.
+ * You can use it to enforce all sorts of *compile-time guarantees*.
+ * You can *blend it* with other memory management techniques!
 
 
 Below, I'll explain single ownership from a C foundation, and then we'll see the _weird_ things it can do.
