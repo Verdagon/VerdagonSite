@@ -1,95 +1,30 @@
+---
+title: From C to Single Ownership and Memory Safety without Borrow Checking, Reference Counting, or Garbage Collection
+subtitle: this one simple trick language designers don't want you to know
+realm: blog
+date: June 15, 2023
+path: blog/c-to-single-ownership-without-borrow-checking-rc-gc
+layout: annotated
+author: Evan Ovadia
+sponsor: me
+namespace: c-blog m-annotated
+---
 
 
-
-# Higher RAII
-
-What ultimately led me to discovering this memory-safe C++ is something called Higher RAII.
-
-(talk about linear_ptr, mention https://lifecs-static.likai.org/piled-higher-and-deeper.pdf, say that it only works at runtime which is a tad unfortunate)
-
-talk about the benefits of higher raii.
-
-Everything we've talked about so far is compatible with Higher RAII.
+Single ownership is one of those concepts that's both easier and more powerful than we realize.
 
 
-_this_ is the true potential of C++'s unique_ptr.
+People often think it's complex, because it most often appears in languages that are already complex for separate reasons.
 
 
-This might sound familiar to some of you: these are linear types!
-
-
-## Exceptions
-
-In Earth, and my roguelikes, and the Vale compiler, we didn't really use exceptions, so this wasn't much of a problem. However, in a codebase that does have exceptions, we could hit an assert and bring down the program pretty quickly, which defeats the benefits of exceptions in codebases that do choose to use them.
-
-I admit, I am not sure how to get this to work with exceptions. In Vale, we'd have a `__unwind` function that's invoked when we do unwinding.
-
-
-## Linear-Aliasing Model
-
-In a way, we have a model here that combines the benefits of linear typing (via linear_ptr) with the benefits of mutable aliasing (via constraint_ref or gen_ref).
-
-
-
-
-
-
-This is where Rust kind of missed the boat. You're not able to move out of structs _at all_. Once something's in a struct, it's in it forever. C++ lets you do this though.
-
-*Rule 4:* When destroying a containing struct, first move everything out of its fields.
-(not actually needed since we arent talking about linear types?)
-
-This is an easy rule to follow for `unique_ptr` local variables. It would be tricky to follow for structs, but we'll resolve that difficulty further below.
-
-
-
-
-
-
-I found these techniques through designing and using the language Vale, which was originally motivated by the question: Can we design a memory-safe C++ without sacrificing any of its speed or flexibility?
-
-
-[# E: "I had been using C++ for 13 or 14 years before Vale showed me these truths about C++, so some of it might come as a surprise to some of you as well."]
-
-
-somewhere: This isn't without some tradeoffs. But it's a nice tool to have in your toolbox, to use where it makes sense. And even if you don't use it directly, it can sometimes be nice to have another mode of thinking, to spur alternate solutions in your own codebase.
-
-
-
-
-
-
-if we want to get combative:
-
-memory safety is always a nice thing to have, as long as we don't give up too much to achieve it. the unfortunate truth about reference counting, garbage collection, and borrow checking is that they seem to be utterly pervasive.
-
-if your language forces you to use it where you don't necessarily need it, and it has some sort of complexity cost, then it can have some downsides.
-
-what we really want is a way to add a bit of memory safety
-
-i'm about to show you a method of memory safety that is a little more 
-
-
-
-
-
-
-
-
-Single ownership is once of those concepts that's both easier and more powerful than we realize.
-
-
-Alas, people often think single ownership is more complex than it really is, because it most often appears in languages that are already complex for separate reasons.
-
-
-I want to dispel that myth, and redesign it from first principles.
+Let's *dispel that myth*, and figure out what it really is!
 
 
 Even if you already know what single ownership is, you'll probably find some interesting surprises:
 
- * You don't need a borrow checker for memory-safe single ownership.
- * You can use it to enforce all sorts of guarantees at compile time.
- * You can blend it with other memory management techniques!
+ * You *don't need borrow checking* for memory-safe single ownership.
+ * You can use it to enforce all sorts of *compile-time guarantees*.
+ * You can *blend it* with other memory management techniques!
 
 
 Below, I'll explain single ownership from a C foundation, and then we'll see the _weird_ things it can do.
@@ -100,13 +35,15 @@ Below, I'll explain single ownership from a C foundation, and then we'll see the
 With manual memory management, we usually make it clear who's responsible for eventually freeing certain memory, via documentation or naming.
 
 
-For example, `strdup` will return a heap-allocated buffer, which the caller then owns. GLib's `strdup` [documentation](https://docs.gtk.org/glib/func.strdup.html) says "The caller of the function takes ownership of the data, and is responsible for freeing it."
+For example, `strdup` will return a heap-allocated buffer, which the caller then owns. From GLib's `strdup` [documentation](https://docs.gtk.org/glib/func.strdup.html):
+
+> The caller of the function takes ownership of the data, and is responsible for freeing it.
 
 
-We then make sure that we eventually deliver these "owned" data to another function that destroys them.
+So we make sure to eventually deliver this data to another function that destroys it.
 
 
-If we don't do that, we get a memory leak.
+If we don't do that, we get a memory leak; the memory is unusable for the rest of the program's run.
 
 ```c
 void main() {
@@ -116,6 +53,7 @@ void main() {
   printf("Real path: %s\n", myBuffer);
 
   // uh oh, we forgot to free(myBuffer)!
+  // Memory leak.
 }
 ```
 
@@ -138,7 +76,7 @@ void main() {
 As any C programmer knows, we *carefully track who owns the data*, all the way from when it's created, to when it's finally destroyed.
 
 
-At any given time in between, we can generally identify who conceptually "owns" certain data, whether it be a certain local variable or a field in some struct somewhere.
+At any given time in between, we can generally identify who "owns" certain data, whether it be a certain local variable or a field in some struct somewhere.
 
 
 Of course, other pointers to the data can exist, they just don't _own_ the data. We have a *mental distinction* between owning pointers and non-owning pointers.
@@ -149,8 +87,11 @@ If you've ever implemented a balancing binary search tree like a [red-black tree
 
 Single ownership isn't just for pointers and `malloc` and `free`, it's to anything that we have a *future responsibility* for.
 
+
 For example, `pthread_create` creates a handle that we're responsible for eventually `pthread_destroy`ing. We generalize this a bit more later, but for now let's just think about heap allocations.
 
+
+<slice />
 
 # How might we track it?
 
@@ -209,21 +150,22 @@ void main() {
 
 
 
-In a way, we're *tracking responsibility for freeing the buffer*.
+In a way, these rules help us *track responsibility for freeing the buffer*.
 
 
 Keep the phrase "tracking responsibility" in mind, we'll build on that later to make the system help us with much more than managing memory.
 
 
-# How a compiler can track it
+<slice />
 
+# How a compiler can track it
 
 If we were to craft a C-like language, then instead of using a suffix like `char* myBuffer_owning`, we might use a symbol on the type, like: `char^ myBuffer`.
 
 
 When you look at it that way, it's kind of like `char`, `char^`, and `char*` are all different types:
 
- * `char` is an *owned value*, owned by the containing stack frame, struct, or array.
+ * `char` is an (owned) *value*, owned by the containing stack frame, struct, or array.
  * `char^` is an *owning pointer* to something in the heap.
  * `char*` is a *non-owning pointer*.
 
@@ -272,9 +214,10 @@ Spaceship^ makeSpaceship() {
 
 
 
-These rules are sometimes known as "move semantics".
+These rules are sometimes known as *move semantics*.
 
 
+<slice />
 
 # Let's keep it weird
 
@@ -292,17 +235,19 @@ Of course, we're not doing any of that.
 Let's see what interesting things happen!
 
 
+<slice />
+
 # Higher RAII, and compile-time guarantees
 
-Recall Rule 2: We can't let an owning variable (or field) go out of scope, the only way to destroy it is to explicitly `move` it or give it to `free`.
+Recall Rule 2: The user can't let an owning variable (or field) go out of scope, the only way to destroy it is to _explicitly_ `move` it or give it to `free`.
 
 
 Because of this, if you accidentally let an owning pointer go out of scope, you'll get a compiler error.
 
 
-You can use this to your advantage, using a technique called "Higher RAII". [# Higher RAII is similar to linear typing. An owning reference is a linear type, but when we can also make non-owning references to the same object, we get Higher RAII.]
+You can use this to your advantage, using a technique called "Higher RAII", which is similar to linear types. [# Higher RAII is similar to linear typing. An owning reference is a linear type, but when we can also make non-owning references to the same object, we get Higher RAII.]
 
-Basically, if you want your caller to remember to do something later, give them ownership of a "reminder" object.
+Basically, if you want your caller to remember to do something later, give them ownership of a "reminder" object that they can't accidentally drop. [# "Drop" here means to let the compiler clean it up with some default action.]
 
 
 This technique is incredibly powerful. With it, the compiler can enforce that you:
@@ -311,10 +256,13 @@ This technique is incredibly powerful. With it, the compiler can enforce that yo
  * Remember to remove something from a cache that you previously added to.
  * Remember to explicitly rollback or commit a transaction.
  * Remember to join a thread and do something with the thread function's result.
+ * Remember to explicitly force-close a TCP connection or wait for a graceful close.
 
 
 More generally, it means the compiler can *ensure you remember to do something in the future* and don't accidentally forget it.
 
+
+<slice />
 
 ## An Example
 
@@ -333,7 +281,7 @@ Some facts about our game's code:
 If we forget to remove it from the display cache, we'd get an odd bug when displaying.
 
 
-Let's use single ownership to prevent this bug at compile-time.
+Let's use single ownership to prevent this bug at compile-time. No mainstream language prevents this kind of bug, but we're about to do it easily!
 
 
 We already have a function that will add the ship to the display cache, which looks like this:
@@ -347,7 +295,7 @@ void AddShipToDisplayCache(DisplayCache* cache, Ship* ship) {
 
 
 
-Let's instead return a "reminder" object:
+Let's instead return a "reminder" object: [# This `ShipInCacheReminder^` could even just be a `ShipInCacheReminder` if the compiler knows to not drop `ShipInCacheReminder`s, such as how in Vale it's decided on a per-type basis.]
 
 
 ```c
@@ -365,7 +313,7 @@ ShipInCacheReminder^ AddShipToDisplayCache(DisplayCache* cache, Ship* ship) {
 The compiler prevents us from accidentally dropping this `ShipInCacheReminder^`; we must explicitly `move` or `free` it. That makes it a very effective reminder.
 
 
-The only place we'll ever `free` it is in the `RemoveShipFromDisplayCache` function:
+The only place we'll ever `free` it is in the `RemoveShipFromDisplayCache` function: [# We could get around this system by maually `free`ing it elsewhere. We'd have to go out of our way to cause that bug, so it's not as worrisome.]
 
 
 ```c
@@ -380,11 +328,14 @@ void RemoveShipFromDisplayCache(
 
 
 
-Voilà! The compiler now guarantees that we'll not forget to `RemoveShipFromDisplayCache`. Let's see what happens if we forget, and how the compiler protects us.
+Voilà! The compiler now guarantees that we'll not forget to `RemoveShipFromDisplayCache`.
+
+
+Let's see it more in context, and get a clearer picture of how this is used.
 
 
 <<<<
-Personally, I prefer storing the reminder next to the `Ship` itself. For example, instead of a central list of `Ship`, we might have a central list of `ShipAndMetadata` which contains a `Ship` and all the reminder objects for it.
+Personally, I prefer storing the reminder next to the `Ship^` itself. For example, instead of a central list of `Ship^`, we might have a central list of `ShipAndMetadata^` which contains a `Ship^` and all the reminder objects for it.
 ////
 ```c
 struct ShipAndMetadata {
@@ -412,7 +363,7 @@ void DestroyShip(
 >>>>
 
 <<<<
-To fix that error, we move things out first. The compiler knows that we'll need to `move` things out and then immediately `free` them. [# This is so common thing that languages like Vale can just "move-destructure" to do this, e.g. `[ship, shipInCache] = shipAndMetadata;`.]
+The compiler knows we need to `move` fields out before `free`ing the container, so let's move things out first. [# This is so common thing that languages like Vale can just "move-destructure" to do this, e.g. `[ship, shipInCache] = shipAndMetadata;`.]
 
 
 We also free `ship` here. However, the `shipInCache` was not dealt with, so the compiler notices that and throws an error.
@@ -436,29 +387,28 @@ void DestroyShip(
 That's good! We don't want the compiler to leak or even `free` that reminder automatically, that would defeat the purpose.
 
 
-<<<<
-To fix it, we'll call `RemoveShipFromDisplayCache`.
-////
+To fix it, we'll call `RemoveShipFromDisplayCache`:
+
 ```c
 void DestroyShip(
     DisplayCache* cache,
     ShipAndMetadata^ shipAndMetadata) {
   Ship^ ship = move shipAndMetadata.ship;
-  ShipInCacheReminder^ shipInCache =
-      move shipAndMetadata.shipInCache;
+  ShipInCacheReminder^ shipInCache = move shipAndMetadata.shipInCache;
   free(move shipAndMetadata);
 
-  RemoveShipFromDisplayCache(
-      cache, &ship, move shipInCache);
+  // Gets rid of the shipInCache
+  RemoveShipFromDisplayCache(cache, &ship, move shipInCache);
+
+  // Gets rid of the ship
   free(move ship);
 
   // No errors!
 }
 ```
->>>>
 
 
-As a bonus, this technique prevents us from accidentally doing `RemoveShipFromDisplayCache` twice, because there's only one reminder object instance. [# So far, this technique doesn't prevent us from removing the wrong `Ship`. If it turns out to be a problem in practice, we could put the `Ship`'s ID into the `ShipInCacheReminder`, though it would take some space.]
+As a bonus, this technique prevents us from accidentally doing `RemoveShipFromDisplayCache` twice, because there's only one reminder object instance. [# So far, this technique doesn't prevent us from removing the wrong `Ship`. If we want, we could prevent that by putting the `Ship`'s ID into the `ShipInCacheReminder`.]
 
 
 They say the biggest two problems in computer science are off-by-one errors and cache invalidation. We just solved the latter!
@@ -466,6 +416,8 @@ They say the biggest two problems in computer science are off-by-one errors and 
 
 If you want to learn more about this, check out [Vale's Higher RAII, the pattern that saved me a vital 5 hours in the 7DRL Challenge](/blog/higher-raii-7drl), where I used this exact technique to remember to remove things from a cache.
 
+
+<slice />
 
 # Memory Safety
 
@@ -491,7 +443,7 @@ It does sound insane! But we can refactor any program to not use non-owning poin
  1. Any struct that stores a non-owning pointer would instead store an index (or ID) into some central data structure.
 
 
-I go into this "linear style" a bit more in [What Vale Taught Me About Linear Types, Borrowing, and Memory Safety](/blog/linear-types-borrowing), check it out!
+If you want to read more about this "linear style", check out [last week's article](/blog/linear-types-borrowing) on how Vale taught me about all of this. Vale's [Linear-Aliasing Model](https://vale.dev/linear-aliasing-model) is about using linear style, and falling back to [generational references](/blog/generational-references) when the user chooses not to use it.
 
 
 If you've ever used a language with a [linear type system](https://en.wikipedia.org/wiki/Substructural_type_system#Linear_type_systems) like [Austral](https://austral-lang.org/), this will sound familiar.
@@ -504,6 +456,8 @@ After a few hours of using this style, it actually feels pretty similar to Rust.
 
 If we want to add non-owning pointers back in while keeping our newfound memory safety, there are a few ways we can go about it.
 
+
+<slice />
 
 ## Memory Tagging and CHERI
 
@@ -520,9 +474,11 @@ Even though these asserts have a 1/16 chance of a false negative, this is great 
 [CHERI](https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/) is still in the R&D phase, but it seems like it will solve a lot of memory tagging's downsides.
 
 
+<slice />
+
 ## Borrow Checking
 
-Of course, there's always Rust's borrow checking approach! It enforces that if someone has a mutable reference to an object, no other references can exist. This simple rule gives us non-owning pointers with full memory safety.
+Of course, there's always Rust's borrow checking approach! It enforces that if someone has a mutable reference to an object, no other references can exist. This simple rule gives us temporary non-owning pointers with full memory safety.
 
 
 It has some really nice benefits:
@@ -533,14 +489,18 @@ It has some really nice benefits:
 
 But also some drawbacks:
 
- * It can be difficult for time management and [development velocity](/blog/when-to-use-memory-safe-part-2).
  * It doesn't let us use common patterns like observers, graphs, back-references, dependency references, intrusive data structures, delegates, and struggles with certain kinds of RAII and interconnected data.
- * It doesn't let us use Higher RAII. [# This is because the borrow checker often forces non-owning reference fields to be function parameters instead, but destructors can't take in parameters.]
+ * It can be difficult for time management and [development velocity](/blog/when-to-use-memory-safe-part-2).
 
+
+I would love to see a language that has both linear types and borrow checking. [Austral](https://austral-lang.org/) is looking pretty promising here. Rust gets close, but its affine types can't get the specific compile-time guarantees of linear types and higher RAII. [# All types in Rust must be affine, in other words all types must have a zero-arg no-return `drop` method defined, so that Rust can automatically drop any type when it goes out of scope. This conflicts with higher RAII, which is all about requiring _explicit_ destruction of certain types.] [# Some folks have been [thinking](http://smallcultfollowing.com/babysteps/blog/2023/03/16/must-move-types/) [about](https://blog.yoshuawuyts.com/linearity-and-control/) what it would take for Rust to do full linear types. It sounds pretty promising, and I hope it happens!]
+
+
+<slice />
 
 ## Generational References
 
-[Vale](https://vale.dev/)'s [generational references](/blog/generational-references) is like a 64-bit memory tagging system, but it uses the language's semantics to skip as many assertions as the user wants.
+[Vale](https://vale.dev/)'s [generational references](/blog/generational-references) is like a 64-bit memory tagging system, but it uses the language's semantics to skip as many assertions as the user wants. [# Specifically, [regions](/blog/zero-cost-borrowing-regions-overview) eliminate the vast majority, and we can use [linear style](/blog/linear-types-borrowing) to eliminate the rest.]
 
 
 It has a some benefits:
@@ -555,18 +515,47 @@ It has its drawbacks too, of course:
 
  * It has a "key" at the top of every allocation, though structs and enums share the key of the containing struct, array, or stack frame to save space.
  * Its non-owning references are 128 bits (like CHERI's), though they can be avoided with the above linear style.
+ * When we choose to dereference a generational reference, it does a check at run-time similar to a bounds check.
 
 
 This combination of generational references and regions is my favorite approach, especially since it still lets us use Higher RAII.
 
 
+# Other Approaches
+
+There are a few other approaches we can use to add non-owning pointers back in while preserving memory safety:
+
+ * [Mutable value semantics](http://www.jot.fm/issues/issue_2022_02/article2.pdf).
+ * Arenas with [region borrowing](/blog/zero-cost-borrowing-regions-overview).
+ * [Constraint references](/blog/raii-next-steps).
+ * [MMM++](/blog/when-to-use-memory-safe-part-1#the-safer-way-to-use-mmm-languages)
+ * [Basil memory stacks](https://degaz.io/blog/632020/post.html)
+ * [Missile memory management](https://devblogs.microsoft.com/oldnewthing/20180228-00/?p=98125) (not just a joke, many compilers do this!)
+ * [SPARK](https://en.wikipedia.org/wiki/SPARK_%28programming_language%29)
+
+...but this post is getting quite large already! [# One day I'd really like to write a series on the surprising number of mechanisms for memory safety. We often think it's just reference counting, tracing garbage collection, and borrow checking, but it turns out there are a lot more.]
+
+
+<slice />
+
 # What does it all mean?
 
-Single ownership is a _lot_ more powerful than we thought. Even without reference counting, garbage collection, or borrow checking, we can use it for memory safety _and_ extra guarantees at compile-time.
+Single ownership is a _lot_ simpler and more powerful than people realize. Even without reference counting, garbage collection, or borrow checking, we can use it for memory safety _and_ extra guarantees at compile-time.
 
 
+I hope languages will start moving in this direction. C++ pioneered single ownership with `unique_ptr` and Rust added memory safety, but both are affine [# Affine means the compiler must always be able to drop data automatically when it goes out of scope.] [# I was hoping that by using `= delete;` on a constructor in C++ we could get a linear type. Alas, no such luck.] so don't get higher RAII's compile-time guarantees. 
 
-*That's all for now!* I hope you enjoyed this article. Keep an eye out for the next one on our [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), [discord server](https://discord.gg/SNB8yGH), or [subreddit](https://reddit.com/r/vale)!
+
+Austral uses linear types for its memory safety, and built their entire language around them to great effect. They wrote up a really great [Introduction to Linear Types](https://austral-lang.org/linear-types) too, definitely worth checking out. [# Austral's creator was the first person I talked to when I realized all of this!]
+
+
+[Vale](https://vale.dev/) has both linear and affine types, plus generational references on top. The user might decide that `Ship`s are affine and `ShipInCacheReminder`s are linear, and can have references to either of them. We also just successfully used [regions](/blog/first-regions-prototype) to eliminate most of generational references' downsides, though it's still quite experimental.
+
+
+Next week I'll be writing about how we can use these techniques (and a few others) to design some memory safety for C++, so keep an eye on the [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), [discord server](https://discord.gg/SNB8yGH), or [subreddit](https://reddit.com/r/vale)!
+
+
+*That's all for now!* If you enjoyed this article, please consider [sponsoring](https://github.com/sponsors/ValeLang)!
 
 
 See you next time!
@@ -575,17 +564,4 @@ See you next time!
 - Evan Ovadia
 
 
-<slice new-color="afterword"/>
-
-
-
-
-
-
-
-
-
-[Bjarne](https://www.stroustrup.com/quotes.html) once said, "Within C++, there is a much smaller and cleaner language struggling to get out." and we're really starting to see that here.
-
-
-I've always felt this, but I didn't see the truth until I embarked on a quest to discover better ways to do memory safety, which eventually led me to discover [Vale](https://vale.dev/)'s [linear-aliasing model](https://vale.dev/linear-aliasing-model).
+<$include "/sponsoring.vmd" />

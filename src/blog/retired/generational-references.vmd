@@ -11,6 +11,9 @@ sponsor: me
 ---
 
 
+! This article describes the heap-only version of generational references. Experimental versions of Vale are using the faster random generational references technique, more information on that soon.
+
+
 *Generational references* are a new memory management technique that's easy, deterministic, and _very_ fast.
 
 

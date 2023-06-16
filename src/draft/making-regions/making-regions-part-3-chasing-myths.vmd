@@ -1,8 +1,7 @@
 ---
-title: Chasing the Myth of Zero-Cost Memory Safety, plus pictures of mythical birds!
-subtitle: Implementing a New Memory Safety Approach, Part 3
+title: Chasing the Myth of Zero-Overhead Memory Safety (plus pictures of mythical birds!)
 author: Evan Ovadia
-date: May 20, 2022
+date: June 19, 2022
 realm: blog
 path: blog/making-regions-part-3-chasing-myths
 layout: annotated
@@ -14,25 +13,25 @@ sponsor: us
 In my recent [article](/blog/linear-types-borrowing), I mentioned that linear types can provide memory safety without a borrow checker, reference counting, or tracing garbage collection.
 
 
-Mike asked, "So linear types give zero-cost memory safety, like borrow checking?"
+Someone named Mike asked, "So linear types give zero-overhead memory safety, like borrow checking?"
 
 
-"Perhaps," I said. "What do you mean by zero-cost memory safety? Do you mean zero-cost abstraction?" [# Memory safety being a zero-cost abstraction means that if you're not using a certain method of memory safety, you're not paying any costs for the option.]
+"Perhaps," I said. "What do you mean by zero-overhead memory safety? Do you mean like zero-cost abstractions?" [# Memory safety being a zero-overhead abstraction means that if you're not using a certain method of memory safety, you're not paying any costs for the option.]
 
 
-"No, I mean there's no run-time overhead for memory safety like from RC, GC, or gen refs." he said.
+"No, I mean no run-time overhead, like from RC, GC, or generations." he said.
 
 
-A long conversation ensued, with an interesting conclusion: *zero-cost memory safety doesn't actually exist, and never has!*
+A long conversation ensued, with an interesting conclusion: *zero-overhead memory safety doesn't actually exist, and never has.*
 
 
 This will come as a surprise to a lot of people, who believe various approaches have no memory safety overhead.
 
 
-Let's embark on a little expedition, to find a language with zero-cost memory safety!
+Let's embark on a little expedition, to find a language with zero-overhead memory safety!
 
 
-# Arrrlang, a pirate-themed language with zero-cost memory safety
+# Arrrlang, a pirate-themed language with zero-overhead memory safety
 
 <<<<
 I once made a toy language named *Arrrlang* that stored everything in type-specific global arrays.
@@ -41,13 +40,13 @@ I once made a toy language named *Arrrlang* that stored everything in type-speci
 The most important thing to know about this language was that, yes, its mascot was a parrot.
 
 
-The parrot's name is a subject of scholarly debate to this day. [# Some people think it's name is just Zeddy, but there are dubious notes predating that which suggests that its full name was Zeddicus Zu'l Zorander the Second.]
+The parrot's name is a subject of scholarly debate to this day. [# Some people think it's name is just Perry, but there are dubious notes predating that which suggests that its full name was Zeddicus Zu'l Zorander the Second.]
 ////
-<div><center><img src="/images/lovebird.jpg" style="max-height: 200px;"/><div style="opacity: .8">(the more mythical birds are below)</div></center></div>
+<div><center><img src="/images/lovebird.jpg" style="max-height: 200px;"/><div style="opacity: .8">(the more _mythical_ birds are below)</div></center></div>
 >>>>
 
 
-Anyway, everything lived in a global array.
+In Arrrlang, everything lived in a global array.
 
  * Every `Ship` was stored in a global `ships` array.
  * Every `Engine` was stored in a global `engines` array.
@@ -56,14 +55,14 @@ Anyway, everything lived in a global array.
 
 
 <<<<
-There were no pointers!
+In Arrrlang, there were no pointers!
 
 
 If a `Ship` wanted to point to its `Engine`, it would instead index into the global `engines` array.
 ////
 ```
 struct Ship {
-	engineIndex int;
+  engineIndex int;
 }
 ```
 >>>>
@@ -72,168 +71,238 @@ struct Ship {
 Everything was indexing into everything else. It actually felt like using a relational database.
 
 
-*Arrrlang had no reference counting or tracing garbage collection.*
+With these basic rules, *Arrrlang was memory safe.*
 
 
 # Arrrlang's Memory Safety Costs
 
-So by Mike's definition, Arrrlang had "zero-cost memory safety".
+Arrrlang had no reference counting, no tracing garbage collection, and no generations. So by Mike's definition, Arrrlang had zero-overhead memory safety.
 
 
-But that's silly, it had plenty of costs!
+But of course, it had plenty of costs.
 
  * It's memory usage kept growing over time.
  * It did a bounds check on every "dereference".
  * It stored released elements in a free-list, which has some costly cache misses.
 
 
-It might be tempting to think that these are inevitable costs, fundamental to any form of managing memory.
+It might be tempting to think that these are inevitable costs, fundamental to any form of managing memory. 
+
+However, tracing garbage collection doesn't have these costs. [#gccost] It has other costs, but the point still stands.
 
 
-But... tracing garbage collection doesn't have these costs.
-
- * They can do "compaction" where it moves objects in memory, so that it can release more memory to the OS.
- * Their references were just references, and references need no bounds checking.
- * They allocate from a bump allocator, which is very cache-friendly.
-
-Of course, tracing garbage collection has different costs, but that's besides the point.
+So it seems this zero-overhead memory-safe language actually still has some run-time overhead in practice.
 
 
-It seems we have our first counter-example, a language that is memory-safe without reference counting or garbage collection, yet it still has some run-time costs.
+If we're looking for a language with zero-overhead memory safety, our expedition apparently isn't over.
 
 
-If we're looking for a language with zero-cost memory safety, our expedition apparently isn't over.
+<div><center><img src="/images/roc.jpg" style="max-height: 200px;"/><div style="opacity: .8">It seems zero-overhead memory safety is as elusive as the<br/>ancient Roc, which was known to carry off entire elephants!</div></center></div>
 
 
-It seems it's as elusive as *the ancient Roc, which was known to carry off entire elephants!*
+<slice>
+#gccost: Specifically:
+
+ * GC does "compaction" where it moves objects in memory, so that it can release more memory to the OS.
+ * GC's references were just references, and references need no bounds checking.
+ * GCs allocate from a bump allocator, which is very cache-friendly.
+</slice>
+
+# Rust, Bounds Checking, Hashing, Cloning
+
+Rust is in the top three favorites for both me and Mike, so it came up pretty quickly in our conversation.
 
 
-<div><center><img src="/images/roc.jpg" style="max-height: 200px;"/><div style="opacity: .8">The Roc!</div></center></div>
+The first thought is, of course, that Rust has bounds checking too, which are an obvious run-time cost (anywhere [between 1-15%](https://shnatsel.medium.com/how-to-avoid-bounds-checks-in-rust-without-unsafe-f65e618b4c1e), usually on the lower side of that).
+
+But all languages have bounds checking! Let's [steelman](https://en.wiktionary.org/wiki/steelman) the question and instead ask, "Does Rust have *more* bounds checking costs *than other languages?*"
 
 
-# Rust, Bounds Checking, Hashing
-
-Rust is in the top three favorite languages for both me and Mike, so it came up pretty quickly in our conversation.
+Sometimes, it's actually less. It's not about [eliding bounds checks](https://users.rust-lang.org/t/how-to-avoid-bounds-checking/4433/3) in loops (which really just moves the bounds check to the `i < len` loop condition), but when combined with [loop unrolling](https://en.wikipedia.org/wiki/Loop_unrolling) it can skip quite a few, and that's a big point in Rust's favor.
 
 
-Rust's bounds checking is an obvious run-time cost, but every language has bounds checking. If we were to [steelman](https://en.wiktionary.org/wiki/steelman) the question we would ask, "Does Rust have *more* bounds checking costs *than other languages?*"
+But there are cases where it has _more_ bounds checking.
+
+When the borrow checker denies two simultaneous `&mut` references to an object, we often make one into an index into a central Vec or HashMap, which have *extra bounds checking or hashing.*
+
+To see this in action, try implementing a doubly linked list, observers, delegates, intrusive data structures, subscriptions, back-references, graphs, or any kind of RAII that doesn't involve `unsafe` or globals. [# As Jonathan Corbet found, intrusive data structures are [nigh impossible in Rust](https://lwn.net/Articles/907876/).]
+
+Or, when we want to read from an array of structs and write to a different field in that same array, we often "flatten" it into two arrays (with twice the bounds checking), similar to a column-oriented database or an ECS approach. [# This is one reason why the borrow checker likes ECS so much.] [# Another good solution for the same array-of-structs problem is to generate an "effect struct" containing data describing some changes that should happen later when we have an exclusive `&mut` again. However, this effect struct can often require clones or heap allocations.]
 
 
-We sometimes hear that it can [elide bounds checks](https://users.rust-lang.org/t/how-to-avoid-bounds-checking/4433/3) in loops, but that's really just moving the bounds check to the `i < len` loop condition. Rust _does_ have less bounds checks when we combine that with [loop unrolling](https://en.wikipedia.org/wiki/Loop_unrolling) though, and that's a point in Rust's favor.
+Another common pattern is to *clone more often* with `.clone()`, often to get around the borrow checker. This is normally quite cheap, but can be expensive for types like `String` and `Vec`. [#lactech] With practice this lessens, but it never goes away completely.
 
 
-But there are cases where it has more costs.
-
-When the borrow checker denies two simultaneous `&mut` references to an object, we often make one into an index into a central Vec or HashMap, which have extra bounds checking or hashing.
-
-To see this in action, try implementing a doubly linked list, observers, delegates, intrusive data structures, subscriptions, back-references, graphs, or any kind of RAII that doesn't involve `unsafe` or globals.
+This additional cloning, hashing, and bounds checking are all consequences of having a borrow checker.
 
 
-On top of that, this tendency to use central collections makes it use more memory, similar to Arrrlang.
+Rust really is quite fast. But alas, it's another example of a zero-overhead memory-safe language that actually has some overhead. Our expedition isn't over!
 
 
-Rust is _really dang close_ to zero-cost memory safety, and raises the bar for languages... but alas, we can't quite say it has zero-cost memory safety. Our expedition isn't over.
+<div><center><img src="/images/snipe.jpg" style="max-height: 250px;"/><div style="opacity: .8">Chasing zero-overhead memory safety is as confounding as the<br />elusive Eagle Snipe, which has evaded even the finest hunters!</div></center></div>
 
 
-It seems that zero-cost memory safety is as elusive as *the Articuno, which was known to freeze entire towns.*
+<slice>
+#lactech: In the words of [LAC-Tech](https://news.ycombinator.com/item?id=33821755):
 
-
-<div><center><img src="/images/articuno.jpg" style="max-height: 300px;"/><div style="opacity: .8">(wait, that might be a pokemon. somebody doublecheck me on this.)</div></center></div>
-
-
-[# DRAFT: Add https://news.ycombinator.com/item?id=33821755 "I'm surprised at how slowly I'm getting used to it! I mean I've improved but I still have a lot of "wtf" moments. End up doing a lot of deep copying and heap allocations just to shut the compiler up, which makes me question just how "zero cost" the safety is."]
-
+"I've improved but I still have a lot of "wtf" moments. End up doing a lot of deep copying and heap allocations just to shut the compiler up, which makes me question just how "zero cost" the safety is."
+</slice>
 
 # Vale's Linear Types
 
-In [What Vale Taught Me About Linear Types, Borrowing, and Memory Safety](/blog/linear-types-borrowing), I talk about how Vale's overhead comes in the form of [generation checks](/blog/generational-references), but we can reduce them to zero with [linear types](/blog/linear-types-borrowing) and [regions](/blog/first-regions-prototype).
+In my [linear types](/blog/linear-types-borrowing) post, I talk about how Vale's overhead comes in the form of [generation checks](/blog/generational-references), but we can reduce them to zero with [linear types](/blog/linear-types-borrowing) and [regions](/blog/first-regions-prototype).
 
 
-After using it for a while, I realized that using linear types is actually really similar to using a borrow checker. That makes sense, as they're both a kind of [substructural type system](https://en.wikipedia.org/wiki/Substructural_type_system).
+After using this "linear style" for a while, I realized that it feels really similar to using a borrow checker. That makes sense, as they're both a kind of [substructural type system](https://en.wikipedia.org/wiki/Substructural_type_system).
 
 
-It had the same effects as borrow checking. Instead of aliasing, we would use more indexes and IDs into central arrays and hash maps.
+And indeed, it had a lot of the same consequences as borrow checking. Instead of aliasing, we would use more indexes and IDs into central arrays and hash maps. I also ended up with more cloning, just to get around this linear style's restrictions.
 
 
-We also couldn't do observers, intrusive data structures, etc. When we tried, we ended up with more centralized collections, more indexing, and more hashing which ironically ended up _more_ expensive sometimes.
+So even though this linear style Vale meets Mike's definition of a zero-overhead memory-safe language, it *also still has overhead*, just like Rust.
 
 
-That made sense because a generation check is about as expensive as a bounds check. Removing one generation check for multiple bounds checks would of course make things slower.
+It seems like there's a *lower bound* to memory safety overhead. Even the most zero-overhead approaches have some overhead. Why is that?
 
 
-Perhaps we should revisit Mike's definition of "zero cost" to include bounds checking.
+<div><center><img src="/images/articuno.jpg" style="max-height: 300px;"/><div style="opacity: .8">It seems that zero-overhead memory safety is as elusive as<br />the Articuno, which was known to freeze entire towns!</div></center></div>
 
 
-Otherwise, chasing zero cost memory safety is as confounding as *the elusive snipe, which has evaded even the finest hunters.*
+# The lower bound is above zero
+
+Someone once challenged me to make a zero-overhead observer in Vale or Rust. It turns out, it still had overhead.
 
 
-<div><center><img src="/images/snipe.jpg" style="max-height: 250px;"/><div style="opacity: .8">(wait, that might be a pokemon. somebody doublecheck me on this.)</div></center></div>
+For example, we tried having a central "subscriptions" collection that tracked which objects were interested in which events from which sources.
 
+
+There were a few different flavors:
+
+ * An array. Alas, we had to do a whole linear-time loop to find all subscriptions for a certain source. Making it an array of arrays didn't help, it just introduced an extra cache miss. [# A "cache miss" is when the CPU requests memory from a 64B chunk that's already in the CPU cache, and it has to wait idle for hundreds of cycles waiting for the data to come in from RAM.]
+ * A hash map from source+event to an array of receivers. This had some extra hashing and an extra cache miss compared to an observers approach.
+
+
+The fastest approach in Vale was to just do a regular observer. Just using some generational references was faster than the "zero-overhead" linear style.
+
+
+I think this is indicative of some underlying rule. If I had to guess, it's that *non-temporary many-to-one and many-to-many relationships have inherent run-time memory-safety overhead.*
+
+These relationships are inherent to most programs, so most programs will have some memory-safety overhead.
+
+
+# Some methods are better than others
+
+In this little journey, we've come across six kinds of overhead:
+
+ * Reference counting
+ * Tracing
+ * Bounds checking
+ * Cloning
+ * Hashing
+ * Generation checks
+
+
+These costs are not all equal, though. The first two are much more expensive:
+
+ * For reference counting, when we make a new reference to an object, we need to reach all the way into that object to increment its reference count number. This is often a cache miss.
+ * For tracing garbage collection, we need to crawl through all "object roots" and following their member references to other objects, and follow _their_ member references to other objects, and so on to find all the live objects to keep alive past the next collection. This involves a lot of cache misses.
+
+
+A *cache miss* is when the CPU requests memory from a 64B chunk ("cache line") that's already in the CPU cache, and it has to wait idle for hundreds of cycles waiting for the data to come all the way from RAM.
+
+
+The latter four don't have as many cache misses, they're generally much faster than reference counting and tracing garbage collection.
+
+
+Though, they still have their costs:
+
+ * Bounds checking is likely on the lower side of [1-15%](https://shnatsel.medium.com/how-to-avoid-bounds-checks-in-rust-without-unsafe-f65e618b4c1e). My basic cellular automata program showed 18%. An [interpreter](https://ceronman.com/2021/07/22/my-experience-crafting-an-interpreter-with-rust/), a rather extreme case, showed 74% overhead.
+ * Cloning can be expensive if we're cloning a string or a vector, which involves some heap allocation and its cache misses.
+ * Hash maps could be expensive depending on the hashing algorithms, such as ones that use modulus.
+ * Generational references access the object's field in parallel with its generation which is likely on the same cache line, but it can be expensive in tight loops unless one uses [linear style](https://verdagon.dev/blog/linear-types-borrowing).
+
+
+To really get good performance, one has to *pick their poison* and decide what overhead they're willing to suffer.
+
+
+Though if we're lucky, a particular situation has something special that makes some approaches less costly than others, which is always nice.
+
+
+<ignore>
+#factorio: The game [Factorio](https://www.factorio.com/) is a marvel of modern optimization. Someone once asked,
+
+> How can you prevent "random access" to memory when those inserters and assemblers are stored in different lists and presumably in different indexes in those lists?
+
+One of the Factorio developers [replied](https://www.reddit.com/r/factorio/comments/13bsf3s/comment/jjcra0t/),
+
+> You can't; it's the nature of complex systems; they end up interacting with other systems. In the end you just have to pay the cost to access that memory if you want the inserters to do what inserters do.
+</ignore>
+
+
+<slice />
 
 # What does it all mean?
 
-It means we shouldn't chase the myth. We shouldn't over-focus on an arbitrary metric like having zero memory safety overhead.
+There's no way to get to zero-overhead memory safety.
 
-[# DRAFT: this seems like a weak crazy ivan because one can just say "maybe lets include bounds checking in our memory safety definition". maybe we should go that way. it would be just as powerful.]
-
-
-Instead, we should solve the problem at hand.
+However, *we can get close.*
 
 
-A wise man once told me:
+For language designers, it means that the search isn't over. Since there is still overhead, there is still room to improve or rearrange.
 
-> While a programmer is making a program that's elegant and uses little time and space, a software engineer is out there solving people's problems.
+Perhaps it means that we should *keep chasing the myth* of zero-overhead memory safety, because we aren't there yet.
 
+That's what I'm trying to do with Vale, and led to discovering its [linear-aliasing model](https://vale.dev/linear-aliasing-model), generational references, and [regions](/blog/zero-cost-borrowing-regions-overview).
 
-In practice, this means writing your code to be simple, flexible, and reasonably fast. Later on, *profile* to see what parts can use some more optimization, and then reduce the overhead there (from memory safety or anything else!)
-
-
-
-# What does this mean?
-
-Years ago, when I first realized that memory safety always had a cost, it was actually kind of a relief.
-
-It meant I could stop *chasing the myth.* After all, we can't get all the way to zero.
+A lot of other languages are exploring these areas too, like [Austral](https://austral-lang.org/), [Val](https://val-lang.dev/), and [Verona](https://github.com/microsoft/verona).
 
 
-Before that, I used to play "overhead golf", where I tried to get my programs down to zero overhead.
+Perhaps it means that we can *stop chasing the myth*.
 
-I would waste _days_ on large refactoring expeditions, just to avoid any reference counting or `RefCell`s. As my programs used less shared mutability, they grew an unhealthy lack of abstraction, and very brittle and unstable APIs.
+Back when I coded in Rust a lot more, I made the mistake of caring too much about avoiding heap allocations, `Rc`, `RefCell`, virtual calls, etc. It was idiomatic to avoid these particular sources of overhead. I took a sense of pride in going the extra mile and spending the extra time reducing my overhead down to "zero".
 
-This kind of absolutism is common among new programmers, so I can forgive myself for getting caught up in it back then.
+In retrospect, I never actually reached zero, because instead I used more cloning, more bounds checking, and more hashing. It was an improvement, but I was chasing a definition of perfection that was arbitrary and unhelpful. I wasted a lot of time past the point of diminishing returns, chasing that myth.
 
-
-Now, I take a more holistic approach, and can sacrifice some speed if it means achieving the greater goal of *making useful software*.
-
-After all, that's what Rust's creators did when they decided to keep bounds checking on in release mode, and add a borrow checker that influenced us to use more bounds checking and hashing.
+It wasn't a problem with Rust. It was a problem with me. Perhaps instead of taking a community's idioms as gospel, we should spend that time doing more profiling.
 
 
-My pragmatism was reborn, *like the Phoenix, which has burned entire towns alive!*
-
-<div><center><img src="/images/phoenix.jpg" style="max-height: 250px;"/><div style="opacity: .8"></div></center></div>
+Perhaps it means that we can *relax a bit* about reducing our overhead to zero, since we can never get there. Perhaps we should instead spend our time making our code simple and flexible, optimize where necessary, and actually solve people's problems instead of playing arbitrary overhead golf. A liberating notion that I wish I could give to my past self!
 
 
-
-# Language Design
-
-In Vale, the default way of programming is to use generational references, which is simple, flexible, and reasonably fast.
+<div><center><img src="/images/phoenix.jpg" style="max-height: 250px;"/><div style="opacity: .8">Solve people's problems and let your pragmatism be reborn,<br /> like the Phoenix which has burned entire towns alive!</div></center></div>
 
 
-Then, when someone wants a certain part of their code to be faster, they can use [regions](/blog/zero-cost-borrowing-regions-overview) to read data fast and [linear style](/blog/linear-types-borrowing) to make data fast.
+What does it all mean? I'm not sure! There's a lot of lessons we could take away from the unreachability of zero-overhead memory safety.
 
 
-I think languages should move in this direction: simple, flexible, reasonably fast by default, with the ability to speed things up where desired.
+# Conclusion
+
+My conversation with Mike had a lot more:
+
+ * How compile-time complexity has an optimization opportunity cost
+ * How some kinds of memory management lend themselves better to concurrency
+ * How memory-safety can be a zero-cost abstraction, even if it isn't zero-overhead.
+ * And of course, more scholarly debate on the Arrrlang mascot's real name. [# It's Zeddicus Zu'l Zorander the Second, and *I will die on this hill.*]
+
+...but these are topics worthy of their own entire posts! So I'll stop here.
 
 
-Luckily, a lot of languages are moving in this direction!
-
- * [Cone](https://cone.jondgoodwin.com/coneref/index.html) is adding borrow checking on top of various memory management schemes.
- * [D](https://dlang.org/) is [adding a borrow checker](https://dlang.org/blog/2019/07/15/ownership-and-borrowing-in-d/) on top of their existing memory management.
- * [Nim](https://nim-lang.org/) is adding [move semantics](https://nim-lang.org/docs/destructors.html) to complement their ORC model.
- * [Verona](https://github.com/microsoft/verona) is blending garbage collection with smaller, more precise bump-allocator arenas.
+I hope you got a lot from this article!
 
 
+Next week I'll be writing about how we can use these techniques (and a few others) to design some memory safety for C++, so keep an eye on the [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), [discord server](https://discord.gg/SNB8yGH), or [subreddit](https://reddit.com/r/vale)!
 
+
+*That's all for now!* If you enjoyed this article, please consider [sponsoring](https://github.com/sponsors/ValeLang)!
+
+
+See you next time,
+
+
+- Evan Ovadia
+
+
+<$include "/sponsoring.vmd" />
 
 
 
@@ -242,19 +311,6 @@ Luckily, a lot of languages are moving in this direction!
 
 
 <ignore>
-Wild goose chase
-
-Snipe hunting
-
-
-
-
-
-balance speed with other important things, like security, [determinism](/blog/perfect-replayability-prototyped), [compile times](/blog/generics-compile-times), and so on.
- 
- * [Austral](https://austral-lang.org/) is using [linear types](https://austral-lang.org/linear-types).
- * [Val](https://www.val-lang.dev/) is using [mutable value semantics](https://www.jot.fm/issues/issue_2022_02/article2.pdf).
-
 
 # The hidden cost of linear types and borrow checking
 
@@ -277,32 +333,11 @@ It also means that nobody else can have a reference to *this data's container*, 
 
 
 
-# Zero Cost Abstraction
-
-*Rust* is certainly the fastest memory-safe mainstream language. But it's not quite "zero cost", and never really claimed to be. Rust's big innovation is that its borrow checker made memory-safety a *zero-cost abstraction*.
 
 
-From Bjarne Stroustrup:
-
-> What you don’t use, you don’t pay for. And further: What you do use,
-you couldn’t hand code any better.
-
-(FIND A BETTER SOURCE)
-
-
-A zero-cost abstraction isn't necessarily zero-cost, of course. It just means that it doesn't introduce any additional overhead.
-
-
-So let's ask: does the borrow checker introduce additional overhead?
-
-
-It does, actually.
-
-
-read https://users.rust-lang.org/t/not-quite-zero-cost-abstraction/11514
+read https://users.rust-lang.org/t/not-quite-zero-overhead-abstraction/11514
 
 read https://www.reddit.com/r/cpp/comments/degmy1/cppcon_2019_chandler_carruth_there_are_no/
-
 
 
 
@@ -310,32 +345,15 @@ When you aim for the absolute best, and you fail, you end up with something _inc
 
 
 
-
-What Rust does well is *making overhead explicit*. (Vale will have a keyword for that soon.)
-
-Zig is really the gold standard for this.
+What Rust does well is *making overhead explicit*. (Vale will have a keyword for that soon.) Zig is really the gold standard for this.
 
 
 
-
-
-article: What is "Zero Cost Memory Safety"?
-or: "Understanding Zero Cost Memory Safety"
-
-- everyone knows what it is, and nobody agrees. it's like... need example. systems programming, lol. republican. "natural" in food https://listverse.com/2014/11/20/10-everyday-words-with-meanings-no-one-can-agree-on/, patriot, open source, emo, roguelike.
-- it doesnt have RC or GC.
-- doesnt mean the language is memory safe for zero cost. we still need bounds checking, for example. (dependent types can do something here, but in practice move a lot of cost to run-time)
-- it's eliminating undefined behavior, or at least being able to in theory (minus implementation bugs)
-- in fact, sometimes we shove cost outward into things like bounds checks, hashing, cloning, or generational indices. a doubly linked list based on a vec is technically zero cost but it moves some overhead into vec expansion and bounds checking. a winning trade sometimes, but the overhead is there. in a random access program, performance will suffer a little bit. branching can have cost, see emulator link.
-- ZCMS is... what exactly?
 
 "makes explicit"
 "cost is opt in"
 no true Scotsman fallacy
 
-mention val, austral, hvm, cone
-
-note to self: theres no such thing, it was really zero cost abstraction lol
 
 
 
@@ -349,34 +367,7 @@ we don't *want* full zero cost memory safety. this is the sweet spot because onl
 
 
 
-the goal is not (and was never) to get to zero cost memory safety. its ridiculous, impossible, and unhealthy.
-
-our goal is to make a new balance between performance, safety, and usability. we're right on target for that.
-
-remember:
-"vale doesnt have zero cost memory safety like rust."
-"rust doesnt either, it has to fall back to bounds checks."
-"some performance hits are okay for safety, its a tradeoff"
-"vale's tradeoffs are much better"
-
-
-
-
-
-
-rust never said it had zero-cost memory safety, it said it had zero-cost abstractions.
-
-
-
 thr borrow checker isnt zero cost. it sends massive shockwaves of complexity cost outward.
 
 
-
-
-
-
-In our conversation, the biggest suspect for extra overhead in Rust was when it couldn't do *intrusive data structures*. As Jonathan Corbet found, intrusive data structures are [nigh impossible in Rust](https://lwn.net/Articles/907876/). The most common workaround is to put everything into a `Vec` or a hash map. This can be great for small objects which can share cache lines with neighbors, but not so great for large objects.
-
-
-It turns out, we do workarounds like this a lot in Rust. Whenever we run into patterns that call for some shared mutability (observers, delegates, intrusive data structures, back-references, graphs, certain kinds of RAII), the workarounds will always incur some run-time overhead.
 </ignore>

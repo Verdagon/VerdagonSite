@@ -16,6 +16,7 @@ I use this site to blog about my endeavors. Enjoy!
 
 # Recent posts:
 
+ * [Single Ownership and Memory Safety without Borrow Checking, RC, or GC](/blog/single-ownership-without-borrow-checking-rc-gc)
  * [The Link Between Generics, Compile Times, Type-Erasure, Cloud Building, and Hot-Code Reloading](/blog/generics-compile-times)
  * [What Vale Taught Me About Linear Types, Borrowing, and Memory Safety](/blog/linear-types-borrowing)
  * [Implementing Vale's Region Borrowing, and its Unexpected Quest](/blog/making-regions-part-2-generics)

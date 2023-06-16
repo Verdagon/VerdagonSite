@@ -467,6 +467,16 @@ if [ $TARGET == "single-ownership-without-borrow-checking-rc-gc" ] || [ $TARGET 
   fi
 fi
 
+if [ $TARGET == "c-to-single-ownership-without-borrow-checking-rc-gc" ] || [ $TARGET == "all" ] ; then
+  echo "Doing c-to-single-ownership-without-borrow-checking-rc-gc"
+  echo $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/c-to-single-ownership-without-borrow-checking-rc-gc src/draft/c-to-single-ownership-without-borrow-checking-rc-gc.vmd
+  eval $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/c-to-single-ownership-without-borrow-checking-rc-gc src/draft/c-to-single-ownership-without-borrow-checking-rc-gc.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
 if [ $TARGET == "linear-types-borrowing" ] || [ $TARGET == "all" ] ; then
   echo "Doing linear-types-borrowing"
   echo $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/linear-types-borrowing src/blog/0.3/linear-types-borrowing.vmd

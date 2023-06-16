@@ -1,7 +1,7 @@
 ---
 title: Vale's Memory Safety Strategy: Generational References and Regions
 author: Evan Ovadia
-date: Updated Apr 10 2023
+date: Updated June X 2023
 realm: blog
 path: blog/generational-references-v2
 layout: annotated
@@ -9,6 +9,8 @@ namespace: c-blog m-annotated
 sponsor: me
 ---
 
+
+<ignore>
 
 TODO:
 - link out to an article on linear style
@@ -19,21 +21,10 @@ TODO:
 - add to v1: ! This is an out-of-date version of the article [Vale's Memory Safety Strategy: Generational References and Regions](/blog/generational-references).
 - sure, we lose a little bit of reproducibility for UAFs, just like rust loses some with its unsafe problems. but overall, vale is actually the best with reproducibility because of deterministic replayability.
 
-
-adding offset stuff should only cause gens to be a bit slower, about 33%. it goes from 3 serial data dependencies to 4.
-no inline:
-  x = ptr - 8
-  y = *x
-  y == gen
-with inline:
-  offset = thing & 0xFF
-  x = ptr - offset
-  y = *x; gen = thing - offset
-  y == gen
-not so bad when you consider instructions are free compared to memory access
+</ignore>
 
 
-"they complement each other nicely"
+! This is a draft.
 
 
 *Generational references* are a new memory management technique that's easy, deterministic, and fast. [# This is an updated version of the 2021 article, which you can still find [here](/blog/generational-references-v1)]
@@ -130,6 +121,7 @@ Now, to make our program memory-safe, we always follow the rule: *always call `_
 
 <<<<
 Before:
+
 ```
 struct Spaceship {
   int numWings;
@@ -430,15 +422,8 @@ But overall, the technique looks very promising, and feels pretty good to use.
 <slice/>
 
 
-
-# Notes
-
-
-[#zerochecks]
-
-
-<slice>
-#zerochecks: Basic steps:
+<ignore>
+Basic steps:
 
  1. Translate it to another single-ownership based language like Austral, Val, or Rust.
  1. Use indices instead of immutable references.
@@ -448,10 +433,28 @@ But overall, the technique looks very promising, and feels pretty good to use.
 This works because any languages with single ownership (in the C++ and Vale sense of the word) can be used to achieve "zero-cost" memory safety (no RC, GC, or `__check`s, but still allowing bounds checking), and all programs in these languages can be translated to the others.
 
 DRAFT: move this to a thoughts page.
-</slice>
 
 
 Try it out! In the Vale release, you can find our benchmarks [here]([BenchmarkRL](https://github.com/Verdagon/BenchmarkRL/tree/master/vale)). You can find the source code for the various approaches [here](https://github.com/ValeLang/Vale/tree/master/Backend/src/region) (feel free to swing by the [discord server](https://discord.gg/SNB8yGH) and we can point you to the right files).
 
 
 *Note this caveat!* To isolate the difference between generational references and the other approaches, we allocate all non-primitive data on the heap. Future versions will add stack allocations. Once we address this limitations, we can get more precise benchmarks against the other approaches.
+
+
+adding offset stuff should only cause gens to be a bit slower, about 33%. it goes from 3 serial data dependencies to 4.
+no inline:
+  x = ptr - 8
+  y = *x
+  y == gen
+with inline:
+  offset = thing & 0xFF
+  x = ptr - offset
+  y = *x; gen = thing - offset
+  y == gen
+not so bad when you consider instructions are free compared to memory access
+
+
+"they complement each other nicely"
+
+
+</ignore>
