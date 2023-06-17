@@ -13,7 +13,7 @@ sponsor: us
 ! This article is still in early access for friends and [sponsors](https://github.com/sponsors/ValeLang), thank you so much to everyone who has helped Vale come this far!
 
 
-In my recent [article](/blog/linear-types-borrowing), I mentioned that linear types can provide memory safety without a borrow checker, reference counting, or tracing garbage collection.
+In my recent [article](/blog/linear-types-borrowing), I mentioned that Vale's linear types can provide memory safety without a borrow checker, reference counting, or tracing garbage collection.
 
 
 Someone named Mike asked, "So linear types give zero-overhead memory safety, like borrow checking?"
