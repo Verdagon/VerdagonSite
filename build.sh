@@ -429,8 +429,8 @@ fi
 
 if [ $TARGET == "myth-zero-overhead-memory-safety" ] || [ $TARGET == "all" ] ; then
   echo "Doing myth-zero-overhead-memory-safety"
-  echo $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/myth-zero-overhead-memory-safety src/draft/making-regions/myth-zero-overhead-memory-safety.vmd
-  eval $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/myth-zero-overhead-memory-safety src/draft/making-regions/myth-zero-overhead-memory-safety.vmd
+  echo $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/myth-zero-overhead-memory-safety src/blog/memory-safe-languages/myth-zero-overhead-memory-safety.vmd
+  eval $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/myth-zero-overhead-memory-safety src/blog/memory-safe-languages/myth-zero-overhead-memory-safety.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
