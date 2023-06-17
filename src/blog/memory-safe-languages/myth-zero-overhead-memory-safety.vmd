@@ -25,7 +25,7 @@ Someone named Mike asked, "So linear types give zero-overhead memory safety, lik
 "No, I mean no run-time overhead, like from RC, GC, or generations." he said.
 
 
-A delightful conversation ensued, with an interesting conclusion: *zero-overhead memory safety doesn't actually exist, and never has.*
+A really interesting conversation ensued, with a surprising conclusion: *zero-overhead memory safety doesn't actually exist, and never has.*
 
 
 This will come as a surprise to a lot of people, who believe various approaches have no memory safety overhead.
@@ -106,9 +106,9 @@ If we're looking for a language with zero-overhead memory safety, our expedition
 <slice>
 #gccost: Specifically:
 
- * GC does "compaction" where it moves objects in memory, so that it can release more memory to the OS.
+ * GC can move objects around, to release more memory to the OS.
  * GC's references were just references, and references need no bounds checking.
- * GCs allocate from a bump allocator, which is very cache-friendly.
+ * GCs can allocate from a bump allocator, which is very cache-friendly.
 </slice>
 
 # Rust, Bounds Checking, Hashing, Cloning
@@ -116,9 +116,9 @@ If we're looking for a language with zero-overhead memory safety, our expedition
 Rust is in the top three favorites for both me and Mike, so it came up pretty quickly in our conversation.
 
 
-The first thought is, of course, that Rust has bounds checking too, which are an obvious run-time cost (anywhere [between 1-15%](https://shnatsel.medium.com/how-to-avoid-bounds-checks-in-rust-without-unsafe-f65e618b4c1e), usually on the lower side of that).
+The first thought is, of course, that safe Rust has bounds checking too, which are an obvious run-time cost (anywhere [between 1-15%](https://shnatsel.medium.com/how-to-avoid-bounds-checks-in-rust-without-unsafe-f65e618b4c1e), usually on the lower side of that).
 
-But all languages have bounds checking! Let's [steelman](https://en.wiktionary.org/wiki/steelman) the question and instead ask, "Does Rust have *more* bounds checking costs *than other languages?*"
+But all languages have bounds checking! Let's [steelman](https://en.wiktionary.org/wiki/steelman) the question and instead ask, "Does safe Rust have *more* bounds checking costs *than other languages?*" [# We can also skip bounds checks in Rust with `get_unchecked` etc, which can be a great tool when you can prove a different way that the index in bounds. For this article, I'll be mainly talking about safe Rust.]
 
 
 Sometimes, it's actually less. It's not about [eliding bounds checks](https://users.rust-lang.org/t/how-to-avoid-bounds-checking/4433/3) in loops (which really just moves the bounds check to the `i < len` loop condition), but when combined with [loop unrolling](https://en.wikipedia.org/wiki/Loop_unrolling) it can skip quite a few, and that's a big point in Rust's favor.
@@ -181,17 +181,23 @@ For example, we tried having a central "subscriptions" collection that tracked w
 
 There were a few different flavors:
 
- * An array. Alas, we had to do a whole linear-time loop to find all subscriptions for a certain source. Making it an array of arrays didn't help, it just introduced an extra cache miss. [# A "cache miss" is when the CPU requests memory from a 64B chunk that's already in the CPU cache, and it has to wait idle for hundreds of cycles waiting for the data to come in from RAM.]
+ * An array. Alas, we had to do a whole linear-time loop to find all subscriptions for a certain source. Making it an array of arrays didn't help, it just introduced an extra cache miss. [# A "cache miss" is when the CPU requests memory from a 64B chunk that's not already in the CPU cache, and it has to wait idle for hundreds of cycles waiting for the data to come in from RAM.]
  * A hash map from source+event to an array of receivers. This had some extra hashing and an extra cache miss compared to an observers approach.
 
 
-The fastest approach in Vale was to just do a regular observer. Just using some generational references was faster than the "zero-overhead" linear style.
+The fastest approach in Vale was to just do a regular observer. Just using some generational references was faster than the "zero-overhead" linear style. [#yew]
 
 
 I think this is indicative of some underlying rule. If I had to guess, it's that *non-temporary many-to-one and many-to-many relationships have inherent run-time memory-safety overhead.*
 
 These relationships are inherent to most programs, so most programs will have some memory-safety overhead.
 
+
+<slice>
+#yew: I once saw a consensus on the Rust discord server to always avoid `Rc`'d observers and instead use Yew.
+
+As much as I like Yew, it's worrying when people advise bringing in an entire front-end framework with hundreds of dependencies just to avoid `Rc`.
+</slice>
 
 # Some methods are better than others
 
@@ -211,7 +217,7 @@ These costs are not all equal, though. The first two are much more expensive:
  * For tracing garbage collection, we need to crawl through all "object roots" and following their member references to other objects, and follow _their_ member references to other objects, and so on to find all the live objects to keep alive past the next collection. This involves a lot of cache misses.
 
 
-A *cache miss* is when the CPU requests memory from a 64B chunk ("cache line") that's already in the CPU cache, and it has to wait idle for hundreds of cycles waiting for the data to come all the way from RAM.
+A *cache miss* is when the CPU requests memory from a 64B chunk ("cache line") that's not already in the CPU cache, and it has to wait idle for hundreds of cycles waiting for the data to come all the way from RAM.
 
 
 The latter four don't have as many cache misses, they're generally much faster than reference counting and tracing garbage collection.
@@ -225,10 +231,17 @@ Though, they still have their costs:
  * Generational references access the object's field in parallel with its generation which is likely on the same cache line, but it can be expensive in tight loops unless one uses [linear style](https://verdagon.dev/blog/linear-types-borrowing).
 
 
-To really get good performance, one has to *pick their poison* and decide what overhead they're willing to suffer.
+To get good performance, one has to *pick their poison* and decide what overhead they're willing to suffer. There's no avoiding overhead completely.
 
 
-Though if we're lucky, a particular situation has something special that makes some approaches less costly than others, which is always nice.
+Often, a particular situation will cause one method to be faster or slower than usual. For example:
+
+ * Cloning's `malloc` is slower than how most GCs allocate memory. In cases with a lot of cloning, or where collections can reasonably be avoided, [#avoidgc] garbage collection can come out ahead.
+ * Bounds checking and generational references are both perfectly branch-predicted, [# This means the compiler can instruct the CPU to tentatively proceed executing as if the check will pass.] but in rare cases (like matrix multiplication or [interpreters](https://ceronman.com/2021/07/22/my-experience-crafting-an-interpreter-with-rust/)) that aren't bottlenecked on cache-misses, these extra instructions can be costly.
+ * Same story with hash maps, one can easily spend most their time hashing. In sufficiently random-access situations, reference counting can be faster.
+
+
+So even though _some_ overhead is inevitable, we can still think about which method is best for a particular situation. [# This is why I like designes like the [Cone](https://cone.jondgoodwin.com/) language. It gives you access to whatever memory management method you might like.]
 
 
 <ignore>
@@ -242,7 +255,9 @@ One of the Factorio developers [replied](https://www.reddit.com/r/factorio/comme
 </ignore>
 
 
-<slice />
+<slice>
+#avoidgc: Easier said than done, but it is possible. [Pony](https://www.ponylang.io/index.html)'s [ORCA](https://tutorial.ponylang.io/appendices/garbage-collection.html) system and [Verona](https://github.com/microsoft/verona)'s [regions](https://github.com/microsoft/verona/blob/master/docs/explore.md#regions) are both separately-collected realms of memory. If you destroy them before the first collection, you get the best of all worlds. I suspect this will be a _very_ nice technique for temporary calculations.
+</slice>
 
 # What does it all mean?
 
@@ -266,17 +281,28 @@ Back when I coded in Rust a lot more, I made the mistake of caring too much abou
 
 In retrospect, I never actually reached zero, because instead I used more cloning, more bounds checking, and more hashing. It was an improvement, but I was chasing a definition of perfection that was arbitrary and unhelpful. I wasted a lot of time past the point of diminishing returns, chasing that myth.
 
-It wasn't a problem with Rust. It was a problem with me. Perhaps instead of taking a community's idioms as gospel, we should spend that time doing more profiling.
+It wasn't a problem with Rust. It was a problem with me. Perhaps instead of taking a community's idioms as gospel, we should always ask _when_ idioms should be followed, and trust our own profiling and experience.
 
 
-Perhaps it means that we can *relax a bit* about reducing our overhead to zero, since we can never get there. Perhaps we should instead spend our time making our code simple and flexible, optimize where necessary, and actually solve people's problems instead of playing arbitrary overhead golf. A liberating notion that I wish I could give to my past self!
+Perhaps it means that we can *relax a bit* about reducing our overhead to zero, since we can never get there. Perhaps we should instead spend our time making our code simple and flexible, optimize where necessary, and actually solve people's problems instead of playing arbitrary overhead golf. It's a principle I knew, but didn't follow as much as I should have.
 
 
 <div><center><img src="/images/phoenix.jpg" style="max-height: 250px;"/><div style="opacity: .8">Solve people's problems and let your pragmatism be reborn,<br /> like the Phoenix which has burned entire towns alive!</div></center></div>
 
 
+Perhaps it also means that the occasional usage of `unsafe` is fine, and perhaps it means that it can be okay to use C, C++, or Zig in situations where memory safety isn't as important as optimal performance or flexibility. Blasphemy, I know. [#blasphemy]
+
+
 What does it all mean? I'm not sure! There's a lot of lessons we could take away from the unreachability of zero-overhead memory safety.
 
+
+<slice>
+#blasphemy: Even though I made a memory safe language, I stand by this blasphemy. There are cases where memory safety is merely _a_ priority, not _the_ priority. 
+
+I [talked about this at Handmade Seattle](https://handmade.network/podcast/ep/afc72ed0-f05f-4bee-a658-9ad02c0453da), and [this article](/blog/when-to-use-memory-safe-part-1) talks about cases like AAA games, sandboxed apps, and client-side programs that always talk to a trusted first-party server.
+
+I worked on Google Earth (written in C++) and memory safety wasn't nearly as big of a problem there as absolutists would have us believe.
+</slice>
 
 # Conclusion
 
