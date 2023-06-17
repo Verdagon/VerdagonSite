@@ -427,10 +427,10 @@ if [ $TARGET == "making-regions-part-2-generics" ] || [ $TARGET == "all" ] ; the
   fi
 fi
 
-if [ $TARGET == "making-regions-part-3-chasing-myths" ] || [ $TARGET == "all" ] ; then
-  echo "Doing making-regions-part-3-chasing-myths"
-  echo $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/making-regions-part-3-chasing-myths src/draft/making-regions/making-regions-part-3-chasing-myths.vmd
-  eval $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/making-regions-part-3-chasing-myths src/draft/making-regions/making-regions-part-3-chasing-myths.vmd
+if [ $TARGET == "myth-zero-overhead-memory-safety" ] || [ $TARGET == "all" ] ; then
+  echo "Doing myth-zero-overhead-memory-safety"
+  echo $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/myth-zero-overhead-memory-safety src/draft/making-regions/myth-zero-overhead-memory-safety.vmd
+  eval $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/myth-zero-overhead-memory-safety src/draft/making-regions/myth-zero-overhead-memory-safety.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1

@@ -10,6 +10,9 @@ sponsor: us
 ---
 
 
+! This article is still in early access for friends and [sponsors](https://github.com/sponsors/ValeLang), thank you so much to everyone who has helped Vale come this far!
+
+
 In my recent [article](/blog/linear-types-borrowing), I mentioned that linear types can provide memory safety without a borrow checker, reference counting, or tracing garbage collection.
 
 
@@ -22,7 +25,7 @@ Someone named Mike asked, "So linear types give zero-overhead memory safety, lik
 "No, I mean no run-time overhead, like from RC, GC, or generations." he said.
 
 
-A long conversation ensued, with an interesting conclusion: *zero-overhead memory safety doesn't actually exist, and never has.*
+A delightful conversation ensued, with an interesting conclusion: *zero-overhead memory safety doesn't actually exist, and never has.*
 
 
 This will come as a surprise to a lot of people, who believe various approaches have no memory safety overhead.
