@@ -25,7 +25,7 @@ Someone named Mike asked, "So linear types give zero-overhead memory safety, lik
 "No, I mean no run-time overhead, like from RC, GC, or generations." he said.
 
 
-A delightful conversation ensued, with an interesting conclusion: *zero-overhead memory safety doesn't actually exist, and never has.*
+A really interesting conversation ensued, with a surprising conclusion: *zero-overhead memory safety doesn't actually exist, and never has.*
 
 
 This will come as a surprise to a lot of people, who believe various approaches have no memory safety overhead.
@@ -237,7 +237,7 @@ To get good performance, one has to *pick their poison* and decide what overhead
 Often, a particular situation will cause one method to be faster or slower than usual. For example:
 
  * Cloning's `malloc` is slower than how most GCs allocate memory. In cases with a lot of cloning, or where collections can reasonably be avoided, [#avoidgc] garbage collection can come out ahead.
- * Bounds checking and generational references are both perfectly branch-predicted, [# This means the compiler can instruct the CPU to tentatively proceed executing as if the check will pass.] but in rare cases (e.g. [interpreters](https://ceronman.com/2021/07/22/my-experience-crafting-an-interpreter-with-rust/)) that aren't bottlenecked on cache-misses, these extra instructions can be costly.
+ * Bounds checking and generational references are both perfectly branch-predicted, [# This means the compiler can instruct the CPU to tentatively proceed executing as if the check will pass.] but in rare cases (like matrix multiplication or [interpreters](https://ceronman.com/2021/07/22/my-experience-crafting-an-interpreter-with-rust/)) that aren't bottlenecked on cache-misses, these extra instructions can be costly.
  * Same story with hash maps, one can easily spend most their time hashing. In sufficiently random-access situations, reference counting can be faster.
 
 
@@ -256,7 +256,7 @@ One of the Factorio developers [replied](https://www.reddit.com/r/factorio/comme
 
 
 <slice>
-#avoidgc: Easier said than done, but it can be done. [Pony](https://www.ponylang.io/index.html)'s [ORCA](https://tutorial.ponylang.io/appendices/garbage-collection.html) system and [Verona](https://github.com/microsoft/verona)'s [regions](https://github.com/microsoft/verona/blob/master/docs/explore.md#regions) are both separately-collected realms of memory. If you destroy them before the first collection, you get the best of all worlds. I suspect this will be a _very_ nice technique for temporary calculations.
+#avoidgc: Easier said than done, but it is possible. [Pony](https://www.ponylang.io/index.html)'s [ORCA](https://tutorial.ponylang.io/appendices/garbage-collection.html) system and [Verona](https://github.com/microsoft/verona)'s [regions](https://github.com/microsoft/verona/blob/master/docs/explore.md#regions) are both separately-collected realms of memory. If you destroy them before the first collection, you get the best of all worlds. I suspect this will be a _very_ nice technique for temporary calculations.
 </slice>
 
 # What does it all mean?
@@ -290,8 +290,19 @@ Perhaps it means that we can *relax a bit* about reducing our overhead to zero, 
 <div><center><img src="/images/phoenix.jpg" style="max-height: 250px;"/><div style="opacity: .8">Solve people's problems and let your pragmatism be reborn,<br /> like the Phoenix which has burned entire towns alive!</div></center></div>
 
 
+Perhaps it also means that the occasional usage of `unsafe` is fine, and perhaps it means that it can be okay to use C, C++, or Zig in situations where memory safety isn't as important as optimal performance or flexibility. Blasphemy, I know. [#blasphemy]
+
+
 What does it all mean? I'm not sure! There's a lot of lessons we could take away from the unreachability of zero-overhead memory safety.
 
+
+<slice>
+#blasphemy: Even though I made a memory safe language, I stand by this blasphemy. There are cases where memory safety is merely _a_ priority, not _the_ priority. 
+
+I [talked about this at Handmade Seattle](https://handmade.network/podcast/ep/afc72ed0-f05f-4bee-a658-9ad02c0453da), and [this article](/blog/when-to-use-memory-safe-part-1) talks about cases like AAA games, sandboxed apps, and client-side programs that always talk to a trusted first-party server.
+
+I worked on Google Earth (written in C++) and memory safety wasn't nearly as big of a problem there as absolutists would have us believe.
+</slice>
 
 # Conclusion
 
