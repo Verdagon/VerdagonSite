@@ -236,10 +236,12 @@ To get good performance, one has to *pick their poison* and decide what overhead
 
 Often, a particular situation will cause one method to be faster or slower than usual. For example:
 
- * Cloning's `malloc` is slower than how most GCs allocate memory. If we can avoid collections, [#avoidgc] then garbage collection can come out ahead.
+ * Cloning's `malloc` is slower than how most GCs allocate memory. In cases with a lot of cloning, or where collections can reasonably be avoided, [#avoidgc] garbage collection can come out ahead.
+ * Bounds checking and generational references are both perfectly branch-predicted, [# This means the compiler can instruct the CPU to tentatively proceed executing as if the check will pass.] but in rare cases (e.g. [interpreters](https://ceronman.com/2021/07/22/my-experience-crafting-an-interpreter-with-rust/)) that aren't bottlenecked on cache-misses, these extra instructions can be costly.
+ * Same story with hash maps, one can easily spend most their time hashing. In sufficiently random-access situations, reference counting can be faster.
 
 
-Though if we're lucky, a particular situation has something special that makes some approaches less costly than others, which is always nice.
+So even though _some_ overhead is inevitable, we can still think about which method is best for a particular situation. [# This is why I like designes like the [Cone](https://cone.jondgoodwin.com/) language. It gives you access to whatever memory management method you might like.]
 
 
 <ignore>
@@ -279,10 +281,10 @@ Back when I coded in Rust a lot more, I made the mistake of caring too much abou
 
 In retrospect, I never actually reached zero, because instead I used more cloning, more bounds checking, and more hashing. It was an improvement, but I was chasing a definition of perfection that was arbitrary and unhelpful. I wasted a lot of time past the point of diminishing returns, chasing that myth.
 
-It wasn't a problem with Rust. It was a problem with me. Perhaps instead of taking a community's idioms as gospel, we should spend that time doing more profiling.
+It wasn't a problem with Rust. It was a problem with me. Perhaps instead of taking a community's idioms as gospel, we should always ask _when_ idioms should be followed, and trust our own profiling and experience.
 
 
-Perhaps it means that we can *relax a bit* about reducing our overhead to zero, since we can never get there. Perhaps we should instead spend our time making our code simple and flexible, optimize where necessary, and actually solve people's problems instead of playing arbitrary overhead golf. A liberating notion that I wish I could give to my past self!
+Perhaps it means that we can *relax a bit* about reducing our overhead to zero, since we can never get there. Perhaps we should instead spend our time making our code simple and flexible, optimize where necessary, and actually solve people's problems instead of playing arbitrary overhead golf. It's a principle I knew, but didn't follow as much as I should have.
 
 
 <div><center><img src="/images/phoenix.jpg" style="max-height: 250px;"/><div style="opacity: .8">Solve people's problems and let your pragmatism be reborn,<br /> like the Phoenix which has burned entire towns alive!</div></center></div>
