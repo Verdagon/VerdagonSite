@@ -3,7 +3,7 @@ title: Chasing the Myth of Zero-Overhead Memory Safety (plus pictures of mythica
 author: Evan Ovadia
 date: June 19, 2022
 realm: blog
-path: blog/myths-zero-overhead-memory-safety
+path: blog/making-regions-part-3-chasing-myths
 layout: annotated
 namespace: c-blog m-annotated
 sponsor: us
@@ -106,9 +106,9 @@ If we're looking for a language with zero-overhead memory safety, our expedition
 <slice>
 #gccost: Specifically:
 
- * GC does "compaction" where it moves objects in memory, so that it can release more memory to the OS.
+ * GC can move objects around, to release more memory to the OS.
  * GC's references were just references, and references need no bounds checking.
- * GCs allocate from a bump allocator, which is very cache-friendly.
+ * GCs can allocate from a bump allocator, which is very cache-friendly.
 </slice>
 
 # Rust, Bounds Checking, Hashing, Cloning
@@ -116,9 +116,9 @@ If we're looking for a language with zero-overhead memory safety, our expedition
 Rust is in the top three favorites for both me and Mike, so it came up pretty quickly in our conversation.
 
 
-The first thought is, of course, that Rust has bounds checking too, which are an obvious run-time cost (anywhere [between 1-15%](https://shnatsel.medium.com/how-to-avoid-bounds-checks-in-rust-without-unsafe-f65e618b4c1e), usually on the lower side of that).
+The first thought is, of course, that safe Rust has bounds checking too, which are an obvious run-time cost (anywhere [between 1-15%](https://shnatsel.medium.com/how-to-avoid-bounds-checks-in-rust-without-unsafe-f65e618b4c1e), usually on the lower side of that).
 
-But all languages have bounds checking! Let's [steelman](https://en.wiktionary.org/wiki/steelman) the question and instead ask, "Does Rust have *more* bounds checking costs *than other languages?*"
+But all languages have bounds checking! Let's [steelman](https://en.wiktionary.org/wiki/steelman) the question and instead ask, "Does safe Rust have *more* bounds checking costs *than other languages?*" [# We can also skip bounds checks in Rust with `get_unchecked` etc, which can be a great tool when you can prove a different way that the index in bounds. For this article, I'll be mainly talking about safe Rust.]
 
 
 Sometimes, it's actually less. It's not about [eliding bounds checks](https://users.rust-lang.org/t/how-to-avoid-bounds-checking/4433/3) in loops (which really just moves the bounds check to the `i < len` loop condition), but when combined with [loop unrolling](https://en.wikipedia.org/wiki/Loop_unrolling) it can skip quite a few, and that's a big point in Rust's favor.
@@ -181,7 +181,7 @@ For example, we tried having a central "subscriptions" collection that tracked w
 
 There were a few different flavors:
 
- * An array. Alas, we had to do a whole linear-time loop to find all subscriptions for a certain source. Making it an array of arrays didn't help, it just introduced an extra cache miss. [# A "cache miss" is when the CPU requests memory from a 64B chunk that's already in the CPU cache, and it has to wait idle for hundreds of cycles waiting for the data to come in from RAM.]
+ * An array. Alas, we had to do a whole linear-time loop to find all subscriptions for a certain source. Making it an array of arrays didn't help, it just introduced an extra cache miss. [# A "cache miss" is when the CPU requests memory from a 64B chunk that's not already in the CPU cache, and it has to wait idle for hundreds of cycles waiting for the data to come in from RAM.]
  * A hash map from source+event to an array of receivers. This had some extra hashing and an extra cache miss compared to an observers approach.
 
 
@@ -211,7 +211,7 @@ These costs are not all equal, though. The first two are much more expensive:
  * For tracing garbage collection, we need to crawl through all "object roots" and following their member references to other objects, and follow _their_ member references to other objects, and so on to find all the live objects to keep alive past the next collection. This involves a lot of cache misses.
 
 
-A *cache miss* is when the CPU requests memory from a 64B chunk ("cache line") that's already in the CPU cache, and it has to wait idle for hundreds of cycles waiting for the data to come all the way from RAM.
+A *cache miss* is when the CPU requests memory from a 64B chunk ("cache line") that's not already in the CPU cache, and it has to wait idle for hundreds of cycles waiting for the data to come all the way from RAM.
 
 
 The latter four don't have as many cache misses, they're generally much faster than reference counting and tracing garbage collection.
@@ -225,7 +225,12 @@ Though, they still have their costs:
  * Generational references access the object's field in parallel with its generation which is likely on the same cache line, but it can be expensive in tight loops unless one uses [linear style](https://verdagon.dev/blog/linear-types-borrowing).
 
 
-To really get good performance, one has to *pick their poison* and decide what overhead they're willing to suffer.
+To get good performance, one has to *pick their poison* and decide what overhead they're willing to suffer. There's no avoiding overhead completely.
+
+
+Often, a particular situation will cause one method to be faster or slower than usual. For example:
+
+ * Cloning's `malloc` is slower than how most GCs allocate memory. If we can avoid collections, [#avoidgc] then garbage collection can come out ahead.
 
 
 Though if we're lucky, a particular situation has something special that makes some approaches less costly than others, which is always nice.
@@ -242,7 +247,9 @@ One of the Factorio developers [replied](https://www.reddit.com/r/factorio/comme
 </ignore>
 
 
-<slice />
+<slice>
+#avoidgc: Easier said than done, but it can be done. [Pony](https://www.ponylang.io/index.html)'s [ORCA](https://tutorial.ponylang.io/appendices/garbage-collection.html) system and [Verona](https://github.com/microsoft/verona)'s [regions](https://github.com/microsoft/verona/blob/master/docs/explore.md#regions) are both separately-collected realms of memory. If you destroy them before the first collection, you get the best of all worlds. I suspect this will be a _very_ nice technique for temporary calculations.
+</slice>
 
 # What does it all mean?
 
@@ -306,3 +313,71 @@ See you next time,
 
 
 <$include "/sponsoring.vmd" />
+
+
+
+
+
+
+
+<ignore>
+
+# The hidden cost of linear types and borrow checking
+
+Linear types, affine types, and borrow checking all have a fundamental limitation: to be able to modify something, we need "permission" from our caller.
+
+
+With just linear or affine types, we need to move ownership into a function if it wants to access some data. This requires that our caller obtain one to give it to us.
+
+
+Even with borrowing, we need to give it a unique reference (or an `&mut` in Rust). Same thing: this requires that our caller obtain one to give it to us.
+
+
+Not only that, but _its_ caller needs to obtain it, which means _its_ caller needs to obtain it, and so on until we eventually get to the data's original owner.
+
+
+In all of these cases, *nobody else can have a reference* to this data, in the entire program.
+
+
+It also means that nobody else can have a reference to *this data's container*, or that data's container, or anything that indirectly contains us. [# For example, in Rust, if `Ship` contains an `Engine`, and I have an `&mut Engine`, nobody else has a reference to `Ship`.]
+
+
+
+
+
+read https://users.rust-lang.org/t/not-quite-zero-overhead-abstraction/11514
+
+read https://www.reddit.com/r/cpp/comments/degmy1/cppcon_2019_chandler_carruth_there_are_no/
+
+
+
+When you aim for the absolute best, and you fail, you end up with something _incredible_. This happened when I optimized a thing in CSC 305 lol.
+
+
+
+What Rust does well is *making overhead explicit*. (Vale will have a keyword for that soon.) Zig is really the gold standard for this.
+
+
+
+
+"makes explicit"
+"cost is opt in"
+no true Scotsman fallacy
+
+
+
+
+we don't *want* full zero cost memory safety. this is the sweet spot because only downwardly infectious
+
+
+
+"there is no such thing as 'zero cost'. experienced rust users know this. in the presence of non-trivial requirements, the only way forward is to incur overhead. cloning, indexing, hashing, bounds checking. you cant avoid them, and they all cause overhead. the question is how far you want to fight that truth, and how long before you give up and decide to just get your work done."
+
+
+
+
+
+thr borrow checker isnt zero cost. it sends massive shockwaves of complexity cost outward.
+
+
+</ignore>
