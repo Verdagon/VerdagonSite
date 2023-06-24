@@ -17,7 +17,6 @@ b {
 }
 
 .donate-link {
-  opacity: .9;
 }
 
 .metadata .separator {
@@ -25,7 +24,6 @@ b {
 }
 
 .author {
-  opacity: .6;
 }
 .date {
 }
@@ -306,4 +304,32 @@ a.donate-button:hover {
   transition-timing-function: cubic-bezier(0.2, 0, 0.13, 2);
   vertical-align: text-top;
   white-space: nowrap
+}
+
+.patreon-button {
+  display: inline-block;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+.patreon-button:hover {
+  text-decoration: none;
+}
+
+.patreon-button div {
+  display: block;
+  background-color: #ff424d;
+  border-radius: 9999px;
+  color: #fff;
+  padding: 0 10px;
+  font-weight: 500;
+  border: 2px solid transparent;
+  line-height: 1.9;
+  font-size: .875rem !important;
+  vertical-align: middle;
+}
+
+.patreon-button div svg {
+  display: inline-block;
+  vertical-align: middle;
+  fill: white;
 }

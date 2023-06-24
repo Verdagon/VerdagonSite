@@ -16,6 +16,8 @@ I use this site to blog about my endeavors. Enjoy!
 
 # Recent posts:
 
+ * [Making C++ Memory-Safe Without Borrow Checking, RC, or Tracing GC](/blog/vale-memory-safe-cpp)
+ * [Chasing the Myth of Zero-Overhead Memory Safety](https://verdagon.dev/blog/myth-zero-overhead-memory-safety)
  * [Single Ownership and Memory Safety without Borrow Checking, RC, or GC](/blog/single-ownership-without-borrow-checking-rc-gc)
  * [The Link Between Generics, Compile Times, Type-Erasure, Cloud Building, and Hot-Code Reloading](/blog/generics-compile-times)
  * [What Vale Taught Me About Linear Types, Borrowing, and Memory Safety](/blog/linear-types-borrowing)
