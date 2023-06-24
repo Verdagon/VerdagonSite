@@ -524,7 +524,7 @@ There's a couple downsides so far:
  * It uses an allocator which segregates by size class and never releases memory back to the OS, to ensure that nobody messes with the generation number of the object and there is no reusing of numbers.
 
 
-We can address both by keep the generations in a separate thread-local table. [# Vale used to do this, but switched to random generational references which are about 3x faster. Someone also made a [Rust crate](https://lib.rs/crates/genref) for this table-based approach!]
+We can address both by keeping the generations in a separate thread-local table. [# Vale used to do this, but switched to random generational references which are about 3x faster. Someone also made a [Rust crate](https://lib.rs/crates/genref) for this table-based approach!]
 
 
 There's also an alternative technique that's about 3x faster than that though: random generational references!
