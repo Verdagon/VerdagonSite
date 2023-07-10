@@ -11,11 +11,8 @@ sponsor: me
 
 
 <ignore>
-
 TODO:
-- get single ownership / static analysis straight
 - once we have a bigger benchmark with a little more random access, perhaps BenchmarkRL, try to get it to show how little it matters in a random-access application, then explain that the CPU is really good at doing bounds checking and gen checking in parallel
-
 </ignore>
 
 
@@ -52,7 +49,7 @@ In C, whenever we allocate a struct on the heap, `malloc` remembers that that lo
 <<<<
 You could imagine that it internally has a bunch of `Allocation` structs, like this. [# The actual `malloc` uses a much faster and more interesting system than the one described here.]
 ////
-```
+```c
 struct Allocation {
   bool currentlyInUse;
   char allocationBytes[];
@@ -69,7 +66,7 @@ Let's add a<br /> `uint64_t currentGeneration;` to it. [# This is similar to the
 
 It starts at zero, and we increment it every time we allocate something to this spot in memory. 
 ////
-```
+```c
 struct Allocation {
   bool currentlyInUse;
   uint64_t currentGeneration;
@@ -90,7 +87,7 @@ Our codebase will use `gmalloc` instead of `malloc`, and use generational refere
 
 `gmalloc` increments `currentGeneration` every time we allocate anything, and we would also have a `gfree` that increments it whenever we free something.
 ////
-```
+```c
 struct GenerationalReference {
   void* alloc;
   uint64_t rememberedGeneration;
@@ -111,7 +108,7 @@ Now, to make our program memory-safe, we always follow the rule: *always call `_
 <<<<
 Before:
 
-```
+```c
 struct Spaceship {
   int numWings;
 };
@@ -127,7 +124,7 @@ int main() {
 ////
 After:
 
-```
+```c
 struct Spaceship {
   int health;
   int numWings;
@@ -147,7 +144,7 @@ int main() {
 
 That `__check` function looks at the 8 bytes above the object (at `Allocation`'s `currentGeneration`), and make sure that it matches the generational reference's `rememberedGeneration`. It could look something like this:
 
-```
+```c
 void __check(GenerationalReference genRef) {
   uint64_t currentGeneration = *(uint64_t*)((char*)genRef.alloc - 8);
   assert(genRef.rememberedGeneration == currentGeneration);
@@ -264,7 +261,7 @@ Of course, beating reference counting is a pretty low bar. [# Unless you're a la
 
 With three tools:
 
- * Single ownership: the compiler eliminates `__check`s for all owned values and owning references.
+ * Single ownership: the compiler eliminates `__check`s for all owned values and owning references, and we can take advantage of that with a "linear style" of coding.
  * [Regions](/blog/zero-cost-borrowing-regions-overview), specifically [immutable region borrowing](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing) can temporarily consider data immutable to skip `__check`s.
  * Static analysis, where the compiler automatically skips redundant `__check`s.
 
@@ -449,7 +446,7 @@ The main benefit of single ownership is that it allows us to embed a struct insi
 
 Recall our `__check` function from before, and notice the hardcoded `8`:
 
-```
+```c
 void __check(GenerationalReference genRef) {
   uint64_t currentGeneration = *(uint64_t*)((char*)genRef.allocation - 8);
   assert(genRef.rememberedGeneration == currentGeneration);
@@ -464,7 +461,7 @@ Instead of that `8`, we're going to subtract a tiny *offset-to-generation* numbe
 
 With this, our `__check` function becomes this:
 
-```
+```c
 void __check(GenerationalReference genRef) {
   uint8_t offsetToGen = genRef.allocation >> 56;
   uint64_t currentGeneration = *(uint64_t*)((char*)genRef.allocation - offsetToGen);
@@ -513,9 +510,9 @@ func OtherFunc(ship_gen_ref &Ship) {
 `OtherFunc` is actually doing a `__precheck` on that `ship_gen_ref`. A `__precheck` won't assert, but will instead produce a specific address if the check fails, one that will predictably produce a fault when accessed.
 
 
-Here's a sample implementation of `__precheck`, which returns address 0 if the pre-check fails: [# Note that this doesn't mean Vale has a concept of null; there's no such thing as null in Vale. This is a backend implementation detail.]
+Here's a sample implementation of `__precheck`, which returns address 0 if the pre-check fails: [#null]
 
-```
+```c
 void* __precheck(GenerationalReference genRef) {
   uint64_t currentGeneration = *(uint64_t*)((char*)genRef.allocation - 8);
   return (genRef.rememberedGeneration == currentGeneration) * genRef.allocation;
@@ -528,10 +525,15 @@ Later, if the user tries to access a reference that failed its `__precheck`, the
 
 In the example above, we turned 200 `__check`s into just 1 `__precheck`.
 
-Such is the power of region borrowing!
+
+That's the power of region borrowing! [# Fun fact: region borrowing can also be applied to a language that uses reference counting, to eliminate the vast majority of increments and decrements. As far as I know, nobody has attempted this yet, but I think this could single-handedly make RC competitive with GC again.]
 
 
-<slice />
+<slice>
+#null: Note that this doesn't mean Vale has a concept of null; there's no such thing as null in Vale. This is a backend implementation detail.
+
+On webassembly and specialized processors where 0 is a valid address, we would use e.g. `INTPTR_MAX` instead. On even more specialized processors that don't fault when accessing invalid addresses, we wouldn't be able to use pre-checking.
+</slice>
 
 # Random Generational References
 
@@ -541,7 +543,7 @@ This is where the scheme gets interesting, involving security, statistics, sorce
 Instead of remembering and incrementing an allocation's generation, we can just use a *pseudo-random number* instead.
 
 
-Whenever we put a struct on the stack, we just conjure up a pseudo-random number and put it above the struct. [# If you've ever heard of Arm's [memory tagging](https://source.android.com/docs/security/test/memory-safety/arm-mte), this is like that but with a wider tag.]
+Whenever we put a struct on the stack, we just conjure up a pseudo-random number and put it above the struct. [# If you've ever heard of Arm's [memory tagging](https://source.android.com/docs/security/test/memory-safety/arm-mte), this is like that but with a wider tag.] [# This pseudo-random number generator doesn't have to be that sophisticated. The most basic implementation could be a simple global integer that we increment on every use, or we could do more interesting things like periodically randomize it, shuffle it, or add prime numbers to it.]
 
 And whenever the struct disappears, we overwrite the generation with a zero, so that later `__check`s on it will fail.
 
@@ -604,7 +606,7 @@ Comfortable odds, I'd say!
 
 # Hidden Benefits
 
-Generational references and regions enable some pretty amazing new features:
+Generational references and regions also enable some pretty amazing new features:
 
  * [Seamless Concurrency](/blog/seamless-fearless-structured-concurrency): Since regions don't require any data coloring (like `Sync`/`Send`) or function coloring (like `async` or `?async`) we can use structured concurrency without refactoring the surrounding program.
  * [Perfect replayability](/blog/perfect-replayability-prototyped): Since generational references don't require nondeterministic collection, Vale was designed to replay a past run of the program to perfectly reproduce any error.

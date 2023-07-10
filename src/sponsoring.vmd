@@ -84,5 +84,5 @@ If you have any questions, always feel free to reach out via [email](mailto:verd
 
 
 <slice>
-#prototypes: [Generational references](/blog/generational-references), the [linear-aliasing model](/blog/linear-types-borrowing), and [higher RAII](/blog/single-ownership-without-borrow-checking-rc-gc) are all complete, and [Region borrowing](/blog/first-regions-prototype), [fearless FFI](/blog/fearless-ffi), and [perfect replayability](/blog/perfect-replayability-prototyped) have been successfully prototyped. Be sure to check out the experimental version of the compiler!
+#prototypes: [Generational references](/blog/generational-references), the [linear-aliasing model](/blog/linear-types-borrowing), and [higher RAII](/blog/single-ownership-without-borrow-checking-rc-gc) are all complete, and [region borrowing](/blog/first-regions-prototype), [fearless FFI](/blog/fearless-ffi), and [perfect replayability](/blog/perfect-replayability-prototyped) have been successfully prototyped. Be sure to check out the experimental version of the compiler!
 </slice>
