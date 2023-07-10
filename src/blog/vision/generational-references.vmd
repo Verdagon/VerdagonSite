@@ -13,7 +13,7 @@ sponsor: me
 <ignore>
 
 TODO:
-- get better banchmarks, add them here
+- get single ownership / static analysis straight
 - once we have a bigger benchmark with a little more random access, perhaps BenchmarkRL, try to get it to show how little it matters in a random-access application, then explain that the CPU is really good at doing bounds checking and gen checking in parallel
 
 </ignore>
@@ -173,7 +173,14 @@ or instead:
 Here's the magical part: *if we always call `__check` before dereferencing, then our code will be memory-safe.*
 
 
-Note that so far, all these structs are on the heap. Further below we'll talk about how we can put data on the stack. But first, let's talk about speed!
+Some extra details:
+
+ * All these structs are on the heap. Further below we'll talk about how we can put data on the stack.
+ * When a generation hits INT_MAX, we retire that spot and never allocate to it again.
+ * The above `__check` uses `assert`, but we actually just manually raise a segmentation fault because it's faster. [# Vale does this by dereferencing a pointer that it knows points to a protected page.]
+
+
+Now, let's talk about speed!
 
 
 <slice />
