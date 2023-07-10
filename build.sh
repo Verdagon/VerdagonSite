@@ -167,8 +167,8 @@ fi
 
 if [ $TARGET == "generational-references-v1" ] || [ $TARGET == "all" ] ; then
   echo "Doing generational-references-v1"
-  echo $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/generational-references src/blog/retired/generational-references.vmd
-  eval $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/generational-references src/blog/retired/generational-references.vmd
+  echo $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/generational-references-v1 src/blog/retired/generational-references-v1.vmd
+  eval $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/generational-references-v1 src/blog/retired/generational-references-v1.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -177,8 +177,8 @@ fi
 
 if [ $TARGET == "generational-references" ] || [ $TARGET == "all" ] ; then
   echo "Doing generational-references"
-  echo $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/generational-references-v2 src/blog/vision/generational-references-v2.vmd
-  eval $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/generational-references-v2 src/blog/vision/generational-references-v2.vmd
+  echo $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/generational-references src/blog/vision/generational-references.vmd
+  eval $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/generational-references src/blog/vision/generational-references.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1
@@ -489,8 +489,8 @@ fi
 
 if [ $TARGET == "vale-memory-safe-cpp" ] || [ $TARGET == "all" ] ; then
   echo "Doing vale-memory-safe-cpp"
-  echo $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/vale-memory-safe-cpp src/draft/vale-memory-safe-cpp.vmd
-  eval $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/vale-memory-safe-cpp src/draft/vale-memory-safe-cpp.vmd
+  echo $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/vale-memory-safe-cpp src/blog/vale-memory-safe-cpp.vmd
+  eval $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/vale-memory-safe-cpp src/blog/vale-memory-safe-cpp.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1

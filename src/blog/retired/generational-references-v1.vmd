@@ -4,14 +4,14 @@ subtitle: 2.3x faster than reference counting, unoptimized!
 author: Evan Ovadia
 date: Jan 5 2021
 realm: blog
-path: blog/generational-references
+path: blog/generational-references-v1
 layout: annotated
 namespace: c-blog m-annotated
 sponsor: me
 ---
 
 
-! This article describes the heap-only version of generational references. Experimental versions of Vale are using the faster random generational references technique, more information on that soon.
+! This is an out-of-date version of the article [Vale's Memory Safety Strategy: Generational References and Regions](/blog/generational-references)
 
 
 *Generational references* are a new memory management technique that's easy, deterministic, and _very_ fast.

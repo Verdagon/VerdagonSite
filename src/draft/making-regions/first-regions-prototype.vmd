@@ -158,7 +158,7 @@ Summary
 Success! Vale's normal mode (`safe_fastest` here) showed no slowdowns compared to only bounds checking.
 
 
-In other words, *Vale's approach has no observable overhead.* [# There might be overhead in theory, in the form of a nonatomic monotonically incrementing integer used for filling generations. It doesn't seem to affect the performance, likely because registers and simple arithmetic operations are so cheap on modern CPUs compared to the real bottleneck which is memory latency. The optimizer also often optimizes it out, since it sees nobody using these generations.]
+In other words, *this approach has no observable overhead.* [# There might be overhead in theory, in the form of a nonatomic monotonically incrementing integer used for filling generations. It doesn't seem to affect the performance, likely because registers and simple arithmetic operations are so cheap on modern CPUs compared to the real bottleneck which is memory latency. The optimizer also often optimizes it out, since it sees nobody using these generations.]
 
 
 Finally seeing this was a shock, a relief, and almost surreal. No overhead! We knew it was possible in theory, but seeing it happen for real still felt very surprising.

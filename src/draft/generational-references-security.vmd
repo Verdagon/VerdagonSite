@@ -1,0 +1,71 @@
+---
+title: Generational References and Security
+author: Evan Ovadia
+date: June 26, 2023
+realm: blog
+path: blog/generational-references-security
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+
+
+
+# You've already lost
+
+if someone is sidechannel attacking you, youve already lost, because they can read secrets, or a private key to decrypt, or a password... so this is mostly an academic exercise. there may be a few situations where the minor details matter, but once they have your keys, and all your data, they can act like you, as you. also, you can use rowhammer to modify nearby ram (doublecheck).
+
+
+
+# Potential Drawbacks
+
+It could change the security situation for Vale.
+
+(explain the exploit)
+
+1. Use a side-channel attack to read things. (btw youve already lost)
+2. The attacker has a way to feed input to that same exact instance.
+2. There's an existing write-after-free that hasn't been fixed. (pretty loud so kinda unlikely)
+3. We can use external inputs to put an attacker-controlled value in the place where the write-after-free happens.
+
+
+# How do we mitigate this?
+
+Solutions, from easy to hard:
+
+ * If you're in a sandbox, app, or talking to some first-party server, you're fine.
+ * Don't run other people's code on your servers. Done.
+ * Use linear-aliasing-regions style.
+
+
+
+# When does this matter?
+
+This doesn't matter if:
+
+ * Somehow sidechannels aren't already a defeat condition.
+ * You aren't using the side tables approach.
+ * You're using linear-aliasing-regions style. You *can* code things like Rust if you wanted to.
+ * You're in a situation that has alternate measures for security (sandboxes, apps, talking to first-party server, etc)
+ * You're the only one running on your machine.
+
+
+# How does this compare to other languages?
+
+No language is perfect. For example, most popular Rust crates use unsafe either directly or in non-stdlib dependencies. The truth is that some level of risk is fine.
+
+
+# How might this change in the future?
+
+As with any language, things could get worse as new exploits are found.
+
+
+Things could get better for Vale. Arm is experimenting with something called CHERI, which is basically a form of generations that are deterministic and unforgeable. If that ever comes out, that will change Vale:
+
+ * Vale becomes completely and deterministically memory-safe.
+ * Vale's region borrow checker becomes useful for parallelism and avoiding data races.
+ * If CHERI has a hybrid mode (where the language can inform the hardware when to skip a check) then Vale uniquely makes CHERI faster while maintaining its safety.
+
+
+

@@ -1,0 +1,694 @@
+---
+title: Vale's Memory Safety Strategy: Generational References and Regions
+author: Evan Ovadia
+date: Updated July 9 2023
+realm: blog
+path: blog/generational-references
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: me
+---
+
+
+<ignore>
+
+TODO:
+- get better banchmarks, add them here
+- once we have a bigger benchmark with a little more random access, perhaps BenchmarkRL, try to get it to show how little it matters in a random-access application, then explain that the CPU is really good at doing bounds checking and gen checking in parallel
+
+</ignore>
+
+
+*Generational references* are a memory management technique, an alternative to reference counting, tracing garbage collection, or borrow checking. [# This is an updated version of the 2021 article, which you can still find [here](/blog/generational-references-v1)]
+
+
+In this technique, every reference remembers the ID ("generation") of the object it's pointing at, and checks on dereference that it still matches. The user can safely skip this check with static analysis, "linear style", or regions. [# In a way, it's like we're applying the [generational indices](https://lucassardois.medium.com/generational-indices-guide-8e3c5f7fd594) technique to an entire programming language.]
+
+
+This article explains:
+
+ * What a generation is.
+ * How generational references work.
+ * How linear style, static analysis, and regions make them faster.
+ * How they all work together to form Vale's memory safety approach.
+
+
+<ignore>
+Generational references let us program in a familiar way [# This means we can make as many references to any object as we want.] and they're fast, with about the same amount of overhead as a bounds check, though even this can be avoided if one uses [linear style](https://vale.dev/linear-aliasing-model) and [region borrowing](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing) for the more performance-sensitive areas. [# Regions have been prototyped, but aren't complete yet. See [here](/blog/regions-first-prototype) for more!]
+</ignore>
+
+
+<slice />
+
+# Generational References
+
+
+Here's an explanation of the most basic kind of generational references. We'll add the more complex bits further below, but this should be a useful stepping stone.
+
+
+In C, whenever we allocate a struct on the heap, `malloc` remembers that that location is "in use". Until we `free` it, nobody else can allocate something there.
+
+
+<<<<
+You could imagine that it internally has a bunch of `Allocation` structs, like this. [# The actual `malloc` uses a much faster and more interesting system than the one described here.]
+////
+```
+struct Allocation {
+  bool currentlyInUse;
+  char allocationBytes[];
+};
+```
+>>>>
+
+
+By making a slight adjustment here, we can create a system that helps our programs' memory safety.
+
+
+<<<<
+Let's add a<br /> `uint64_t currentGeneration;` to it. [# This is similar to the "generational indices" technique from C++ and Rust, but applied to the entire world instead of just a specific vector.]
+
+It starts at zero, and we increment it every time we allocate something to this spot in memory. 
+////
+```
+struct Allocation {
+  bool currentlyInUse;
+  uint64_t currentGeneration;
+  char allocationBytes[];
+};
+```
+>>>>
+
+
+Now, instead of `malloc` returning a `void*`, let's make a `gmalloc` that returns a "generational reference".
+
+<<<<
+A *generational reference* is simply a pointer with a "remembered generation" number next to it.
+
+
+Our codebase will use `gmalloc` instead of `malloc`, and use generational references instead of raw pointers.
+
+
+`gmalloc` increments `currentGeneration` every time we allocate anything, and we would also have a `gfree` that increments it whenever we free something.
+////
+```
+struct GenerationalReference {
+  void* alloc;
+  uint64_t rememberedGeneration;
+};
+
+GenerationalReference gmalloc(int size) {
+  // Find an Allocation not currentlyInUse.
+  // Increment its currentGeneration.
+  // Return it.
+}
+```
+>>>>
+
+
+Now, to make our program memory-safe, we always follow the rule: *always call `__check` before dereferencing a generational reference.*
+
+
+<<<<
+Before:
+
+```
+struct Spaceship {
+  int numWings;
+};
+
+int main() {
+  Spaceship* ship =
+    (Spaceship*)malloc(sizeof(Spaceship));
+
+  // Set ship's numWings to 2
+  ship->numWings = 2;
+}
+```
+////
+After:
+
+```
+struct Spaceship {
+  int health;
+  int numWings;
+};
+
+int main() {
+  GenerationalReference shipRef =
+    gmalloc(sizeof(Spaceship));
+
+  // Set ship's numWings to 2
+  __check(shipRef);
+  ((Ship*)shipRef.alloc)->numWings = 2;
+}
+```
+>>>>
+
+
+That `__check` function looks at the 8 bytes above the object (at `Allocation`'s `currentGeneration`), and make sure that it matches the generational reference's `rememberedGeneration`. It could look something like this:
+
+```
+void __check(GenerationalReference genRef) {
+  uint64_t currentGeneration = *(uint64_t*)((char*)genRef.alloc - 8);
+  assert(genRef.rememberedGeneration == currentGeneration);
+}
+```
+
+
+It's as we're saying:
+
+> *"Hello! I'm looking for the 11th inhabitant of this house, are they still around?"*
+
+
+and the person who opens the door says:
+
+> *"No, sorry, I'm the 12th inhabitant of this house, the 11th inhabitant is no more."*
+
+or instead:
+
+> *"Yes! That is me. Feel free to dereference!"*
+
+
+
+Here's the magical part: *if we always call `__check` before dereferencing, then our code will be memory-safe.*
+
+
+Note that so far, all these structs are on the heap. Further below we'll talk about how we can put data on the stack. But first, let's talk about speed!
+
+
+<slice />
+
+# Generational References are Fast
+
+
+The very first versions of Vale used the above approach for its memory safety. We benchmarked it, and it outperformed reference counting pretty nicely, even with regions turned off.
+
+
+For this benchmark, we measured [#program] [#rustandc] three flavors of Vale:
+
+ * *Unsafe*, with no memory safety, the equivalent of C++ (minus caveats, see below!)
+ * *RC*, where we use naive reference counting for all our objects.
+ * *GR*, which uses generational references and no regions.
+
+
+<div class="comparison">
+  <table>
+    <thead>
+      <tr>
+        <th>Mode</th>
+        <th>Speed&nbsp;(seconds)</th>
+        <th>Overhead Compared to Unsafe (seconds)</th>
+        <th>Overhead Compared to Unsafe (%)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th class="na">Unsafe</th>
+        <td class="na">43.82&nbsp;seconds</td>
+        <td class="na">n/a</td>
+        <td class="na">n/a</td>
+      </tr>
+      <tr>
+        <th class="na">RC</th>
+        <td class="bad">54.90&nbsp;seconds</td>
+        <td class="bad">+11.08&nbsp;seconds</td>
+        <td class="bad">+25.29%</td>
+      </tr>
+      <tr>
+        <th class="na">GR</th>
+        <td class="good">48.57&nbsp;seconds</td>
+        <td class="good">+4.75&nbsp;seconds</td>
+        <td class="good">+10.84%</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+
+<slice>
+#program: We used the [BenchmarkRL](https://github.com/Verdagon/BenchmarkRL/tree/master/vale) terrain generator to gather these numbers, with different values for the `--region-override` flag: `unsafe-fast`, `naive-rc`, and `resilient-v3` respectively.
+
+
+#rustandc: Here, we benchmarked against other flavors of Vale, to isolate the differences between unsafe, reference-counting, and generational references.
+
+Once we implement regions and inline data, we'll be benchmarking against C++ and Rust, stay tuned!
+</slice>
+
+
+Generational references have only 10.84% overhead, less than half the cost of reference counting!
+
+
+<slice/>
+
+
+*Note these caveats!* To isolate the difference between generational references and the other approaches:
+
+ * This is only the basic generational references approach, Vale has since improved on the design, explained further below.
+ * This is run without regions or linear style, just basic generational references.
+ * In all flavors, we only allocate objects on the heap, except for primitives. Future versions will add stack allocations.
+ * We used a `gmalloc` implementation for all versions, though only GR ever touches the generation number, the other versions ignore it.
+
+
+<slice/>
+
+
+Of course, beating reference counting is a pretty low bar. [# Unless you're a language like Lobster or Nim, which do some really ingenious things with reference counting.] Vale aims to be on par with languages like C++ and Rust. How might we get there?
+
+
+With three tools:
+
+ * Single ownership: the compiler eliminates `__check`s for all owned values and owning references.
+ * [Regions](/blog/zero-cost-borrowing-regions-overview), specifically [immutable region borrowing](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing) can temporarily consider data immutable to skip `__check`s.
+ * Static analysis, where the compiler automatically skips redundant `__check`s.
+
+
+<slice/>
+
+# Skipping checks with single ownership
+
+Single ownership is a C++ concept which roughly means that "Every object is *owned* by exactly one other object (or local variable). When that owner is destroyed, the owned object is automatically `free`d."
+
+
+Vale uses single ownership; every Vale object is owned by a single struct, array, or stack frame. [# Even primitives like `int` have a single owner, though it doesn't feel like it because they're automatically copied.]
+
+
+<<<<
+In Vale, any object on the stack is owned by the containing stack frame.
+
+
+When a function accesses data owned by one of its variables, it doesn't need a `__check`.
+////
+```vale
+struct Spaceship { fuel int; }
+exported func main() {
+  ship Spaceship = Spaceship(7);
+
+  // Doesn't need a __check!
+  println(ship_ref.fuel);
+}
+```
+>>>>
+
+
+<<<<
+Any struct on the heap is owned by an "owning pointer", such as the one in this local variable `ship`.
+
+
+Same as before, if a function accesses data owned by one of its variables, it doesn't need a `__check`.
+////
+```vale
+struct Ship { fuel int; }
+exported func main() {
+  ship Ship = Ship(7);
+}
+```
+>>>>
+
+
+If you want to access something you don't own, you need a *reference* to it, written `&Ship`. Vale's references are all generational references.
+
+
+<<<<
+Vale automatically inserts `__check`s when you access anything you don't own.
+
+(...at least, until the next section when we talk about regions.)
+////
+```vale
+func PrintFuel(ship_ref &Ship) {
+  // implicit __check(ship_ref)
+  println(ship_ref.fuel);
+}
+```
+>>>>
+
+
+<slice />
+
+# Linear Style: Moving data to skip checks
+
+We can specifically *move ownership to avoid `__check`s.*
+
+
+<<<<
+Here's the above `PrintFuel` function.
+
+```vale
+func PrintFuel(ship_ref &Ship) {
+  // implicit __check(ship_ref)
+  println(ship_ref.fuel);
+}
+
+exported func main() {
+  ship = Ship(7);
+  PrintFuel(&ship);
+  PrintFuel(&ship);
+}
+```
+////
+...and here we instead temporarily move ownership to the `PrintFuel` function.
+
+```vale
+func PrintFuel(ship Ship) Ship {
+  // No __check needed!
+  println(ship.fuel);
+  return ship;
+}
+
+exported func main() {
+  ship = Ship(7);
+  set ship = PrintFuel(ship); «borrow»
+  set ship = PrintFuel(ship);
+}
+```
+>>>>
+
+
+We sometimes call this "linear style", and it allows us to skip `__check`s whenever we want.
+
+
+If you want to learn more, check out any of these articles:
+
+ * [What Vale Taught Me About Linear Types, Borrowing, and Memory Safety](https://verdagon.dev/blog/linear-types-borrowing) talks about how we can use this "linear style" to make a program with zero generation checks.
+ * [Single Ownership and Memory Safety without Borrow Checking, Reference Counting, or Garbage Collection](/blog/single-ownership-without-borrow-checking-rc-gc) talks about linear style from a C starting point.
+ * [Making C++ Memory-Safe](/blog/vale-memory-safe-cpp) talks about how we can use it to make C++ memory safe.
+
+
+
+We can write an entire program like this and *reduce our `__check`s down to zero.* However, if zero `__check`s is the goal, it's probably easier to blend linear style and regions, which we'll talk about next.
+
+
+<slice>
+#borrow: In future versions of Vale, we might even have a `borrow` statement for this.
+</slice>
+
+
+# Skipping checks with regions
+
+We can also use [regions](/blog/zero-cost-borrowing-regions-overview)' to safely skip `__check`s for a certain scope.
+
+
+<<<<
+We can add `pure` to the above `PrintFuel` function to inform the compiler that we won't change any data that existed before the function call.
+
+
+In exchange for that, the compiler is able to skip `__check`s for any arguments, or any data those arguments might own.
+////
+```vale
+pure func PrintFuel(ship_ref &Ship) {
+  // No __check needed!
+  println(ship_ref.fuel);
+}
+```
+>>>>
+
+
+
+This is called [immutable region borrowing](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing). It's a pretty in-depth topic, check out [this series](/blog/zero-cost-borrowing-regions-overview) which talks about other ways that regions help eliminate `__check`s.
+
+
+We recently finished the first regions prototype, and it showed that our benchmark program had no observable overhead when using linear style and regions to eliminate all `__check`s. Check out [Vale's First Regions Prototype](/blog/first-regions-prototype) for more!
+
+
+Using this blend of linear style and regions will feel familiar to those who have used languages like Rust. It has the same benefit of avoiding run-time costs (from garbage collection, reference counting, or `__check`s), though it can often add other run-time costs in the form of extra cloning, bounds checking, and hashing. [# In both paradigms, we often work around the lack of mutable aliasing by cloning or by making all aliases into indices/IDs into a central vectors or hash maps.] [# See also [Chasing the Myth of Zero-Overhead Memory Safety](/blog/myth-zero-overhead-memory-safety), which talks about how there's no way to eliminate all run-time memory-safety-related overhead.]
+
+
+<slice />
+
+# Blending linear style, regions, and generational references
+
+Vale programs will likely want to start with generational references, as they're the easiest and most flexible way to program. Generational references enable mutable aliasing which enables much better decoupling and healthier abstractions. [# More concretely, without mutable aliasing, we can't use patterns like [observers](https://www.reddit.com/r/rust/comments/pwqju6/is_there_an_underlying_reason_that_idiomatic_rust/), [back-references](https://users.rust-lang.org/t/back-reference-to-the-parent-struct/7413/2), [dependency references](https://en.wikipedia.org/wiki/Dependency_injection), [callbacks](https://news.ycombinator.com/item?id=12029238), and [delegates](https://medium.com/@nimjea/delegation-pattern-in-swift-4-2-f6aca61f4bf5), all which enable better decoupling between parts of our programs.]
+
+
+Even if the programmer does nothing, the compiler will still skip a vast amount of `__check`s, since libraries (especially the standard library) make heavy use of regions and linear style.
+
+
+As the programmer gets a better sense of where they need to optimize (by profiling), they'll then want to add regions and linear style to the specific areas that call for it. Sometimes, simply adding `pure` can eliminate a large amount of `__check`s in a function.
+
+
+It can sometimes be a fun challenge to reduce a program's `__check`s to zero. However, like we often see in Rust, when we eliminate certain kinds of run-time overhead we often end up adding other kinds of overhead such as cloning, bounds checking, or hashing. There's a certain point of diminishing returns, an optimal balance between generational references, linear style, and regions.
+
+This is good, because it's fast, yet still gets the flexibility offered by generational references.
+
+
+This is Vale's strength: it's fast by default, and we can gradually optimize where it makes sense to.
+
+
+<slice />
+
+# How do we put data in other objects?
+
+The main benefit of single ownership is that it allows us to embed a struct inside another struct, or a struct inside an array. [# Technically, we don't need single ownership for this. Languages like C# allow us to put value types (such as `struct`s) directly inside classes and arrays. The real trick is whether we can take a reference to that embedded data.] How do we do that with generational references?
+
+
+Recall our `__check` function from before, and notice the hardcoded `8`:
+
+```
+void __check(GenerationalReference genRef) {
+  uint64_t currentGeneration = *(uint64_t*)((char*)genRef.allocation - 8);
+  assert(genRef.rememberedGeneration == currentGeneration);
+}
+```
+
+
+Instead of that `8`, we're going to subtract a tiny *offset-to-generation* number that we put in the top byte of the `genRef.allocation` pointer. [# Note that the offset-to-generation number can only fit in a single byte, which means that if a struct is more than 256 bytes wide, it will need another generation number inside it.]
+
+*This will point us to the generation of the containing struct.*
+
+
+With this, our `__check` function becomes this:
+
+```
+void __check(GenerationalReference genRef) {
+  uint8_t offsetToGen = genRef.allocation >> 56;
+  uint64_t currentGeneration = *(uint64_t*)((char*)genRef.allocation - offsetToGen);
+  assert(genRef.rememberedGeneration == currentGeneration);
+}
+```
+
+
+Our `__check` function just went from 4 instructions to 5 (or 6 for certain CPUs [#lamtbi]). This isn't that much, especially considering we eliminate most generation checks with linear style and regions. For that low price, *we can now embed structs in other structs.*
+
+
+This gives us more control over the layout of our data, which helps make our programs more cache-friendly.
+
+
+<slice>
+#lamtbi: It's 5 instructions assuming we have [top-byte ignore](https://www.kernel.org/doc/html/latest/arm64/memory-tagging-extension.html) or the upcoming [linear address masking](https://www.phoronix.com/news/Intel-LAM-Glibc). If we don't it'll be 6 instructions as we add a bitwise-and to mask off those top 8 bits before we subtract.
+</slice>
+
+
+# Pre-checking
+
+When the compiler is certain data won't change (such as when we're using immutable region borrowing), we can "pre-check" our generational references once beforehand to skip a lot of checks later.
+
+
+Recall the pure `PrintFuel` function:
+
+```vale
+pure func PrintFuel(ship_ref &Ship) {
+  // No __checks needed!
+  foreach _ in 0..100 {
+    println(ship_ref.fuel);
+    println(ship_ref.fuel);
+  }
+}
+```
+
+And now imagine we pass a generational reference into `PrintFuel`, like here:
+
+```vale
+func OtherFunc(ship_gen_ref &Ship) {
+  PrintFuel(&ship_gen_ref);
+}
+```
+
+
+`OtherFunc` is actually doing a `__precheck` on that `ship_gen_ref`. A `__precheck` won't assert, but will instead produce a specific address if the check fails, one that will predictably produce a fault when accessed.
+
+
+Here's a sample implementation of `__precheck`, which returns address 0 if the pre-check fails: [# Note that this doesn't mean Vale has a concept of null; there's no such thing as null in Vale. This is a backend implementation detail.]
+
+```
+void* __precheck(GenerationalReference genRef) {
+  uint64_t currentGeneration = *(uint64_t*)((char*)genRef.allocation - 8);
+  return (genRef.rememberedGeneration == currentGeneration) * genRef.allocation;
+}
+```
+
+
+Later, if the user tries to access a reference that failed its `__precheck`, the program will safely raise a fault, similar to when a normal `__check` fails.
+
+
+In the example above, we turned 200 `__check`s into just 1 `__precheck`.
+
+Such is the power of region borrowing!
+
+
+<slice />
+
+# Random Generational References
+
+This is where the scheme gets interesting, involving security, statistics, sorcery, and pragmatism. (Special thanks to [hc](https://lobste.rs/s/sglvcc/generational_references_2_3x_faster_than#c_ddjjg0) for this next key insight!)
+
+
+Instead of remembering and incrementing an allocation's generation, we can just use a *pseudo-random number* instead.
+
+
+Whenever we put a struct on the stack, we just conjure up a pseudo-random number and put it above the struct. [# If you've ever heard of Arm's [memory tagging](https://source.android.com/docs/security/test/memory-safety/arm-mte), this is like that but with a wider tag.]
+
+And whenever the struct disappears, we overwrite the generation with a zero, so that later `__check`s on it will fail.
+
+
+This also has other benefits:
+
+ * The language has to do less work! [# When destroying an object, overwriting a generation with zero is faster than incrementing what was there before. Also, we don't have to check for overflow when a generation number hits 2^64.]
+ * The object can live on the stack, inside other objects, directly inside arrays, or even inside custom allocators.
+ * We can use the regular `malloc` instead of the `gmalloc` we invented above.
+ * We can reuse a specific spot in memory as many times as we want.
+ * We're able to release memory back to the OS, in environments with virtual memory. [# This relies on the OS detecting accesses to released memory and raising segmentation faults.] [# We can still release memory to the OS, but we remap the virtual address space to a single shared page, preferably read-only and filled with zeroes. This lets us not trigger a fault on `__precheck`s.]
+
+
+This is a very strong *stochastic* approach, similar to how passwords work.
+
+
+It does have a theoretical downside. For example, if we have an invalid access in our server code that's causing (worst case) six million loud errors a second and we decide to ignore it, then after 73,250 years [#math] on average it could reuse the same generation as something that was there before, in which case the invalid access bug could cause some unsafety.
+
+
+Those well-versed in statistics will recognize that this isn't really a problem, but let's explore it a little.
+
+
+The odds of an invalid access happening undetected is always `1/2^64` for a 64-bit generation.
+
+ * The odds don't change with the number of live objects.
+ * The odds don't change with the how long the program's been running. 
+ * The odds don't change with the the number of objects that have lived in that particular location.
+ * The odds don't change with the the number of previous generation check failures, because the first one brings down the entire process.
+
+
+It also helps to keep in mind that these probabilities only apply to the error detection mechanism, not to the program itself.
+
+
+One of my beta readers asked:
+
+> "How does this compare to Rust? It seems like the probabilistic detection wouldn't be as good."
+
+That would be true, except that [most Rust programs](https://2020.icse-conferences.org/details/icse-2020-papers/68/Is-Rust-Used-Safely-by-Software-Developers-) use `unsafe` or have it in their dependencies, even when you don't count the standard library.
+
+When someone uses `unsafe` to get around the borrow checker's restrictions, even if they think really hard about `unsafe`'s more arcane interactions, bugs can remain hidden for a long time, stealthily causing undefined behavior in the `unsafe` block and in the safe code around it.
+
+We'd similarly use random generational references to get around the restrictions of affine style, and fortunately, any invalid accesses are detected _very_ loudly as a check failure brings down the entire program. Bugs are discovered _very_ quickly, instead of causing mysterious behavior for years.
+
+Vale's design also goes one step further and replaces `unsafe` with a "skip-check dereference" operator to skip `__checks` in release mode. The major benefit is that the compiler ignores these in dependencies by default, so we no longer have to trust that our dependencies used unsafety well.
+
+So it's better in some ways, worse in others. It's just a different approach.
+
+
+<slice>
+#math: Given a 64 bit generation, it will take an average of [13 quintillion](https://www.wolframalpha.com/input?i=ln%28.5%29%2Fln%28.99999999999999999995%29) tries to trigger a false negative.
+
+If there's only one failure per second, it's [439 billion years](https://www.wolframalpha.com/input?i=13860000000000000000+%2F+%2860+*+60+*+24+*+365%29) on average to cause unsafety.
+
+If there's only one failure per week, it would take [266 quadrillion years](https://www.wolframalpha.com/input?i=13860000000000000000+%2F+52) on average to cause unsafety.
+
+If there's six million check failures per second (the [largest DDoS in history](https://www.zdnet.com/article/google-says-it-mitigated-a-2-54-tbps-ddos-attack-in-2017-largest-known-to-date/)), it's [73,250 years](https://www.wolframalpha.com/input?i=13860000000000000000+%2F+%286000000+*+60+*+60+*+24+*+365%29) on average to cause any unsafety.
+
+Comfortable odds, I'd say!
+</slice>
+
+# Hidden Benefits
+
+Generational references and regions enable some pretty amazing new features:
+
+ * [Seamless Concurrency](/blog/seamless-fearless-structured-concurrency): Since regions don't require any data coloring (like `Sync`/`Send`) or function coloring (like `async` or `?async`) we can use structured concurrency without refactoring the surrounding program.
+ * [Perfect replayability](/blog/perfect-replayability-prototyped): Since generational references don't require nondeterministic collection, Vale was designed to replay a past run of the program to perfectly reproduce any error.
+ * [Higher RAII](https://vale.dev/guide/structs#higher-raii): Vale's type system can use ownership to ensure that we don't forget to call a function at some point in the future, and its destructors can take in arguments and return values.
+
+
+There are also a few more features that regions will enable, involving concurrency, transactions, and unique security benefits. [# One of the benefits of [sponsoring Vale](https://github.com/sponsors/ValeLang) is that you get access to all our future plans, and get to ask questions about them!] They're a little too early in the design phases to explain here, but stay tuned!
+
+
+<slice />
+
+# Summary
+
+
+Generational references and regions are a pretty promising combination with a lot of benefits:
+
+ * Easy to use, especially for anyone coming from more complex languages like C++ or Rust.
+ * They let us choose which parts of our code should be simple, and which should be optimized further.
+ * They enable a lot of interesting new features, like [Seamless Concurrency](/blog/seamless-fearless-structured-concurrency), [Perfect replayability](/blog/perfect-replayability-prototyped), and [Higher RAII](https://vale.dev/guide/structs#higher-raii).
+
+
+There are some downsides, as with any memory safety paradigm:
+
+ * It occasionally adds an 8-byte generation number to the top of allocations.
+ * Most pointers will only be 8 bytes, [# At any given time in a program, the vast majority of pointers are owning pointers, which require no generation.] but some will have an additional 8-byte generation with them.
+ * There will be `__check`s at run-time, unless the programmer chooses to optimize them away.
+
+
+But overall, the technique looks very promising, and feels pretty good to use.
+
+
+I hope you enjoyed this article! As always, if you have any questions, feel free to ask on [twitter](https://twitter.com/vale_pl), our [discord server](https://discord.gg/SNB8yGH), or the [subreddit](https://reddit.com/r/vale). Cheers!
+
+- Evan Ovadia
+
+
+
+<slice/>
+
+
+<$include "/sponsoring.vmd"/>
+
+
+<ignore>
+
+Try it out! In the Vale release, you can find our benchmarks [here]([BenchmarkRL](https://github.com/Verdagon/BenchmarkRL/tree/master/vale)). You can find the source code for the various approaches [here](https://github.com/ValeLang/Vale/tree/master/Backend/src/region) (feel free to swing by the [discord server](https://discord.gg/SNB8yGH) and we can point you to the right files).
+
+*Note this caveat!* To isolate the difference between generational references and the other approaches, we allocate all non-primitive data on the heap. Future versions will add stack allocations. Once we address this limitations, we can get more precise benchmarks against the other approaches.
+
+
+adding offset stuff should only cause gens to be a bit slower, about 33%. it goes from 3 serial data dependencies to 4.
+
+no inline:
+  x = ptr - 8
+  y = *x
+  y == gen
+
+with inline, with TBI, putting it in pointer:
+  offset = ptr >> 56
+  x = ptr - offset
+  y = *x
+  y == gen
+
+with inline, no TBI, putting it in gen:
+  offset = thing & 0xFF
+  x = ptr - offset
+  y = *x; gen = thing - offset
+  y == gen
+
+
+Regarding sidechannel attacks:
+
+ * Same risk of a spectre attack as other languages.
+ * It's only a risk for extremely expressive APIs, like interpreters, that already have an unfixed UAF.
+ * They're incredibly unlikely.
+ * If someone spectre'd you, you've already lost.
+ * Spectre attacks on Vale have different consequences: it turns an arbitrary read into an arbitrary write.
+
+Ways to mitigate:
+
+ * Reduce determinism; use a deterministic thread scheduler, don't expose precise timers, limit use of FFI.
+ * Use the LGT approach, where we have side tables of generations.
+ * Possible other approaches:
+   * Limit integers to 63 bits, possibly have side stacks
+   * Integrate with CHERI somehow
+   * Side table of 1-bit "there is a generation at that address" things
+
+From https://zchee.github.io/golang-wiki/Spectre/:
+
+ > At time of writing, we do not use either of these mitigations for Go programs running at Google, nor do we anticipate doing so. They are included in the Go toolchain as a kind of “defense in depth” for users with very special use cases (or significant paranoia).
+
+ > These mitigations would only be necessary when there is a potential Spectre attack against a Go program, which would require all of the following to be true. First, an attacker must be able to run arbitrary code on the same CPUs as a victim Go program containing a secret. Second, the attacker must be able to make some kind of HTTP or RPC requests to the victim Go program. Third, those requests have to trigger a potentially vulnerable code fragment to speculate into attacker-selected behavior. Most commonly this would mean using an arbitrary attacker-provided integer to index a slice or array. These three conditions are only very rarely all true at the same time.
+
+</ignore>

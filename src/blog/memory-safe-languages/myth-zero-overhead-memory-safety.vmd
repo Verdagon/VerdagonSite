@@ -251,7 +251,7 @@ Often, a particular situation will cause one method to be faster or slower than 
  * Same story with hash maps, one can easily spend most their time hashing. In sufficiently random-access situations, reference counting can be faster.
 
 
-So even though _some_ overhead is inevitable, we can still think about which method is best for a particular situation. [# This is why I like designes like the [Cone](https://cone.jondgoodwin.com/) language. It gives you access to whatever memory management method you might like.]
+So even though _some_ overhead is inevitable, we can still think about which method is best for a particular situation. [# This is why I like designs like the [Cone](https://cone.jondgoodwin.com/) language. It gives you access to whatever memory management method you might like.]
 
 
 <ignore>
