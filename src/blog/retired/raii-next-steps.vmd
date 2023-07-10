@@ -10,7 +10,7 @@ namespace: c-blog m-annotated
 sponsor: me
 ---
 
-! Note: This article was published before we changed from constraint refs to HGM.
+! Note: This article was published before we changed from constraint references to generational references.
 
 
 While diving the depths of single ownership, we discovered a hidden gem from the most unlikely of places. With it, we were able to reassemble C++ into something that really unleashes the full potential of RAII.

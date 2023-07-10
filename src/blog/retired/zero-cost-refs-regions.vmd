@@ -10,7 +10,7 @@ namespace: c-blog m-annotated
 sponsor: me
 ---
 
-! Note: This article was published before we changed resilient mode to use [HGM](/blog/hybrid-generational-memory) instead of RC. Now, read-only regions eliminate gen-checks, rather than RC overhead.
+! Note: This article was published before Vale switched to [generational references](/blog/generational-references) from RC. Now, read-only regions eliminate generation checks, rather than RC overhead.
 
 
 Vale is rapidly approaching v0.1, [# Check out the [Roadmap](/roadmap) for progress and plans!] and now that we've proven the foundations solid, we can finally share our plans for making Vale *extremely fast.*

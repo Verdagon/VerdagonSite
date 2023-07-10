@@ -694,7 +694,7 @@ Ways to mitigate:
    * Integrate with CHERI somehow
    * Side table of 1-bit "there is a generation at that address" things
 
-From https://zchee.github.io/golang-wiki/Spectre/:
+From https://github.com/golang/go/wiki/Spectre:
 
  > At time of writing, we do not use either of these mitigations for Go programs running at Google, nor do we anticipate doing so. They are included in the Go toolchain as a kind of “defense in depth” for users with very special use cases (or significant paranoia).
 

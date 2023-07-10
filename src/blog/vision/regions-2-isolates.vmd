@@ -290,7 +290,7 @@ This is known as a Cellular Automata algorithm, and is very similar to blurring 
 Here's our `main` function which shows the general structure of our program.
 
 
-The `'` in front of `[][]bool` specifies the array is isolated.
+The `'` in front of `[][]bool` specifies the array is isolated. [#imagetype]
 
 
 The `image.read` in `coalesceImage(&rand, image.read)` will open up the `image` isolate as immutable, and then pass it in as an argument to coalesceImage.
@@ -304,7 +304,7 @@ exported func main() {
   rand = LCGRand(1337);
 
   // An isolated 16x16 array of bools.
-  image = «imagetype»
+  image =
       '[][]bool(16, x => {
         '[]bool(16, y => {
           rand.next() mod 2 == 0
@@ -332,7 +332,7 @@ exported func main() {
 </slice>
 
 
-Here's the `coalesceImage` function.
+Here's the `coalesceImage` function. [#foreachiso]
 
 
 ```
@@ -343,7 +343,7 @@ func coalesceImage<r'>(
 
   // Make a new isolated array.
   tiles '[][]bool =
-      foreach [x, column] in tiles.entries() { «foreachiso»
+      foreach [x, column] in tiles.entries() {
         foreach [y, walkable] in column.entries() {
           // Produces a boolean
           averageNeighbors(rand, tiles, x, y)
