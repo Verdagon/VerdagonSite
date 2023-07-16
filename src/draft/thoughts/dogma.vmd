@@ -21,3 +21,66 @@ It really excels with encapsulation, polymorphism, and modularity, which helps y
 link out to MSE velocity
 
 link to stateful strengths, pull from it too
+
+
+
+(before posting this, ask on r/pl if there are any langs that are mixing approaches, so we can highlight them and vale and cone at the end)
+
+- The internet seems to be divided into three big camps:
+  - OO can be pretty nice if used well
+  - FP is the one true way
+  - Rust is the one true way
+- But we're missing a vast space of interesting combinations!
+- There are good parts of OO:
+  - composition
+  - polymorphism
+  - encapsulation
+  - we think in terms of objects _anyway_
+- and bad parts of OO:
+  - implementation inheritance can be overused and unnecessarily couple things
+- Good parts of rust:
+  - can track things other than types in the type system
+  - Bring your own overhead™
+  - can temporarily freeze things on a per-object basis
+  - separating threads' memory
+- Bad parts of rust:
+  - Borrow checker is very restrictive
+  - A lot of your program is spent avoiding the borrow checker (indices, IDs)
+    - rust isnt a memory model, its a motivation to find better memory models
+  - Can't do polymorphism as well as others
+    - no, rust's generics dont count, they pollute the type signature
+    - no, idiomatic rust cant handle polymorphism well, polluting parameters
+- Good parts of procedural (like zig)
+  - simple!
+- Bad parts of procedural
+  -
+- Theres a vast space inbetween!
+- also, its totally artificial!
+  - FP can do OO! monads are just interfaces! IDs are just refs to mutable objects!
+  - Rust is often just FP! we take the world immutably and produce effects!
+  - We minimize state in OO anyway, and produce effects! eg my EC AI
+- vale is exploring:
+  - good OO, since rust neuters it. fun fact: FP has good OO.
+  - tracking region via the type system, like rust did, but free of its dogma: we can use more strategies
+
+
+## Move past the dogma, make a great memory model
+
+(before posting this, ask on r/pl if there are any langs that are mixing memory models, so we can highlight them and vale and cone at the end)
+
+- Good parts of FP
+  - everything's immutable, which is cool
+- Bad parts of FP
+  - everything's immutable, which is stupid
+- Good parts of GC
+  - compaction
+  - we can do manual compaction!
+  - dont need global GC, could use actors!
+- Good parts of RC
+  - deterministic and simple
+- Good parts of single ownership
+  - can put things in arrays
+- Good parts of fortran
+  - we declare all our needed space up front! (and maybe a modern approach could spill over into RAM)
+- Good parts of the relational model
+  - lightning fast iteration

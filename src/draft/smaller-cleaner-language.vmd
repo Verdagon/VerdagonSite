@@ -1,4 +1,24 @@
 
+talk about vale, val, austral, lobster, hvm
+
+talk about that one article that said we should get rid of refcell and stuff. harvest their cred lol
+
+maybe even talk about va
+
+
+
+https://without.boats/blog/notes-on-a-smaller-rust/
+
+I would also take Rust’s commitment to concurrency-first and make all the available primitives threadsafe. No Rc, no Cell and RefCell. Interior mutability is only allowed through a mutex type, and everything can be moved across threads. Send and Sync would only exist as some built-in checks on ownership-related types.
+
+I think closures and arrays/vecs/slices could also be simplified a great deal by not guaranteeing anything about where they’re allocated, though I haven’t worked out all the details.
+
+Such a language would almost certainly also use green threads, and have a simple CSP/actor model like Go does. There’d be no reason to have “zero cost” futures and async/await like we do in Rust. This would impose a runtime, but that’s fine - we’re not creating a systems language. I already said earlier that we’d probably have garbage collection, after all.
+
+
+
+
+
 
 maybe combine this with the impling the region borrow checker?
 

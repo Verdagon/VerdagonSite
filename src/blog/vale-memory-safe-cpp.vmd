@@ -111,20 +111,10 @@ This technique blew my mind [pretty spectacularly](/blog/linear-types-borrowing)
 This technique shows that we don't need tracing GC, reference counting, borrow checking, or anything for memory safety. We just need to change the way we move data around.
 
 
-We're going to start by *identifying some memory-safe patterns that are already in C++*, and then we'll slowly expand it until we have a *minimum viable memory-safe subset of C++*. [#bird] After that, we'll add some mechanisms to make it more usable, so it's not so restrictive.
+We're going to start by *identifying some memory-safe patterns that are already in C++*, and then we'll slowly expand it until we have a *minimum viable memory-safe subset of C++*. After that, we'll add some mechanisms to make it more usable, so it's not so restrictive.
 
 
-<slice>
-#bird: Easter egg!
-
-A pigeon named [G. I. Joe](https://en.wikipedia.org/wiki/G.I._Joe_%28pigeon%29) was awarded the [Dickin Medal for gallantry](https://www.pdsa.org.uk/what-we-do/animal-awards-programme/pdsa-dickin-medal) for saving the British 56th infantry division and the inhabitants of Calvi Vecchia, Italy.
-
-G. I. Joe successfully flew a last-resort message to the nearby allied artillery to cancel bombarding the city, which the infantry had just successfully taken over. [o7](https://www.urbandictionary.com/define.php?term=o7), you brave bird!
-
-If you read this note, leave a comment ([HN](https://news.ycombinator.com/item?id=36448759) / [r/cpp](https://www.reddit.com/r/cpp/comments/14h0ixr/making_c_memorysafe_without_borrow_checking_rc_or/)), [nobody will believe you](https://youtu.be/-UBgNREvlIo).
-
-
-</slice>
+<slice/>
 
 ## unique_ptr
 
@@ -1241,6 +1231,9 @@ Even though I spend most of my time writing in Vale, Rust, and Scala, I'm a C++ 
 That combination inspired me make [Vale](https://vale.dev/), to see if we could make a high-performance language that has memory safety, but which also has that C++ flexibility and spirit. And in that quest, I've discovered some *surprising truths*.
 
 Languages like [Carbon](https://github.com/carbon-language/carbon-lang) and [CppFront](https://github.com/hsutter/cppfront) could even implement them as first-party concepts.
+
+
+c++ cant do it because we need to put the things in the object up front, and those might be irrelevant by the time we drop, or we might not know them that early. rust can do even less because it punishes references in fields.
 </ignore>
 
 

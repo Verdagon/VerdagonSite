@@ -1,0 +1,72 @@
+---
+title: Easter Eggs
+author: Evan Ovadia
+date: July 11, 2023
+realm: blog
+path: blog/easter-egg-notes
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: me
+---
+
+
+<ignore>
+Future notes:
+
+ * Farmers used to "holler" to communicate, and there was even a contest about it, https://northcarolinahistory.org/encyclopedia/the-national-hollerin-contest/
+ * Possum Drop: https://en.wikipedia.org/wiki/The_Possum_Drop
+ * King Neptune
+ * Staff Sergeant Reckless
+ * William Windsor the Goat <--- the best
+ * Hessian the Duck
+ * Nemo the Dog
+ * Sinbad the Chief Dog
+ * Master Sergeant Big Deuce VI
+ * Sergeant Stubby
+ * Simon the Cat: Simon was a ship's cat on the British Royal Navy's HMS Amethyst during the Yangtze Incident in 1949. Despite being injured by shrapnel during an attack, Simon continued to perform his duties by protecting the ship's food stores from rats. He was awarded the Dickin Medal for his actions, becoming the only cat to receive the prestigious honor.
+ * Cher Ami the Pigeon: Cher Ami was a carrier pigeon during World War I that served with the U.S. Army Signal Corps. She delivered a crucial message that saved the lives of a trapped American battalion, despite being shot and wounded by enemy fire. Cher Ami was awarded the Croix de Guerre, a French military honor, for her bravery.
+
+
+
+</ignore>
+
+
+I often like to hide a little "easter egg" note in the side notes, and see if anyone reads them before I remove them.
+
+
+Below is a list of past easter egg notes, enjoy!
+
+
+Also, if you have any ideas for future easter egg notes, let me know! You can reach me via [email](mailto:verdagon_epsa@verdagon.dev), [twitter](https://twitter.com/vale_pl), or [discord](https://discord.gg/SNB8yGH). Cheers!
+
+
+# Brigadier Sir Nils Olav III
+
+(Was on [Vale's First Prototype for Immutable Region Borrowing](https://web.archive.org/web/20230712155756/https://verdagon.dev/blog/first-regions-prototype#where-does-vale-go-from-here))
+
+
+[Brigadier Sir Nils Olav III](https://en.wikipedia.org/wiki/Nils_Olav), colonel-in-chief of the Norwegian King's Guard, is a widely celebrated national hero. A statue was erected in his honor in 2005, and he was even awarded a knighthood by [King Harald V](https://en.wikipedia.org/wiki/Harald_V_of_Norway) himself.
+
+Oh also, Nils Olav is a [king penguin](https://en.wikipedia.org/wiki/King_penguin).
+
+During his knighting ceremony, the King declared that Nils was, as a penguin, "in every way qualified to receive the honour and dignity of knighthood".
+
+If you read this note, mention Nils Olav on [HN](https://news.ycombinator.com/item?id=36690556) or [r/programming](https://www.reddit.com/r/programming/comments/14wu830/vales_first_prototype_for_immutable_region/)! [Nobody will believe you](https://youtu.be/-UBgNREvlIo).
+
+(Congrats to [cbsmith](https://news.ycombinator.com/item?id=36691658), [kubanczyk](https://news.ycombinator.com/item?id=36692089), [TheGoldenMinion](https://www.reddit.com/r/programming/comments/14wu830/comment/jrklcry/?utm_source=reddit&utm_medium=web2x&context=3), [lovich](https://news.ycombinator.com/item?id=36691564), [padraig_oh](https://www.reddit.com/r/programming/comments/14wu830/comment/jrkmjiw/?utm_source=reddit&utm_medium=web2x&context=3), and [leksak](https://news.ycombinator.com/item?id=36691737)!)
+
+
+# G. I. Joe
+
+(Was on [Making C++ Memory-Safe Without Borrow Checking, RC, or GC](https://web.archive.org/web/20230629052606/https://verdagon.dev/blog/vale-memory-safe-cpp#borrowless-affine-style))
+
+
+A pigeon named [G. I. Joe](https://en.wikipedia.org/wiki/G.I._Joe_%28pigeon%29) was awarded the [Dickin Medal for gallantry](https://www.pdsa.org.uk/what-we-do/animal-awards-programme/pdsa-dickin-medal) for saving the British 56th infantry division and the inhabitants of Calvi Vecchia, Italy.
+
+G. I. Joe successfully flew a last-resort message to the nearby allied artillery to cancel bombarding the city, which the infantry had just successfully taken over. [o7](https://www.urbandictionary.com/define.php?term=o7), you brave bird!
+
+If you read this note, leave a comment ([HN](https://news.ycombinator.com/item?id=36448759) / [r/cpp](https://www.reddit.com/r/cpp/comments/14h0ixr/making_c_memorysafe_without_borrow_checking_rc_or/)), [nobody will believe you](https://youtu.be/-UBgNREvlIo).
+
+
+(Congrats to [dwr90](https://www.reddit.com/r/cpp/comments/14h0ixr/comment/jpbx3l4/?utm_source=reddit&utm_medium=web2x&context=3), [nico mac](https://news.ycombinator.com/item?id=36464990), [LLyaudet](https://news.ycombinator.com/item?id=36527312), [chris_wot](https://news.ycombinator.com/item?id=36453695), and [saagarjha](https://news.ycombinator.com/item?id=36462488)!)
+

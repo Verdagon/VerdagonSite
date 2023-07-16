@@ -10,3 +10,7 @@ talk about generational references
 
 talk about basil's weird stack thing
 
+
+nim, orca. perceus?
+
+maybe also lament that swift shared its objects across threads, otherwise it would be in an awesome position to take advantage of this.

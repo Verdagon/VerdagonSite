@@ -2,6 +2,20 @@ Next Decade in Languages: Regions
 Part 1 of the Next Decade in Programming Languages series
 
 
+orca, verona
+
+isos can become imm
+
+
+
+For fun, I benchmarked this against Vale's secret alternate reference-counted backend, and found that it reduces reference counting overhead by a _lot_. If you want to see the numbers click (LINK), but don't take the numbers too seriously, Vale uses "naive" reference counting with no optimizations. It's unclear whether these numbers would be higher or lower when added to a language with other reference counting optimizations already.
+
+This is pretty promising for the future of reference counting. If anyone's making a new language with single-threaded reference counting, let us know!
+
+
+
+
+
 "Surely, we've perfected programming languages! It's hard to really imagine anything else past this."
 
 Indeed, we're likely around where physics was, in 1878, when Philipp von Jolly said that *"in this field, almost everything is already discovered, and all that remains is to fill a few unimportant holes"* about physics.

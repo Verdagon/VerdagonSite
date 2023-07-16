@@ -3,13 +3,14 @@ title: The Next Decade in Languages, Part 1: Allocators
 author: Evan Ovadia
 date: Draft
 realm: blog
-path: blog/beyond-rust-innovations
+path: blog/next-decade-languages-allocators
 layout: annotated
 namespace: c-blog m-annotated
 sponsor: me
 ---
 
 
+verona, cone, odin, zig
 
 specifically, decoupling it, and making it easier
 

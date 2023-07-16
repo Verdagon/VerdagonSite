@@ -16,6 +16,8 @@ I use this site to blog about my endeavors. Enjoy!
 
 # Recent posts:
 
+ * [Vale's First Prototype for Immutable Region Borrowing](/blog/first-regions-prototype)
+ * [Generational References (Updated)](/blog/generational-references)
  * [Making C++ Memory-Safe Without Borrow Checking, RC, or Tracing GC](/blog/vale-memory-safe-cpp)
  * [Chasing the Myth of Zero-Overhead Memory Safety](https://verdagon.dev/blog/myth-zero-overhead-memory-safety)
  * [Single Ownership and Memory Safety without Borrow Checking, RC, or GC](/blog/single-ownership-without-borrow-checking-rc-gc)

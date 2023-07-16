@@ -507,6 +507,16 @@ if [ $TARGET == "generics-compile-times" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
+if [ $TARGET == "easter-egg-notes" ] || [ $TARGET == "all" ] ; then
+  echo "Doing easter-egg-notes"
+  echo $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/easter-egg-notes src/blog/thoughts/easter-egg-notes.vmd
+  eval $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/easter-egg-notes src/blog/thoughts/easter-egg-notes.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
 
 
 

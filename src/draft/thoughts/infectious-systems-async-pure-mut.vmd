@@ -1,10 +1,22 @@
 
-
 after regions prototype, do infectious post
 
 then do MSE2, citing the infectiousness as one of the bigger problems in rust, linking to the infectious post.
 
 soln would be to flip the infrctious direction, make everything asyncish. but that ship has kind of sailed for rust, which defaults the other way. newer languages have the right idea, like zig.
 
-
 talk about the alternative to the infectiousness: zig's colorblind async.
+
+
+
+
+
+https://www.reddit.com/r/ProgrammingLanguages/comments/vofiyv/thoughts_on_infectious_systems_asyncawait_and_pure/
+
+(wait for seamless concurrency?)
+
+talk about "red tape syndrome"
+
+infectious problem: everyone above you needs to approve something youre doing. why does everyone care if youre doing this thing?
+
+they give you reasons, but then you look at the next company over and they avoid the problem completely by thinking about the problem a different way. makes you wonder, what went wrong?

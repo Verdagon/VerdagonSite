@@ -1,8 +1,8 @@
 ---
-title: Vale's First Regions Prototype
+title: Vale's First Prototype for Immutable Region Borrowing
 subtitle: Results and measurements!
 author: Evan Ovadia
-date: May 28, 2023
+date: July 11, 2023
 realm: blog
 path: blog/regions-prototype
 layout: annotated
@@ -11,41 +11,39 @@ sponsor: us
 ---
 
 
-! This article is still in early access for friends and [sponsors](https://github.com/sponsors/ValeLang), thank you so much to everyone who has helped Vale come this far!
-
-
 Three years, two states, and one pandemic ago, I wrote about a very weird idea: what if the type system could track which data existed before a pure call, to eliminate its memory safety overhead? [# See the [original article here](/blog/zero-cost-refs-regions), but keep in mind that was written before I came up with generational references!]
 
 
 And a couple months later, another weird idea struck: what if we use generational indices as the foundation for an entire language?
 
 
-These ideas evolved in _weird_ ways. The first one evolved into a full [region-based borrowing system](/blog/zero-cost-borrowing-regions-overview). The second one become [generational references](/blog/generational-references). Together, they looked like they could form an *entirely new approach* to memory safety, one that doesn't use reference counting, tracing garbage collection, nor borrow checking.
+These ideas evolved in _weird_ ways. The first one evolved into a full [region-based borrowing system](/blog/zero-cost-borrowing-regions-overview). The second one became [generational references](/blog/generational-references). Together, they looked like they could form an *entirely new approach* to memory safety, one that doesn't use reference counting, tracing garbage collection, nor borrow checking.
 
 
-
-The exciting part of all of this was that it's a completely opt-in system, and we're not restricted to a certain programming style. We could write our code in a *normal, comfortable way,* and then come back and add regions later for the parts of our program that we want to optimize. [# This is possible because it makes borrowing compose much better with shared mutability; you can do as much aliasing as you want and then turn the entire world immutable via `pure`.]
-
-
-Even with only [basic use](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing) of regions, we could reduce most generation checks [# A "generation check" happens whenever we dereference a generational reference. It checks to make sure the target object is still alive.] away with just a few annotations. Add in [isolates](/blog/zero-cost-borrowing-regions-part-2-isolates) and linear style, [# Linear style is where we never make a reference to something unless handing it into a pure function.] and we can get generation checks *down to zero* for any Vale code.
+Basically, the coder writes their program in a normal C or C++ish way, and Vale's generational references keep everything memory safe. Then, the coder can use `pure` and [region borrowing](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing) to eliminate most generation check overhead. [# A "generation check" happens whenever we dereference a generational reference. It checks to make sure the target object is still alive.] Add in some [linear style](/blog/linear-types-borrowing), [# Linear style is where we never make a reference to something unless handing it into a pure function.] and we can get generation checks *down to zero* for any Vale code.
 
 
-If it all worked, then we could finally have a language where we could easily prototype, easily iterate, and then easily optimize. No language has ever nailed all three, so this was pretty exciting.
+In other words, this could make our Vale code very, very fast.
+
+
+The exciting part is that region borrowing is completely opt-in. We could write our code in a *normal, comfortable way,* and later add region borrowing for the parts that we want to optimize, almost like a more flexible, opt-in borrow checker. [# This is possible because it makes borrowing compose much better with shared mutability; you can do as much aliasing as you want and then turn the entire world immutable via `pure`.] We could choose which parts of our program should be as flexible as Java, or as fast as Rust, or anywhere in-between.
 
 
 But alas, it was all a theory. We couldn't play with it, because it wasn't real yet!
 
 
+<slice/>
+
 # Building the Theory
 
 
-Most of my free time for the past three years has gone into building out the compiler's foundations so that it could support this unexplored approach.
+Most of my free time for the past few years has gone into building out the compiler's foundations so that it could support this unexplored approach.
 
 
-It was _hard_. Any kind of borrowing system is already pretty complex, but they also requires full generics, which are notoriously difficult. [# Previously, Vale had templates (like C++), not full generics.] [# It took the Golang team a decade to figure out their generics, and I don't blame them at all for that, after this struggle with generics!]
+It was _hard_. Any kind of borrowing system is already pretty complex, but they also require full generics, which are notoriously difficult. [# Previously, Vale had templates (like C++), not full generics.] [# It took the Golang team a decade to figure out their generics, and I don't blame them at all for that, after this struggle with generics!]
 
 
-On top of that, an entire new compiler stage was needed to get regions and generational references to work seamlessly together. [# Under the hood, it reduces regions to "pure height" integers: negative for region generic parameters, zero for the default region, and increasing positive for every pure block. See Part 4 for more on this!]
+On top of that, an entire new compiler stage was needed to get regions and generational references to work seamlessly together. [# Under the hood, it reduces regions to "pure height" integers: negative for region generic parameters, zero for the default region, and increasing positive for every pure block.]
 
 
 Finally, a few months ago, *the regions prototype was finished*. It's rough around the edges, [# For example, its compile errors are very, _very_ verbose, and there are a lot of things that just trigger assertions in the compiler still. I'll be fixing all of these before merging it into the main branch.] but it successfully compiled something for the first time.
@@ -130,7 +128,7 @@ It was a program that uses [Cellular Automata](https://gamedevelopment.tutsplus.
 
 
 
-Of course, it didn't work perfectly. Compilers are tricky. The slightest misstep in the compiler code will add extra instructions to the resulting assembly, causing artificial overhead in the final program. And sometimes, there's extra little bits of information you need to pass to the optimizer (or the CPU itself!) to trick it into the most optimal behavior.
+Of course, it didn't work perfectly at first. Compilers are tricky. The slightest misstep in the compiler code will add extra instructions to the resulting assembly, causing artificial overhead in the final program. And sometimes, there's extra little bits of information you need to pass to the optimizer (or the CPU itself!) to trick it into the most optimal behavior.
 
 
 To help me track down the problems, I kept comparing its assembly to the assembly generated by Vale's "unsafe" modes:
@@ -139,9 +137,12 @@ To help me track down the problems, I kept comparing its assembly to the assembl
  * `unsafe_with_bounds` then adds bounds checking for array accesses, similar to how Rust does it.
 
 
-After a couple months of tracking down differences, the resulting assembly looked nearly identical to Vale's `unsafe_with_bounds` mode! Every difference was expected [# The only expected difference is that it put a pseudo-random generation number at the top of every allocation, though it never needed to read it for any generation checks. This is really just a montonically increasing register under the hood, to keep things fast. We'll be able to remove this once we add [isolates](/blog/zero-cost-borrowing-regions-part-2-isolates) or `uni`que references.] and everything looked pretty reasonable.
+After a couple months of tracking down differences, the resulting assembly looked nearly identical to Vale's `unsafe_with_bounds` mode! Every difference was expected [# The only expected difference is that it put a pseudo-random generation number at the top of every allocation, though it never needed to read it for any generation checks. This is really just a monotonically increasing register under the hood, to keep things fast. We'll be able to remove this once we add [isolates](/blog/zero-cost-borrowing-regions-part-2-isolates) or `uni`que references.] and everything looked pretty reasonable.
 
 
+<slice />
+
+# The Benchmarks
 
 Finally, I benchmarked the program again:
 
@@ -158,13 +159,13 @@ Summary
 Success! Vale's normal mode (`safe_fastest` here) showed no slowdowns compared to only bounds checking.
 
 
-In other words, *this approach has no observable overhead.* [# There might be overhead in theory, in the form of a nonatomic monotonically incrementing integer used for filling generations. It doesn't seem to affect the performance, likely because registers and simple arithmetic operations are so cheap on modern CPUs compared to the real bottleneck which is memory latency. The optimizer also often optimizes it out, since it sees nobody using these generations.]
+In other words, *this approach has no observable overhead.* [# There could be overhead in theory, in the form of a nonatomic monotonically incrementing integer used for filling generations. It doesn't seem to affect the performance, likely because registers and simple arithmetic operations are so cheap on modern CPUs compared to the real bottleneck which is memory latency. The optimizer also often optimizes it out, since it sees nobody using these generations.]
 
 
 Finally seeing this was a shock, a relief, and almost surreal. No overhead! We knew it was possible in theory, but seeing it happen for real still felt very surprising.
 
 
-Feel free to play with it! Just build from the [regions branch](https://github.com/Verdagon/Vale/tree/regions), check out the [benchmarking scripts](https://github.com/Verdagon/RegionsBenchmarks), and to ask any questions in the [discord server](https://discord.gg/SNB8yGH).
+Feel free to play with it! Just build from the [regions branch](https://github.com/Verdagon/Vale/tree/regions), check out the [benchmarking scripts](https://github.com/Verdagon/RegionsBenchmarks), and ask any questions in the [discord server](https://discord.gg/SNB8yGH).
 
 
 And before we get too excited, let's keep these important details in mind:
@@ -175,12 +176,13 @@ And before we get too excited, let's keep these important details in mind:
  * In a larger program (a tiny roguelike game), I also observed that the optimizer didn't merge two identical branches of an if-statement, and missed a couple other obvious optimizations. I'm not sure how the presence of an integer (especially unread!) would affect this. It could even be a bug in LLVM, which are pretty common.
 
 
-That last one hints that we might want our own Vale-specific pre-optimizer, similar to Rust's [Cranelift](https://github.com/bytecodealliance/wasmtime/tree/main/cranelift), since LLVM was designed more with C in mind.
+That last one hints that we might want our own Vale-specific pre-optimizer, similar to Rust's [MIR](https://blog.rust-lang.org/2016/04/19/MIR.html), [# Thanks [bluejekyll](https://news.ycombinator.com/item?id=36690907) for this correction!] since LLVM was designed more with C in mind. [# We might want this anyway, as I'm pretty sure LLVM would treat generational references as undefined behavior, if it could figure out that we're intentionally accessing released memory.]
 
 
 Still, even with these details, these results are quite promising!
 
 
+<slice />
 
 # What does this mean?
 
@@ -194,23 +196,27 @@ It also means that this approach is actually viable, and could be desirable for 
  * It wants to prototype and iterate more easily than with borrow checking.
 
 
+<slice />
+
 # Where does Vale go from here?
 
 The above benchmarks compared Vale's safe mode to Vale's unsafe modes, for a more accurate comparison of the memory safety approaches.
 
 
-However, there are still a few things to do before Vale can really go toe-to-toe with languages like C and C++.
+However, there are still a few things to do before Vale can really go toe-to-toe with languages like C and C++. [#easter]
 
  * I'll need to start a Vale-specific pre-optimizer, since LLVM's optimizer seems to have some problems reasoning about generations and immutability.
  * Vale still needs to support inline data, instead of putting all structs on the heap. (Note that that wouldn't affect the above benchmarks, which didn't use any structs.)
  * Regions are still just in the prototype phase. I'll need to smoothe out the rough edges, pay down a bit of tech debt, and merge this code in before doing anything else.
 
 
-After this is merged in, I'll be making the standard library use regions so that every user will benefit from regions, even if their main program code doesn't use regions directly.
+After this is merged in, I'll be making the standard library use regions so that every user will benefit from them, even if their main program code doesn't use regions directly.
 
 
-After that, I'll be polishing the rest of the compiler and making it more usable for a general audience.
+It's a pretty ambitious endeavor, so it's not clear how long this will take. With enough sponsorship I can work on this full-time, so if you believe in the direction we're heading, please consider sponsoring on [GitHub](https://github.com/sponsors/ValeLang) or [Patreon](https://www.patreon.com/user/about?u=5018675)!
 
+
+<slice/>
 
 # Conclusion
 
@@ -220,25 +226,43 @@ It's been an epic and exciting journey to get to this point! And now, we _finall
 I want to give a massive thanks to everyone that has helped with this endeavor, especially our contributors and sponsors! I definitely would not have made it to this point without your support.
 
 
-If you're impressed with our [track record](https://vale.dev/roadmap#recent-additions) and believe in the [direction we're heading](https://vale.dev/roadmap), please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
-
-<center>
-  <a href="https://github.com/sponsors/ValeLang" class="donate-button">
-     <svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-heart icon-sponsor mr-1 color-fg-sponsors">
-        <path fill-rule="evenodd" d="M4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.565 20.565 0 008 13.393a20.561 20.561 0 003.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.75.75 0 01-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5zM8 14.25l-.345.666-.002-.001-.006-.003-.018-.01a7.643 7.643 0 01-.31-.17 22.075 22.075 0 01-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.08 22.08 0 01-3.744 2.584l-.018.01-.006.003h-.002L8 14.25zm0 0l.345.666a.752.752 0 01-.69 0L8 14.25z"></path>
-     </svg>
-     Sponsor us on GitHub!
-  </a>
-</center>
-
-With your support, we can bring regions to programmers worldwide!
-
-
-See you next time,
+Cheers!
 
 - Evan Ovadia
 
 
 
-
 <$include "/sponsoring.vmd"/>
+
+
+<ignore>
+
+Our job isn't done here yet. Even though we have zero-cost borrowing, there's another aspect of generational references we'd like to resolve: some objects still have (useless) generation numbers.
+
+
+<<<<
+For example, in this program, there's still a generation number above `Spaceship`, even though nobody ever checks it. [# It's pretty common for languages to have metadata for some objects. Swift's 8-byte reference counts, Java's 8-24 bytes ([metadata](https://www.javamex.com/tutorials/memory/object_memory_usage.shtml) plus a possible [remembered hash code](https://stackoverflow.com/a/3796963)). Vale's case is better because embedded structs don't have generations, only the containing local, heap allocation, or array slot. It's most similar to the 8-byte overhead we see in Rust's `SlotMap` or `GenerationalArena`.]
+
+In the future, we'll be able to solve that by putting the Spaceship in its own private region called an isolate (link here) like `ship 'Spaceship = ...` which means that only one person can have a reference to it at a given time.
+////
+```
+struct Spaceship {
+  health i64;
+  engine Engine;
+  navigation Nav;
+  wings Wings;
+}
+struct Engine { fuel i64; }
+struct Nav { height i64; }
+struct Wings { width i64; }
+
+func main() {
+  ship Spaceship = ...;
+  println(ship.health);
+}
+```
+>>>>
+
+In the cellular automata program from before, each array had a generation at the top of it. The 1000x1000 `[][]bool` would have 1001 generations (one for the outer array, and one for each inner array). If that was an `[][]Spaceship`, it would have one generation per Spaceship. To avoid those generation numbers, we could have an array of isolated spaceships, like `[][]'Spaceship`.
+
+</ignore>

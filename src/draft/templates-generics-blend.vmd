@@ -8,3 +8,10 @@ layout: annotated
 namespace: c-blog m-annotated
 ---
 
+or "Vale's Unusual Blend of Templates and Generics"
+
+we're not transitioning all the way; lambdas still behave like templates
+
+C++ is actually closest to the ideal right now
+
+compile time benefits, the plan for monomorphizing

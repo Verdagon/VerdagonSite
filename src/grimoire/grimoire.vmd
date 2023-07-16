@@ -7,6 +7,15 @@ layout: annotated
 namespace: c-blog m-annotated
 ---
 
+
+<ignore>
+
+
+article: RefCell's Lost Twin: The Scope Tether
+
+</ignore>
+
+
 In 2017, [a new pyramid was uncovered at the Dahshur Necropolis](https://www.smithsonianmag.com/smart-news/new-pyramid-discovered-egypt-180962813/), which contains some of Egypt's most ancient pyramids. Langdon Roberts, a world-renowned [Computational Egyptologist](https://escholarship.org/uc/item/0fk4n4gv), was able to decipher the hieroglyphs: they described how ancient egyptians made memory safe programs, using *techniques we've never seen before!*
 
 

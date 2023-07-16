@@ -1,0 +1,153 @@
+---
+title: Why Languages Should Have Linear Types
+author: Evan Ovadia
+date: Jul 12, 2023
+realm: blog
+path: blog/why-languages-should-have-linear-types
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: me
+---
+
+
+I'm working on a rather large language project, written in Scala. Sometimes I wish it was written in Vale, because Vale eliminates certain kinds of bugs.
+
+
+Can you spot the logic bug in this piece of Scala code? (If you don't know Scala, you can also pretend it's Swift/Kotlin and the below `match` is like their `switch`.)
+
+
+```
+def maybeStoreAndMaybeSend(
+		inputExpr: IExpression,
+		maybeNewVariableName: Option[String],
+		maybeSendDestination: Option[Destination]) = {
+
+	val exprMustUse: IExpression = // Note: Don't forget to use this.
+	  maybeNewVariableName match {
+	    case Some(newVariableName) => {
+	    	// The user wants to store the inputExpr into a variable first and then load it.
+	      new CompoundExpr(
+	      		new CreateVariableExpr(newVariableName, inputExpr.type),
+	      		new LoadVariableExpr(newVariableName))
+	    }
+	    case None => {
+	  		// The user doesn't want a new variable, they just want to send the value directly.
+	    	inputExpr
+	    }
+	  }
+
+	maybeSendDestination match {
+		case Some(destination) => {
+			send(exprMustUse, destination)
+		}
+		case None => {
+			// Do nothing
+		}
+	}
+}
+```
+
+
+If you said "You didn't use `exprMustUse` where the `// Do nothing` is!", you're right! [# And if you said something else, you're probably still right, because the above is a simplified snippet that I haven't actually tried compiling, and probably has bugs.]
+
+
+This is actually a (simplified) piece of code from the Vale compiler itself, which is written in Scala. Ironically, if the Vale compiler was written in Vale, this bug wouldn't have happened!
+
+
+Vale has what's known as *linear types*, a type that you must use. If you forget to use it, like above, the compiler will throw an error. [# It's like a much more powerful `must_use`/`[[nodiscard]]` attribute.] You'll never accidentally discard it without using it.
+
+
+<<<<
+In Vale, instead of this:
+
+```
+interface IExpression { }
+```
+////
+we'd just add `linear` like this:
+
+```
+linear interface IExpression { }
+```
+>>>>
+
+
+...and suddenly, the compiler catches that mistake:
+
+
+```
+func maybeStoreAndMaybeSend(
+		inputExpr IExpression,
+		maybeNewVariableName Opt<String>,
+		maybeSendDestination Opt<Destination>) {
+
+	exprMustUse =
+	  match maybeNewVariableName {
+	    Some(newVariableName) => {
+	    	// The user wants to store the inputExpr into a variable first and then load it.
+	      new CompoundExpr(
+	      		new CreateVariableExpr(newVariableName, inputExpr.type),
+	      		new LoadVariableExpr(newVariableName))
+	    }
+	    None => {
+	  		// The user doesn't want a new variable, they just want to send the value directly.
+	    	inputExpr
+	    }
+	  }
+
+	match maybeSendDestination {
+		Some(destination) => {
+			send(exprMustUse, destination)
+		}
+		None => {
+			// Error: No `drop` function found for variable `maybeNewVariableName`.
+		}
+	}
+}
+```
+
+
+
+
+
+
+lets write an article about making an AVL tree in rust and how it resulted in a leak because it gave up single ownership lol
+
+"this is one of the reasons i was a bit disenchanted with rust, and hoped we could find a paradigm with memory safety that didnt give up c++s benefits."
+
+lets keep the article itself balanced, talking about the benefits of rusts approach too. but then lets cite it all over the place talking about how it can cause some problems by solving others.
+
+perhaps even mention that one could also easily forget to update a certain index, and suddenly have a mismatch problem, one that could lead to privacy problems.
+
+talk about how rust can solve this with SlotMap. somehow also talk about how vale does this everywhere and in a much more seamless composable way, where you can embed objects in other objects.
+
+stuff like this is why itll never take off, and why vale has a real shot. its the only safe no-GC approach/language thats not hard as hell.
+
+third error we prevent: accidentally dropping. "you dont wanna drop a thread on the floor. you generally want to do _something_ with the result or deliver the future to someone who wants to do something, or panic it."
+
+perhaps also mention that we can do a zero-check tree in vale, but these are all reasons not to lol. also mention that it literally trades a gen check for a bounds check.
+
+total:
+- rust mem safety compile time, vale runtime
+- vale moves accidental drops to compile time
+- vale detects wrong-instance
+- vale compile time no accidental leaks
+- vale has replayability =D
+
+
+
+
+maybe an article about higher RAII solved a source of bugs in the vale compiler in the function templar. higher RAII can make us remember to handle something. otherwise we might accidentally drop it and forget it.
+
+though, i suppose it can also be solved by just having the innermost function take certain parameters.
+
+i guess higher RAII is more useful for when something beforehand wants to signal that we need to do something.
+
+
+
+
+an article that tries to implement a thread drop thing in c++ and rust?
+like, drop that returns a value
+
+itd need an assert in drop. but then show vale doing it better lol
+

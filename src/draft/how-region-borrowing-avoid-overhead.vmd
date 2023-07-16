@@ -1,0 +1,47 @@
+
+## Some example that makes use of readonly being compatible with both
+
+regions are for going the extra mile. gen refs are already very cheap, but regions go even further. and then they enable multithreading for even more power.
+
+show we can use something from whatever mutability. it doesnt impose an immutability restriction on its caller.
+
+"this is awesome. it means..."
+
+talk about how this doesnt impose any restrictions on the caller. that means we can do things gradually. thats the real strength of regions: the ability to start easy and progressively optimize when we know we should.
+
+"along the lines of [gradual performance]"
+
+
+
+## Observers
+
+observer, start with rustish example, add mut ref
+
+another downside of using rc is that it forces something onto the heap. with gen refs, they can be wherever you want.
+
+it's not just observers. dependency refs, intrusive data structures (such as doubly linked list), higher raii, backreferences, etc. are all the same.
+
+easier to do whatever pattern the situation calls for.
+
+
+## Seamless Concurrency
+
+easier concurrency, without having to rearchitect your entire program to fit a certain mold. just add parallel and youre good.
+
+- seamless concurrency. have an Rc<Pattern> in Level? or a Cell<HP> in units or somewhere, perhaps to allow for a unit damaging itself when it explodes. perhaps even a Cell<gen_index> for whoever attacked them last. all the components are trait objects too. any other possible uses of Rc?
+
+
+## RAII?
+
+
+## CLI app?
+
+
+## What this enables
+
+
+
+then say "3/4 of these cant be done by borrow checking." lol
+
+though be careful, rust can do two of these with RC. be sure to then highlight cost of rc perhaps.
+

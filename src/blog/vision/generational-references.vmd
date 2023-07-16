@@ -19,7 +19,11 @@ TODO:
 *Generational references* are a memory management technique, an alternative to reference counting, tracing garbage collection, or borrow checking. [# This is an updated version of the 2021 article, which you can still find [here](/blog/generational-references-v1)]
 
 
-In this technique, every reference remembers the ID ("generation") of the object it's pointing at, and checks on dereference that it still matches. The user can safely skip this check with static analysis, "linear style", or regions. [# In a way, it's like we're applying the [generational indices](https://lucassardois.medium.com/generational-indices-guide-8e3c5f7fd594) technique to an entire programming language.]
+In this technique, every reference remembers the ID ("generation") of the object it's pointing at.
+
+If the user dereferences an object and Vale isn't certain it's still alive, it will insert a run-time check that the reference's generation matches the object's generation.
+
+We can safely skip these checks with static analysis, "linear style", or regions. [# In a way, it's like we're applying the [generational indices](https://lucassardois.medium.com/generational-indices-guide-8e3c5f7fd594) technique to an entire programming language.]
 
 
 This article explains:
@@ -410,7 +414,7 @@ pure func PrintFuel(ship_ref &Ship) {
 This is called [immutable region borrowing](/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing). It's a pretty in-depth topic, check out [this series](/blog/zero-cost-borrowing-regions-overview) which talks about other ways that regions help eliminate `__check`s.
 
 
-We recently finished the first regions prototype, and it showed that our benchmark program had no observable overhead when using linear style and regions to eliminate all `__check`s. Check out [Vale's First Regions Prototype](/blog/first-regions-prototype) for more!
+We recently finished the first regions prototype, and it showed that our benchmark program had no observable overhead when using linear style and regions to eliminate all `__check`s. Check out [Vale's First Prototype for Immutable Region Borrowing](/blog/first-regions-prototype) for more!
 
 
 Using this blend of linear style and regions will feel familiar to those who have used languages like Rust. It has the same benefit of avoiding run-time costs (from garbage collection, reference counting, or `__check`s), though it can often add other run-time costs in the form of extra cloning, bounds checking, and hashing. [# In both paradigms, we often work around the lack of mutable aliasing by cloning or by making all aliases into indices/IDs into a central vectors or hash maps.] [# See also [Chasing the Myth of Zero-Overhead Memory Safety](/blog/myth-zero-overhead-memory-safety), which talks about how there's no way to eliminate all run-time memory-safety-related overhead.]
@@ -440,6 +444,8 @@ This is Vale's strength: it's fast by default, and we can gradually optimize whe
 <slice />
 
 # How do we put data in other objects?
+
+! This is only hypothetical, as Vale doesn't yet support inline data (that's next after regions). This section describes how we plan on doing it.
 
 The main benefit of single ownership is that it allows us to embed a struct inside another struct, or a struct inside an array. [# Technically, we don't need single ownership for this. Languages like C# allow us to put value types (such as `struct`s) directly inside classes and arrays. The real trick is whether we can take a reference to that embedded data.] How do we do that with generational references?
 
@@ -585,7 +591,7 @@ That would be true, except that [most Rust programs](https://2020.icse-conferenc
 
 When someone uses `unsafe` to get around the borrow checker's restrictions, even if they think really hard about `unsafe`'s more arcane interactions, bugs can remain hidden for a long time, stealthily causing undefined behavior in the `unsafe` block and in the safe code around it.
 
-We'd similarly use random generational references to get around the restrictions of affine style, and fortunately, any invalid accesses are detected _very_ loudly as a check failure brings down the entire program. Bugs are discovered _very_ quickly, instead of causing mysterious behavior for years.
+We'd similarly use random generational references to get around the restrictions of linear style, and fortunately, any invalid accesses are detected _very_ loudly as a check failure brings down the entire program. Bugs are discovered _very_ quickly, instead of causing mysterious behavior for years.
 
 Vale's design also goes one step further and replaces `unsafe` with a "skip-check dereference" operator to skip `__checks` in release mode. The major benefit is that the compiler ignores these in dependencies by default, so we no longer have to trust that our dependencies used unsafety well.
 
@@ -603,6 +609,7 @@ If there's six million check failures per second (the [largest DDoS in history](
 
 Comfortable odds, I'd say!
 </slice>
+
 
 # Hidden Benefits
 
@@ -643,8 +650,64 @@ I hope you enjoyed this article! As always, if you have any questions, feel free
 - Evan Ovadia
 
 
-
 <slice/>
+
+# Appendix: "Generation Tables" Option
+
+! Vale doesn't have this option yet, stay tuned!
+
+
+The random generational references approach above is Vale's default, but we'll also have this "generation tables" approach as another option for users, in case random generational references don't work for them for some reason. [#sidechannel]
+
+
+In this approach, an object doesn't have a 64 bit generation, it instead has a 32-bit `entryIndex` into the "generation table".
+
+
+A generational reference contains three things:
+
+ * `object`: Pointer to the object.
+ * `index`: 32-bit index into the generation table.
+ * `rememberedGeneration`: 32-bit generation number.
+
+
+Every region will have a *generation table*, a single struct which contains:
+
+ * `entries`: Pointer to an "entries" array.
+ * `size`: How many elements in the entries array.
+ * `firstFree`: Index of the first free entry (this is the head of the entry free-list).
+
+
+An entry has two things:
+
+ * `currentGeneration`: 32-bit generation for the object corresponding to this entry.
+ * `nextFree` 32-bit index to the next free entry, if this entry is currently unused.
+
+
+To do a generation check for a given generational reference, we look up the `index`th entry in the table, and see if its `currentGeneration` matches the reference's `rememberedGeneration`.
+
+
+When the user creates a Vale object, we:
+
+ * Expand the generation table if there are no entries left.
+ * Set the new object's `entryIndex` to the table's `firstFree` index.
+ * Set the table's `firstFree` index to this entry's `nextFree`.
+
+
+When the user destroys a Vale object, we:
+
+ * Increment the `entryIndex`th entry's `currentGeneration`. If it hits INT_MAX, stop here.
+ * Set the entry's `nextFree` to the table's `firstFree`.
+ * Set the table's `firstFree` to the object's `entryIndex`.
+
+
+<slice>
+#sidechannel: One reason we're keeping the generation tables approach around is as an opt-in Spectre mitigation, similar to Go's [-spectre](https://github.com/golang/go/wiki/Spectre) flag. 
+
+Spectre attacks aren't any more likely in Vale and still require very specific conditions (see [Golang's explanation](https://github.com/golang/go/wiki/Spectre)), but if there's a Spectre attack plus an extant use-after-free plus attacker-controlled input, they could possibly follow up their Spectre attack with an RCE.
+
+It's unknown if this is actually possible, but until we can rule it out, we'll work towards having this alternate option.
+</slice>
+
 
 
 <$include "/sponsoring.vmd"/>

@@ -9,6 +9,25 @@ namespace: c-blog m-annotated
 sponsor: us
 ---
 
+
+<ignore>
+
+VmdSiteGen: 19 vs 72
+ParseIter: 3 vs 20
+VmdParse: 27 vs 77
+49 vs 169 (29%)
+
+BenchmarkRL: 35 vs 111 (32%)
+
+Atharia: 3 vs 119
+Domino: 8 vs 212
+Terrain: 17 vs 126
+28 vs 457 (6%)
+
+</ignore>
+
+
+
 We're going to commit a cardinal sin today and talk about *syntax design!* [# It's such a travesty to be talking about something as mundane as _syntax_ during the week we're prototyping [deterministic replayability](https://github.com/ValeLang/Vale/blob/master/docs/PerfectReplayability.md)!]
 
 

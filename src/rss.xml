@@ -26,6 +26,16 @@
 
 
       <item>
+         <title>Vale's First Prototype for Immutable Region Borrowing</title>
+         <guid>https://verdagon.dev/blog/first-regions-prototype</guid>
+         <link>https://verdagon.dev/blog/first-regions-prototype</link>
+         <pubDate>Sun, 11 Jul 2023 00:00:00 -0500</pubDate>
+         <category>Programming Languages</category>
+         <category>Vale Programming Language</category>
+         <author>noreply@verdagon.dev (Evan Ovadia)</author>
+      </item>
+
+      <item>
          <title>Generational References (Expanded)</title>
          <guid>https://verdagon.dev/blog/generational-references</guid>
          <link>https://verdagon.dev/blog/generational-references</link>

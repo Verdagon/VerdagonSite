@@ -1,5 +1,5 @@
 ---
-title: Implementing a New Memory Safety Approach, Part 2: An Unexpected Quest
+title: Optimizing Regions
 subtitle: Generics help us avoid code size explosions!
 author: Evan Ovadia
 date: Jan 20, 2022
@@ -9,6 +9,9 @@ layout: annotated
 namespace: c-blog m-annotated
 sponsor: us
 ---
+
+
+perhaps "r15 is a figment of our imaginations"
 
 
 
@@ -26,3 +29,30 @@ and of course it is, im just running hyperfine on a mac lol
 still getting nonsense results. ah, there it is, im still doing bounds checks lol
 
 to make sure i did bounds checking everywhere, im leaning on the type system. adding a wrapper for an integer to represent that yes, it was checked in bounds. thisll be a great use for linear types once i can self-host.
+
+
+The quest to optimize regions
+
+
+
+
+- O3 has a lot of (deterministic) noise. restrictptr should not have been faster than unsafe+bounds.
+- needing cset shield
+- bounds cost a lot!
+
+
+- zero cost memory is a myth! is this a point in zigs favor? does rust have invisible complexity?
+- borrowing and immutability cause cloning! slowdowns. another point in zigs favor.
+- the notion that bounds checks cause speedups is completely false, it seems.
+
+
+
+
+
+- restrict vs global
+- local vs global
+- register renaming "r15 is a figment of your imagination"
+- register spilling, unspilling: https://stackoverflow.com/questions/2460198/p6-architecture-register-renaming-aside-does-the-limited-user-registers-resul
+- i++ vs ++i
+
+
