@@ -572,3 +572,9 @@ Cheers,
 
 - Evan Ovadia
 
+
+<ignore>
+https://news.ycombinator.com/item?id=36845943:
+Julia excels at all of these and as such is nearly perfect for science, whereas Rust is unusually bad at the "prototyping and redesign" part. Like, you change the ownership model of some struct, or some single type, and now you have to unravel half your code base to change type signatures and fix borrow checker woes. It's also just slow to write.
+</ignore>
+

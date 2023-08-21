@@ -15,6 +15,7 @@ digraph {
     # HWSV [label="HWSV: How We\nSimplified Vale"];
     # WTEGC [label="WTEGC: When to Eliminate Gen Checks"];
     # WHP [label="WHP: Why Have Panics"];
+    # CSILD [label="Code Size in Language Design"];
 
 
     layout=neato;
@@ -36,6 +37,8 @@ digraph {
 
     IDP [label="Inline Data\nPrototype", fillcolor="#FFC0C0", style=filled];
 
+    MSAP [label="Memory-Safe\nAllocators\nPrototype", fillcolor="#FFC0C0", style=filled];
+
     ORP [label="Opaque\nReplayability\nPrototype", fillcolor="#FFC0C0", style=filled];
     SPR -> ORP;
 
@@ -46,9 +49,6 @@ digraph {
     PAAF4 -> R4;
     SPR -> R4;
     IDP -> R4;
-
-    STRP [label="STRP: Languages need to solve the right problems", fillcolor="#FFC0C0", style=filled];
-    START -> STRP;
 
     MUTEX [label="Mutexes", fillcolor="#FFC0C0", style=filled];
     SCP -> MUTEX;
@@ -64,6 +64,8 @@ digraph {
 
     LK [label="Linear\nKeyword", fillcolor="#FFC0C0", style=filled];
 
+    BRE [label="Bigger\nRegions\nExample", fillcolor="#FFC0C0", style=filled];
+
 
 
 
@@ -75,14 +77,21 @@ digraph {
     IFORCS [label="IFORCS:\nInvestigating\nFunction\nOverloading\nin Rust, C++,\nand Swift"];
     OI -> IFORCS;
 
-    WSVG [label="WSVG: Where Should Vale Go"];
-    SVP -> WSVG;
+    WSVG [label="WSVG:\nWhere Should\nVale Go"];
+    SCP -> WSVG;
 
-    SCBACT [label="SCBACT: Should Checks Be At Compile Time", fillcolor="#C0FFFF", style=filled];
+    SCBACT [label="SCBACT:\nShould Checks\nBe At Compile Time", fillcolor="#C0FFFF", style=filled];
     START -> SCBACT;
+    HLAPA -> SCBACT;
 
     WLT [label="WLT: Why\nLinear Types"];
     LK -> WLT;
+
+    VFPMSA [label="VFPMSA:\nMemory Safe\nAllocators\nPrototype"];
+    MSAP -> VFPMSA;
+
+    WWWSL [label="WWWSL:\nWant Simpler\nLanguages"];
+    MTSE -> WWWSL;
 
     SOWBC [label="SOWBC: Single\nOwnership Without\nBorrow Checking"];
     OOGPBP -> SOWBC;
@@ -91,8 +100,8 @@ digraph {
     WLSHTGB [label="WLSHTGB: When a\nLanguage Should\nHave Templates,\nGenerics, or Both"];
     R3 -> WLSHTGB;
 
-    ORCPP [label="ORCPP: On Replacing C++", fillcolor="#C0FFFF", style=filled];
-    START -> ORCPP;
+    HDLSE [label="HDLSE: Design\nLanguage for\nSoftware Engineering"];
+    HLAPA -> HDLSE;
 
     NDLDC [label="NDLDC: Next\nDecade in\nLanguage Design:\nConcurrency"];
     SCP -> NDLDC;
@@ -100,8 +109,18 @@ digraph {
     PAAF4 [label="PAAF4: Plans\nand Ambitions\nfor v0.4"];
     R3 -> PAAF4;
 
-    ACBG [label="ACBG: Abstractions Can Be Good", fillcolor="#C0FFFF", style=filled];
+    ACBG [label="ACBG:\nAbstractions\nCan Be Good", fillcolor="#C0FFFF", style=filled];
     START -> ACBG;
+
+    STRP [label="STRP: Solve\nthe right\nproblems", fillcolor="#C0FFFF", style=filled];
+    START -> STRP;
+
+    MTSE [label="MTSE:\nMastered Things\nSeem Easy", fillcolor="#C0FFFF", style=filled];
+    START -> MTSE;
+    PRCOM -> MTSE;
+
+    SUW1K [label="SUW1K:\nSpeeding Up\nw 1 Keyword"];
+    SCP -> SUW1K
 
     # WVDHE [label="WVDHE: Why\nVale Doesn't\nHave Enums"];
     # IDP -> WVDHE;
@@ -120,12 +139,15 @@ digraph {
 
     HRBAO [label="HRBAO: How\nRegion Borrowing\nAvoids Overhead", fillcolor="#C0FFFF", style=filled];
     START -> HRBAO;
+    FIBEE -> HRBAO;
 
     FPRP [label="FPRP: Flexible Perfect\nReplayability Prototyped"];
     ORP -> FPRP;
 
-    HLAPA [label="HLAPA: How Languages Affect a Program's Architecture", fillcolor="#C0FFFF", style=filled];
-    START -> HLAPA;
+    HLAPA [label="HLAPA:\nLangs Affect\nArchitecture"];
+    SCBACT -> HLAPA;
+    PRCOM -> HLAPA;
+    BRE -> HLAPA;
 
     TOIS [label="TOIS: Thoughts\non Infectious\nSystems"];
     SCP -> TOIS;
@@ -142,22 +164,30 @@ digraph {
     USGR [label="USGR: Using\nthe Stack with\nGenerational\nReferences"];
     IDP -> USGR;
 
-    HTUDW [label="HTUDW:\nHow to use tech\ndebt wisely", fillcolor="#C0FFFF", style=filled];
-    START -> HTUDW;
-    FUGB -> HTUDW;
+    HUTDW [label="HUTDW:\nHow to use tech\ndebt wisely", fillcolor="#C0FFFF", style=filled];
+    START -> HUTDW;
+    FUGB -> HUTDW;
+
+    DSEAA [label="DSEAA:\nDifference\nEngineering\nArtistry"];
+    HUTDW -> DSEAA;
 
     FUGB [label="FUGB: Fuck You\nGive Banana", fillcolor="#C0FFFF", style=filled];
     START -> FUGB;
-    HTUDW -> FUGB;
+    HUTDW -> FUGB;
 
-    OOGPBP [label="OOGPBP: The\nGood Parts and\nBad Parts of OOP", fillcolor="#C0FFFF", style=filled];
+    PLI [label="PLI: Prototype,\nLaunch, Iterate"];
+    FUGB -> PLI;
+    HUTDW -> PLI;
+
+    OOGPBP [label="OOGPBP: The\nGood Parts and\nBad Parts of OOP"];
     ECECSR -> OOGPBP;
     DCFCB -> OOGPBP;
-    START -> OOGPBP;
+    ACBG -> OOGPBP;
 
     LRNHLL [label="LRNHLL:\nLessons\nfrom Rust"];
     DPRACV -> LRNHLL;
     TOBR -> LRNHLL;
+    WLT -> LRNHLL;
 
     WRSHLT [label="WRSHLT:\nWhy Rust\nShould Have\nLinear Types"];
     WLT -> WRSHLT;
@@ -165,7 +195,7 @@ digraph {
     HPDLMPD [label="HPDLMPD: The\nHardest Part of\nDesigning a Language\nis Moving Past the Dogma"];
     OOGPBP -> HPDLMPD;
 
-    WLDSKAM [label="WLDSKAM: What Language Designers Should Know About Memory", fillcolor="#C0FFFF", style=filled];
+    WLDSKAM [label="WLDSKAM: Lang\nDesigners Should\nKnow About Memory", fillcolor="#C0FFFF", style=filled];
     START -> WLDSKAM;
 
     SWRR [label="SWRR: Surprising\nWeak References,\nRedux"];
@@ -178,8 +208,8 @@ digraph {
     HUTDW -> HWRSC;
     OI -> HWRSC;
 
-    HUTDW [label="HUTDW: How\nto Use Tech\nDebt Wisely", fillcolor="#C0FFFF", style=filled];
-    START -> HUTDW;
+    DIG [label="DIG: Determinism in Games"];
+    VPRS -> DIG;
 
     EPTTV [label="EPTTV: Encouraging\nPeople to Try Vale", peripheries=3];
     IDP -> EPTTV;
@@ -195,29 +225,34 @@ digraph {
     FUGB -> WWSMMPL;
     HVSDCFC -> WWSMMPL;
 
-    PRCOM [label="PRCOM: \nProgressive\nComplexity", fillcolor="#C0FFFF", style=filled];
+
+    UDF [label="UDF: Uni\nData Flow"];
+    BRE -> UDF;
+
+    PRCOM [label="PRCOM: \nProgressive\nComplexity"];
     TOLC -> PRCOM;
-    START -> PRCOM;
+    SCBACT -> PRCOM;
+    MTSE -> PRCOM;
 
     TOLC [label="TOLC: Thoughts\non Language\nComplexity"];
     PRCOM -> TOLC;
-    START -> TOLC;
 
-    WROBC [label="WROBC: Why\nRegions Over\nBorrow Checking", fillcolor="#C0FFFF", style=filled];
-    START -> WROBC;
+    WROBC [label="WROBC: Why\nRegions Over\nBorrow Checking"];
+    BRE -> WROBC;
 
     FIBEE [label="FIBEE: Vale's First\nImmutable Borrowing\nExample, Explained\nStep by Step", fillcolor="#C0FFFF", style=filled];
     START -> FIBEE;
+    HRBAO -> FIBEE;
 
-    TIFC [label="TIFC: Thoughts on\nthe Inevitability\nof Function Coloring", fillcolor="#C0FFFF", style=filled];
-    START -> TIFC;
+    TIFC [label="TIFC: Thoughts on\nthe Inevitability\nof Function Coloring"];
+    SCP -> TIFC;
 
     FUSAT [label="FUSAT: The\nFastest User Study\nof All Time"];
     SPR -> FUSAT;
 
     L150K [label="L150K:\n150k Lines"];
     HDNHLP -> L150K;
-    HTUDW -> L150K;
+    HUTDW -> L150K;
 
     WACN [label="WACN: Writing\na Compiler\nNomadically", fillcolor="#C0FFFF", style=filled];
     START -> WACN;
@@ -261,7 +296,7 @@ digraph {
     START -> ECECSR;
 
 
-    WWPLRG [label="WWPLRG: Perfect\nLanguage for\nRoguelike Games"];
+    WWPLRG [label="WWPLRG:\nPerfect Lang for\nRoguelike Games"];
     ECECSR -> WWPLRG;
 
     CGPRC [label="CGPRC: Combining\nthe good parts of\nRust and C++"];
@@ -276,8 +311,9 @@ digraph {
     TOLC -> TOBR;
     LRNHLL -> TOBR;
 
-    CBMA [label="CBMA: Composing\nBorrowing and\nMutable Aliasing", fillcolor="#C0FFFF", style=filled];
-    START -> CBMA;
+    CBMA [label="CBMA: Composing\nBorrowing and\nMutable Aliasing"];
+    FIBEE -> CBMA;
+    BRE -> CBMA;
 
     LSOL [label="LSOL: A List\nof Single\nOwnership\nLanguages"];
     SOWBC -> LSOL;
@@ -327,6 +363,9 @@ digraph {
 
     APASTM [label="APASTM: Approach\nfor Software\n Transactional Memory"];
     STM -> APASTM;
+
+    HVLDB [label="HVLDB:\nVale Like\nDatabase"];
+    APASTM -> HVLDB;
 
     HTAMP [label="HTAMP: How\nto Avoid Mutex\nPoisoning"];
     APASTM -> HTAMP;
@@ -429,9 +468,42 @@ rust is like the framework approach. you must always use the borrow checker, eve
 
 
 
+
+# Why We Want Simpler Languages (WWWSL)
+
+talk about the developer velocity, the realism, etc.
+
+talk about inherent complexity
+
+
+
+
+# Determinism in Games (DIG)
+
+an article about determinism in games, and C#s struggles here
+
+talk about replayability. helps debugging.
+
+fixed point math
+
+RTS needs this
+
+
+# Speeding Up Things With 1 Keyword (SUW1K)
+
+"speed up cellular automata 4x with 1 keyword" article when we have parallel
+
+
 # The Memory Safety Grimoire (MSG)
 
 40 grimoire docs, see grimoire.vmd
+
+
+
+# How to Design a Language for Software Engineering (HDLSE)
+
+
+rust sucks. FP solves it with the state monad and lenses.
 
 
 
@@ -485,6 +557,14 @@ Mention it's up in the air for Vale. We could do a switch in our one remaining s
 
 
 
+# Mastered Things Seem Easy (MTSE)
+
+maybe "I've Mastered It, Therefore It's Simple"
+
+honor your pain.
+
+
+
 # Writing a Compiler Nomadically (WACN)
 
 A bunch of tips for programming on the go:
@@ -530,6 +610,23 @@ get the thing working
 link in our dev velocity article
 
 
+# Prototype, Launch, Iterate (PLI)
+
+article about prioritizing getting something working vs innovating well
+
+maybe mention that it was a mistake to do templates, and closures. they seemed easy at the time, but they slowed me down a bit when it came to generics. might have been a good idea to rely on some primitive code generation, kind of like C, until the more interesting features were in.
+
+then again, the reverse coulda been true. maybe better to nail down the basics before doing the complex stuff?
+
+
+Comment by Animats - https://news.ycombinator.com/item?id=34591105
+
+rust: day or two of rewriting to get ownership rihht
+
+- how developer velocity is important for 7drl
+- developer velocity is important for hvz. ninjafix
+
+
 # The Hardest Part of Language Design is Considering Others' Ideas (HPLDCOI)
 
 we tend to identify with what we made. after all, if i made something bad, then i am bad. classic human thinking. we are bright souls on very faulty hardware.
@@ -546,6 +643,7 @@ i can only hope that more people come forward with their proposals.
 
 
 
+
 # When a Language Should Have Templates, Generics, or Both (WLSHTGB)
 
 
@@ -557,6 +655,21 @@ templates-generics-blend.vmd
 # Next Decade in Language Design: Allocators (NDLDA)
 
 next-decade-languages-allocators.vmd
+
+
+
+# Vale's First Prototype for Memory Safe Allocators (VFPMSA)
+
+
+once we have allocators, make an article on how to use allocators to speed up code. show a 100x increase using bump allocation. perhaps for a sort?
+
+use the big-page stack too maybe
+
+show how we can use single-type pools for speedups. A-star?
+
+multi-type pools too
+
+i wonder if we can use a simd hash map for our multi pools
 
 
 
@@ -597,6 +710,12 @@ region borrowing. nice because we can freeze some things while the innards remai
 
 maybe also lament that swift shared its objects across threads, otherwise it would be in an awesome position to take advantage of this.
 
+
+
+article overviewing other languages adding borrow checkers
+vale and iirc c++, dlang...
+also mention automatic, like swift abd lobster
+also mention the imm rc thing
 
 
 
@@ -668,6 +787,8 @@ and perhaps a background article on the region borrow checker on vale.dev.
 (stands for Skip Mutex Lock In Mutable Region)
 
 talk about how if we see a mutex inside a mutable region, we dont need to lock it to modify it. fuuuck thats cool.
+
+rust also has it: https://old.reddit.com/r/rust/comments/150vgyx/whats_the_coolest_function_in_the_rust_language/js5f4qn/
 
 (show an eat trash be free raccoon thing)
 
@@ -1248,6 +1369,14 @@ when youre choosing a language, you gotta ask: do i want 20% more features to gr
 
 
 
+an article on why vale can do this kind of structured concurrency reading when rust cant: vale has no escape hatches (it needs none)
+
+
+talk about constraints.
+constraints cause refactoring.
+https://news.ycombinator.com/item?id=34591105
+
+
 when rust keeps us from certain techniques, our code necessarily becomes more complex.
 
 there are very likely situations for which those techniques make for the simplest code. so by necessity outlawing those techniques makes for more complex code. for example, raii and observers.
@@ -1414,6 +1543,16 @@ article on how memory travels from somewhere to somewhere else i dunno
 but talk about all the war pigeons that got the Dickin Award
 
 
+article on post-space-travel architecture
+
+a lot of push stuff
+
+unlimited bandwidth, but latency is the real trick
+
+maybe work in CRDTs?
+
+
+
 
 # How to Use Tech Debt Wisely (HUTDW)
 
@@ -1443,6 +1582,25 @@ Always pay it down. The first time you don't, you are no longer allowed to follo
 
 
 i dont know if vale will be here two years from now. we might not have the sponsors for that. so its good to just take note of those long term things and solve it when we get there. otherwise we fizzle out and do zero good. its better to prove the concepts exist, for the next language to take over.
+
+
+
+# Difference Between Software Engineering and Artistry (DSEAA)
+
+Or perhaps: Software Engineering is Not Artistry
+
+talk about how there are two kinds of programmers:
+
+ * software engineering is about getting things done in pursuit of a goal.
+ * artistry is pursuing other goals, usually elegance.
+
+its good to let a little bit of artistry in when it serves the ultimate purpose.
+
+we often think we're pursuing one goal, when we're really just pursuing artistry.
+
+code often just pleases us, but not for any particular purpose. it tickles our fancy in a way that we've trained ourselves to like.
+
+i used to like the DAG hierarchies of OO. i used to like borrow checking. but all of these are just noise. stop chasing the high, and make something useful!
 
 
 # Why Linear Types (WLT)
@@ -1487,6 +1645,18 @@ bad: inheritance
 avoid infectious things that blast through those. like async and &mut.
 
 
+how one can get the benefits of OO without the drawbacks if they just stop using the "extends" keyword
+
+
+- flexible code is important. we knew that the PM would be asking for more. (from kim in chat with the ... see more link)
+- its important to make loose code. crystal balling can help you know where more looseness might be beneficial. (kim again)
+- in 7drl, good enough is the goal.
+
+
+
+often, a collection is just single owned ptrs and it works nice. good balance between borrow checking and GC.
+
+
 article: "Lessons learned from Rust and Object-Oriented Programming"
 
 talk about how OOP is mostly bad but has some great strengths, specifically in solid APIs that are resilient to changes. when youre in the field, you want a good lieutenant. you just want to issue commands. if the situation changes, you dont want him to bring you ever little detail, you dont want to know the concerns of his day to day operations. you just want to tell him to do the thing, and he'll find a way to do it. thats a solid API. it lets you focus on the more important things (business logic).
@@ -1514,6 +1684,9 @@ the unfortunate reality is that we see less interchangeability and abstraction i
 but luckily, there is hope. OO concepts are coming back into the world via higher 
 
 the benefit is that you can abstract away components and make them interchangeable.
+
+
+
 
 # The Fastest User Study of All Time (FUSAT)
 
@@ -1895,6 +2068,9 @@ talk about the ISender<T> thing i talked about with icefox
 
 # The Paths Beyond the End of Memory Safety (PBEMS)
 
+need a better title, this one is so arcane, and annoyingly confrontational
+
+
 we all think that we've reached the end of memory safety, that its basically between GC and borrow checking. a tradeoff of simplicity and speed.
 
 what everyone doesnt know is that the borrow checker is one specific spot on a very large spectrum. rust is charging blindly in one direction, with its lantern, not realizing that there is more than just its 20ft of light. rust is in a massive cavern.
@@ -1997,25 +2173,8 @@ hoping vale will:
 
 in any article mention the progress made in the past year, what we're working on now, and our larger current goal
 
-
-
-# On Replacing C++ (ORCPP)
-
-also, do we really want to replace C++? if c++ is shrinking, then we want to replace its replacement. if it's growing, then do we really need to replace it? i wonder.
-
-first read https://www.reddit.com/r/rust/comments/w2tygg/carbon_language_an_experimental_successor_to_c/ and https://www.reddit.com/r/programming/comments/w2thvo/carbon_an_experimental_c_successor_language/ and https://news.ycombinator.com/item?id=32151609
-
-carbon: could replace c++, though itll be hard for them to add memory safety.
-
-vale: could replace c++ for the higher level use cases. servers, cross platform code, etc. it's a bit better than rust because it's easier and more flexible.
-
-odin: "Odin isn't really meant to replace C++ though, it's meant to replace C. It does have several higher-level features though that makes it a really good in-between for C++ and C as well, but it mainly sticks to C-land. Mainly its type system, modern design, and quality-of-life changes make it way better than C" - Foxify
-
-zig: a lot of people use c++ as c-with-templates. zig could do pretty well here.
-
-rust: could replace it. there are a lot of articles about it, so i wont go too deeply into it here.
-
-talk about its pretty hard to replace c++, especially since it's used for so much. but between a bunch of other languages, we'll probably be able to replace it for new projects.
+- the kind of architectures rust's borrow checker influences you into, its benefits, its weaknesses, and how the region borrow checker might compare
+- how abstraction helps architecture (via decoupling) and the kinds of abstraction that different languages offer
 
 
 
@@ -2044,6 +2203,11 @@ mention:
 - detecting every non-owning dereference is a gray area. vale and cheri say implied, rust says explicit.
 
 
+write an article on assertions
+
+have a section on  should i use type state programming or the type system for all guarantees? say no, because they tend to fall apart in the presence of encapsulation and decoupled concerns
+
+
 # Abstractions Can Be Good (ACBG)
 
 article: hot take: abstraction can be a good thing
@@ -2061,6 +2225,51 @@ firebase is one
 react
 
 
+# Code Size in Language Design (CSILD)
+
+article: "Compression in Language Design: C#, Vale, Swift, Rust, Java, and C++"
+
+talk about type erasure, jvm bytecode being compact, c++ and rust being template heavy. c#s interesting compromise.
+
+then talk about the challenge with making regions work well. minimizing information in templatas helping mitigate the explosion. type erasure making for better compilation times
+
+
+
+monomorphizing huge code size
+https://news.ycombinator.com/item?id=28818536
+possibly big weakness in rust and c++
+
+article on selective monomorphizing, when compiler has the choice
+can use pgo too
+
+article: WebAssembly, Binary Sizes, and Compile-time Polymorphism
+
+talk about how we might not want to monomorphize everything. talk about branch prediction
+
+talk about this is why jvm and clr are so brilliant
+
+talk about how we can whitelist certain parts
+
+itll need a language that is high level enough though, that can be polymorphic over type erasure.
+
+
+
+
+# How Vale is Like a Database (HVLDB)
+
+article: "Your language should be a database"
+
+talk about fearless FFI recording all inputs and outputs
+
+talk about WAL (write ahead logs)
+
+talk about transactionality
+
+
+
+# Vale's First Prototype for Memory-Safe Unsafe (VFPMSU)
+
+Does a systems programming language really need unsafe?
 
 
 # Lessons from Rust for Newer Higher-Level Languages (LRNHLL)
@@ -2089,6 +2298,8 @@ So that it can really do fearless structured concurrency, like Vale.
 Should be a ghost-written article perhaps.
 
 if we could just assume things were Send/Sync, then we'd be able to do this in rust. unfortunately, rust currently assumes everything isn't sync/send.
+
+
 
 
 

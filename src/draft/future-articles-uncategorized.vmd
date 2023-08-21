@@ -1,255 +1,48 @@
 Add these to future-articles.vmd, both in the subsections and the graph
 
-
-----
-
-perfect replayability with opaques
-cone, lobster, vale, inko, nim's common goal
+(none right now)
 
 
+# Graveyard
 
+Here's some articles that we decided not to write about.
 
-# Should we Add Rust-Style Enums to Vale?
+Misc:
 
-----
+ * "using defer for more than just function scope" talking about how we can do higher raii and its way better. nope, nobody cares about defer.
 
-an article on structural subtyping in vale?
+Boring:
 
-----
+ * Its harder to optimize assembly because dont know types, and that one weird C rule about structs
+ * an article on structural subtyping in vale?
 
-show arthur this one
+No substance to write about:
 
-ask him about unidirectional data flow
+ * "Moving the borrow checker upward" (regions)
+ * article on choosing to keep looking for better solns, which led to pre and live. talk about how its a good thing to not be satisfied with the status quo. the only way to improve on today's tools is to realize their imperfections, weaknesses, and missed opportunities
+ * The Curse of Knowing Too Many Programming Languages
+ * "7 interesting facts i learned while writing a compiler" they dont even have to be about compilers, could even be random BS learned from my server lol
 
-make an article: first step to becoming a software architect
+Too antagonistic:
 
------
+ * "fearless concurrency without the borrow checker"
+ * "simple, fast, safe future alternatives to Rust" talk about vale, verona, forty2, val
 
-article: "solving the complexity problem in systems programming"
-or "low level programming doesnt have to be complex"
-(maybe once we have unsafe)
-or "making low-level program less complex"
+Bigger ones below.
 
-----
-
-article: Why We Want Simpler Languages
-
-talk about the developer velocity, the realism, etc.
-
-talk about inherent complexity
-
-----
-
-article: "7 interesting facts i learned while writing a compiler"
-
-they dont even have to be about compilers, could even be random BS learned from my server lol
-
-----
-
-"rust's approach has some great benefits. a rust program rarely needs reference counting, relying on borrow checking instead. This means most of Rust's remaining run-time overhead is in bounds checking, which is low enough to be acceptable in all but the most demanding of use cases. It's a _very_ nice tradeoff for a lot of situations.
-
-however, it also has some drawbacks, which can slow development down or cause a lot of needless complexity. ..."
-
-(this is nice because it acknowledges rusts strengths in a way that also undermines them lol)
-
-(link to article about using rust on a team)
-
-"in theory, rust is perfect. in practice however, it can be (blah blah). vale instead focuses on (blah blah). this is what makes vale a good language: instead of striving to be theoretically perfect, it strives to be (syn for realistic) and more useful for real-world situations."
-
-(mention it removes borrow checking and brings in higher raii, as if its an equivalent exchange)
-
-whenever you mention a rust benefit, make sure to somewhere else counteract:
-- rusts only overhead is bounds checking. rust makes you do bounds checking more.
-- rust is good at fearless concurrency. GC'd languages like pony and clojure also have fearless concurrency. (perhaps mention that vale, rust, pony, clojure, and a lot of other languages have it)
-- rust is designed for embedded. borrow checker is especially helpful with safety in the presence of heap allocation. embedded devices have no heap allocation.
-- rust is about safety. its not as memory safe as javascript or other languages stronger guarantees. vale is safer than rust in a way, with fearless ffi and no unsafe.
-- rust's single ownership causes more error conditions. not as good as pony which is unable to panic lol. vale is a little more willing to panic, following the erlang philosophy.
-
-----
-
-
-maybe add caveat to gen refs article: the stdlib map uses a lot of none and some that are being shuffled around
-
-or not a caveat, but an explanation for why so many aliasings
-
-----
+## Talking about FP
 
 article on experimenting with FP for a few years, and my takeaways
 
 talk about the workarounds
 shared mutability is inevitable
 
-----
+the similarity between FP and rust, in that they force you to declare all side effects, and the benefits and drawbacks of that
 
-article titled Moving the borrow checker upward
+don't do this, because we aren't really that good at FP.
 
-----
 
-article "simple, fast, safe future alternatives to Rust" talk about vale, verona, forty2, val
-
-need non-provocative title that gives the same information to the same audience
-
-----
-
-article on how rust is inspiring all sorts of new approaches
-
-----
-
-write an article on assertions
-
-have a section on  should i use type state programming or the type system for all guarantees? say no, because they tend to fall apart in the presence of encapsulation and decoupled concerns
-
-----
-
-article on unidirectional data flow
-
-talk about pure functions and borrow checker and reentrancy
-
-----
-
-article on post-space-travel architecture
-
-a lot of push stuff
-
-unlimited bandwidth, but latency is the real trick
-
-maybe work in CRDTs?
-
-----
-
-"memory safe doubly linked list with single ownership" article title
-
-talk about how gen refs make it easy, and single ownership's benefit of compile time memory management (not memory safety, thats runtime)
-
-talk about how a rust impl would.need unsafe to work, this doesnt lol
-
-preclude comments about it being a bad data structure, perhaps provide some good examples. say that one should have vec be default, but offering a linked list is an obvious and big win for a standard library
-
-----
-
-article: "Overcoming Biases and Irrationality in Designing a Programming Language"
-
-talk about my own biases and how they manifest, and how i detect them.
-
-basically bring forth a lot of hpmor stuff.
-
-also talk about holding extremes too high perhaps. i am too extreme that coupling is bad. its a valid viewpoint, but when it becomes a bias, it starts to blind me to things. (come up with examples)
-
-maybe talk about how i was solving the wrong problem with OO, kind of. my kind of OO still has a fragile base class problem, but in the form of a misapplied strategy pattern
-
-----
-
-article about prioritizing getting something working vs innovating well
-
-maybe mention that it was a mistake to do templates, and closures. they seemed easy at the time, but they slowed me down a bit when it came to generics. might have been a good idea to rely on some primitive code generation, kind of like C, until the more interesting features were in.
-
-then again, the reverse coulda been true. maybe better to nail down the basics before doing the complex stuff?
-
-----
-
-perhaps more articles on lessons from industry, and then tie vale in at the very end?
-
-some lessons we've learned...
-- user testing, the right click. then kim going up the up staircase
-- how developer velocity is important for 7drl
-- developer velocity is important for hvz. ninjafix
-- the sanity check, and how it caught dozens of bugs during implementation. "what do i know at this point, thats not already enforced"
-- flexible code is important. we knew that the PM would be asking for more. (from kim in chat with the ... see more link)
-- its important to make loose code. crystal balling can help you know where more looseness might be beneficial. (kim again)
-- in 7drl, good enough is the goal.
-- when working on a team, you need analysis and redundancy and defenses in place to keep other teammates from breaking your shit. thats why static typing is so useful. thats why compile time checking is good. thats why we have higher raii, and the region borrow checker to help concurrency, and what else
-
-----
-
-article about how mastered things seem easy
-
-----
-
-an article about determinism in games, and C#s struggles here
-
-----
-
-article named "The Best Language for Software Engineering"
-
-and then talk about how its ridiculous to point at any one language. talk about FP and rust and c++ vs GC'd languages, and maybe static typing. 
-
-talk about how FP gets pretty far by having state monad and lenses. but the downside is you cant inline things very easily.
-
-talk about how rust gets pretty far, but it doesnt really have lenses or a state monad.
-
-----
-
-"How to solve heisenbugs at the language level"
-
-or "The worst kind of bug, and the most powerful tool to solve it"
-
-and maybe an article on determinism for games?
-
-perhaps split into multiple articles
-
-----
-
-article "Designing a language for simplicity"
-
-praise go
-
-pivot to vale
-
-----
-
-article "fearless concurrency without the borrow checker"
-
-----
-
-an article about why c++ is good
-
-often, a collection is just single owned ptrs and it works nice. good balance between borrow checking and GC.
-
-----
-
-article on choosing to keep looking for better solns, which led to pre and live. talk about how its a good thing to not be satisfied with the status quo. the only way to improve on today's tools is to realize their imperfections, weaknesses, and missed opportunities
-
-----
-
-an article on blending actors and threads
-
-----
-
-article:
-The Curse of Knowing Too Many Programming Languages
-
-----
-
-im thinking my next article will be the first real "Languages ∩ Architecture" topic, ive got a few ideas so far:
-- how one can get the benefits of OO without the drawbacks if they just stop using the "extends" keyword
-- the kind of architectures rust's borrow checker influences you into, its benefits, its weaknesses, and how the region borrow checker might compare
-- how abstraction helps architecture (via decoupling) and the kinds of abstraction that different languages offer
-- the similarity between FP and rust, in that they force you to declare all side effects, and the benefits and drawbacks of that
-
-perhaps we should take a very "this is my experience and musing" approach
-
-----
-
-"speed up cellular automata 4x with 1 keyword" article when we have parallel
-
-----
-
-article overviewing other languages adding borrow checkers
-vale and iirc c++, dlang...
-also mention automatic, like swift abd lobster
-also mention the imm rc thing
-
-----
-
-article: Does a systems programming language really need unsafe?
-
-----
-
-article on whats coming. include structured parallelism!
-
-----
-
-"Why memory safety is the wrong goal"
+## Why memory safety is the wrong goal
 
 talk about the privacy problem with arrays.
 
@@ -259,96 +52,74 @@ talk about generational arena. perhaps link to moldavis' comments
 
 then maybe talk about vale
 
-----
+dont do this, because vale doesnt really help as much as we'd like. we can do random generational indices, but we can still index into things.
 
-we cant pre check! we might be accessing something already released to the OS. we cant release anything to the OS. we can remap it though. we'll have to do that.
 
-make sure to add this to the regions articles.
 
-this is probably also good to keep it from being reused by C.
+## Systems Programming
 
-----
+article: "solving the complexity problem in systems programming"
+or "low level programming doesnt have to be complex"
+(maybe once we have unsafe)
+or "making low-level program less complex"
+
+dont do this, because its not clear that vale will do systems programming well.
+
+
+
+## On Optimizing for Happiness in Programming Languages
 
 an article about the two joys of programming. talk about the addictive puzzle of perfection, and about the joy of exploration. talk about coder evan and creative evan.
 
 maybe talk about "should we optimize for joy in lang design?" i want to lean no. more complexity often leads to more joy. i like rust best of any language, but its the wrong call for a lot of situations. instead we should optimize for less friction.
 
-----
+we like a certain amount of complexity. nobody likes playing tic tac toe. a lot of people like playing zelda. we shouldnt needlessly add complexity to the language though. we could do that for a hobby language, not a real one.
 
-write an article about how its harder to optimize assembly because dont know types, and that one weird C rule about structs
 
-----
-
-an article on why vale can do this kind of structured concurrency reading when rust cant: vale has no escape hatches (it needs none)
-
-----
-
-article: "Your language should be a database"
-
-talk about fearless FFI recording all inputs and outputs
-
-talk about WAL (write ahead logs)
-
-talk about transactionality
-
-----
-
-article: "Compression in Language Design: C#, Vale, Swift, Rust, Java, and C++"
-
-talk about type erasure, jvm bytecode being compact, c++ and rust being template heavy. c#s interesting compromise.
-
-then talk about the challenge with making regions work well. minimizing information in templatas helping mitigate the explosion. type erasure making for better compilation times
+lets not talk about this. it doesnt land well with monkey.
 
 
 
-monomorphizing huge code size
-https://news.ycombinator.com/item?id=28818536
-possibly big weakness in rust and c++
+# How Rust Inspired New Programming Languages
 
-article on selective monomorphizing, when compiler has the choice
-can use pgo too
+talk about austral, vale
 
-article: WebAssembly, Binary Sizes, and Compile-time Polymorphism
-
-talk about how we might not want to monomorphize everything. talk about branch prediction
-
-talk about this is why jvm and clr are so brilliant
-
-talk about how we can whitelist certain parts
-
-itll need a language that is high level enough though, that can be polymorphic over type erasure.
-
-
-
-----
-
-once we have allocators, make an article on how to use allocators to speed up code. show a 100x increase using bump allocation. perhaps for a sort?
-
-use the big-page stack too maybe
-
-show how we can use single-type pools for speedups. A*?
-
-multi-type pools too
-
-i wonder if we can use a simd hash map for our multi pools
-
-----
-
-Comment by Animats - https://news.ycombinator.com/item?id=34591105
-rust: day or two of rewriting to get ownership rihht
-
-
-----
-
-"using defer for more than just function scope"
-an article aimed at go/zig folks, talking about how we can do higher raii and its way better lol
-
-----
+cant really, its hard to say for sure that rust inspired them.
 
 
 
 
+# Overcoming Biases and Irrationality in Designing a Programming Language
+
+talk about my own biases and how they manifest, and how i detect them.
+
+basically bring forth a lot of hpmor stuff.
+
+also talk about holding extremes too high perhaps. i am too extreme that coupling is bad. its a valid viewpoint, but when it becomes a bias, it starts to blind me to things. (come up with examples)
+
+maybe talk about how i was solving the wrong problem with OO, kind of. my kind of OO still has a fragile base class problem, but in the form of a misapplied strategy pattern
+
+lets not actually, kinda boring and dry and not really doing anything for us.
 
 
 
+# On Replacing C++ (ORCPP)
+
+also, do we really want to replace C++? if c++ is shrinking, then we want to replace its replacement. if it's growing, then do we really need to replace it? i wonder.
+
+first read https://www.reddit.com/r/rust/comments/w2tygg/carbon_language_an_experimental_successor_to_c/ and https://www.reddit.com/r/programming/comments/w2thvo/carbon_an_experimental_c_successor_language/ and https://news.ycombinator.com/item?id=32151609
+
+carbon: could replace c++, though itll be hard for them to add memory safety.
+
+vale: could replace c++ for the higher level use cases. servers, cross platform code, etc. it's a bit better than rust because it's easier and more flexible.
+
+odin: "Odin isn't really meant to replace C++ though, it's meant to replace C. It does have several higher-level features though that makes it a really good in-between for C++ and C as well, but it mainly sticks to C-land. Mainly its type system, modern design, and quality-of-life changes make it way better than C" - Foxify
+
+zig: a lot of people use c++ as c-with-templates. zig could do pretty well here.
+
+rust: could replace it. there are a lot of articles about it, so i wont go too deeply into it here.
+
+talk about its pretty hard to replace c++, especially since it's used for so much. but between a bunch of other languages, we'll probably be able to replace it for new projects.
+
+not gonna write about it because i just dont care about replacing c++. its a silly thing that has no meaning or purpose. if anything we'd write about making things more memory safe, and i think thats possible for c++ so its hard to write about replacing it.
 

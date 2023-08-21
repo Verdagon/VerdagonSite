@@ -1,0 +1,17 @@
+
+
+
+don't use the phrase zero-cost memory safety or even zero-overhead memory safety.
+
+these aren't attainable. instead mention certain features, like zero cost region borrowing.
+
+
+
+careful about how we compare to rust.
+
+whenever you mention a rust benefit, make sure to somewhere else counteract:
+- rusts only overhead is bounds checking. rust makes you do bounds checking more.
+- rust is good at fearless concurrency. GC'd languages like pony and clojure also have fearless concurrency. (perhaps mention that vale, rust, pony, clojure, and a lot of other languages have it)
+- rust is designed for embedded. borrow checker is especially helpful with safety in the presence of heap allocation. embedded devices have no heap allocation.
+- rust is about safety. its not as memory safe as javascript or other languages stronger guarantees. vale is safer than rust in a way, with fearless ffi and no unsafe.
+- rust's single ownership causes more error conditions. not as good as pony which is unable to panic lol. vale is a little more willing to panic, following the erlang philosophy.

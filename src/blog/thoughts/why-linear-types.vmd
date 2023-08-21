@@ -151,3 +151,31 @@ like, drop that returns a value
 
 itd need an assert in drop. but then show vale doing it better lol
 
+
+
+
+"memory safe doubly linked list with single ownership" article title
+
+talk about how gen refs make it easy, and single ownership's benefit of compile time memory management (not memory safety, thats runtime)
+
+talk about how a rust impl would.need unsafe to work, this doesnt lol
+
+preclude comments about it being a bad data structure, perhaps provide some good examples. say that one should have vec be default, but offering a linked list is an obvious and big win for a standard library
+
+
+When thinking about programs, there are two kinds of properties: safety properties ("bad things don't happen") and liveness properties ("good things do happen") (https://en.wikipedia.org/wiki/Safety_and_liveness_properties) While type systems are great for enforcing safety properties, liveness properties are harder to enforce with them. The two are dual and correspond to the "always" and "eventually" modalities in temporal logic
+
+
+lets look at the existing (not) solutions for these situations.
+looks like rust has a problem with futures being dropped.
+probably tcp connections as well. nope, looks like it just sends a stop message.
+
+
+in vale, we want to make sure that no messages are dropped. we can always drop a sender, but receivers are linear. dropping a sender will send a "sender dropped" message, and we can only drop a receiver in the presence of that message. this ensures that nothing is ever lost on accident.
+yep, sure enough, rust channels' extant messages are just dropped. lol.
+
+
+changing of the guard
+eternal flame
+nuclear football transfer. they know what their responsibility is.
+

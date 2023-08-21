@@ -1,0 +1,67 @@
+
+One of my old interns emailed me today, saying that his manager asked him to go on-call, and that he didn't want to. He asked:
+
+> Do you had any advice on avoiding oncall, or on mitigating its effects on stress and mental health, or on withdrawing from oncall obligations in the medium & long terms?
+
+
+So here's what I responded! I hope it helps anyone else that is in the same situation.
+
+----
+
+Hey! Yeah, I'm not a fan of being on-call either. I don't think I've ever been paged and *not* been stressed in the moment.
+
+
+It sounds like you're about to have a pretty difficult conversation with your manager. I think the first important thing to know is what healthy and unhealthy on-call situations looks like. The second thing is knowing that *you can say no* if it looks unhealthy, and you can negotiate to make the situation better.
+
+
+Being on-call might be no big deal, or it can be a mentally unhealthy nightmare, depending on how healthy the project itself and the culture is.
+
+
+An example of a healthy project is one that has:
+
+ * Good integration testing, such that people aren't just letting bugs out into production for the oncall to fix.
+ * Good error detection in production (logging for servers, telemetry for apps) such that problems are detected early (preferably in the beta channel or canary servers) before they become emergencies.
+ * Good integration testing (again) such that if you need to do a hotfix you can be comfortable that your integration tests will catch any problems you might introduce.
+ * Really good observability to immediately identify when the problem is in your codebase, or in something upstream. When our dependencies had problems, our servers had problems, and we would get paged. It always took a stressful 20 minutes to determine, most of the time, that it wasn't even our problem, and someone in an upstream server was working on a fix.
+ * A "playbook" of what to do when any symptoms happen, how to diagnose problems, and how to fix them.
+
+If your project has all these, then I would say that your project takes oncallers' mental health seriously, and only then should you consider stepping up as a last line of defense. If a project doesn't do _any_ of these, then being on-call will be very stressful and unhealthy.
+
+
+The SRE orgs at Google wouldn't accept oncalling responsibility for any project that didn't meet certain conditions, similar to the ones above. And that's how it should be, because the SREs took this kind of thing seriously. [# They also took extra measures, like capping a shift to 8 hours, and giving a vacation day (or extra pay) to anyone who was paged.] We had to spend half a year meeting those conditions Earth up to par before we got an SRE, and that's how it should be.
+
+There are also some cultural factors to consider:
+
+ * Whenever oncall is paged, they get a vacation day. This ensures that management has a financial incentive to reduce the number of pages and increase quality. This helps one trust that management will uphold all the above points.
+ * Whenever oncall is paged, a postmortem is made identifying the root cause and how it's going to be fixed, with an update to the playbook. This helps you know that management is empowered (by us developers) with the information to fix the root problem.
+ * A healthy culture such that if your hotfix breaks someone else's code, it's not your fault, rather it's the fault of the lack of an integration test that covers that.
+
+
+Lastly, if someone is asking you to be responsible for something, you need to be *empowered to resolve the situation.* When you see a problem that you don't know how to fix, you need to be able to act unilaterally and without guilt. That could mean:
+
+ * Rollback to the last good build.
+ * If someone is better equipped to fix it, you can require them to fix it. *You are in command,* by the power vested in you as oncall.
+ * Wrench a TL or manager out of whatever they're doing so they can help you. And yes, when you're in an emergency, their meeting is trivial and unimportant.
+
+When someone saddles you with responsibility without giving you the power to resolve the situation, you're not "part of the team", *you're the fall guy,* and you deserve better than that.
+
+
+So, in a perfect world, I would start with "no" and hold to it until they have satisfactory answers for all of the above.
+
+
+These kinds of conversations with managers can be difficult. And sometimes we make it more difficult for ourselves by not knowing what our own boundaries are. Going in, I would say to myself, "They are asking you. You don't have to say yes. You are doing them a favor by even engaging in this conversation. You need to protect your health. If they don't take your health seriously, then you won't take their requests seriously. You like this company, and would prefer to continue liking this company, and the only way to do that is with good boundaries. Don't say yes to anything unless you're confident you can protect your health. And maybe also demand a weekly bonus for it, and a vacation day per page. And maybe a fancy oncaller hat."
+
+
+Also, I don't want to assume your manager is being unreasonable, from the short email you sent. They likely have a lot more experience with the codebase and have the basic familiarity necessary for diagnosing and fixing problems, so being oncall might not seem so difficult to them. We engineers often confuse familiarity with simplicity. If your manager is downplaying how stressful it might be, gently remind them that they have years of experience to make it less stressful, so that they can more see the importance of the above quality measures.
+
+
+Anyway, I'm not sure how realistic anything I'm saying is, but hopefully it gives you a starting point for how to think about oncall. If nothing else, it gives you some ideas of what to ask for, to make your manager put his money where his mouth is when it comes to supporting folks' mental health.
+
+
+There's also the possibility that you've lost this battle before it began. If your director told your manager to get more oncallers at all costs, then nothing you say will convince him (though perhaps you could talk to the director directly maybe?). Best to know that possibility going in, and how you want to react to it.
+
+
+Hope that helps!
+
+- Evan
+

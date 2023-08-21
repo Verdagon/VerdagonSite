@@ -517,6 +517,16 @@ if [ $TARGET == "easter-egg-notes" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
+if [ $TARGET == "vision-for-vale" ] || [ $TARGET == "all" ] ; then
+  echo "Doing vision-for-vale"
+  echo $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/vision-for-vale src/blog/thoughts/vision-for-vale.vmd
+  eval $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/vision-for-vale src/blog/thoughts/vision-for-vale.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
 
 
 

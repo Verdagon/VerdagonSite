@@ -1,0 +1,229 @@
+---
+title: My Vision for Vale
+author: Evan Ovadia
+date: Aug 3, 2023
+realm: blog
+path: blog/vision-for-vale
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: us
+---
+
+
+<ignore>
+Talk about how we want a standard library that has unified concurrency and linear types.
+</ignore>
+
+
+! This post is only intended for friends, contributors, and sponsors, so try not to share it publicly.
+
+
+I don't talk about this topic that often, because it's a little too much for most, and it has too many outlandish ideas that aren't even in the design phase yet. [# I don't want to accidentally promise anything, especially while I've got my hands full with [regions](https://verdagon.dev/blog/zero-cost-borrowing-regions-overview)!]
+
+But I do want to paint a picture and show where I think we should go.
+
+
+Long story short, *there is a lot about programming that I want to change*, and I think Vale is the best way to do it. Even if Vale doesn't become mainstream, I want it to shake people out of their beliefs and illuminate a way forward for other languages for years to come. [# This is one reason I blog so much for Vale: we need to push these ideas into the mainstream, not just the language.]
+
+
+Basically, we're going to make a language that:
+
+ * Has both speed _and_ simplicity. [# ...while remaining memory-safe, of course.]
+ * Solves more bugs at compile time (such as data inconsistencies, heisenbugs, forgotten promises, etc).
+ * Supports healthy abstractions, and avoids the bad ones.
+
+...all while keeping the language easy, so that we don't need a PhD to use it, and we can focus on helping people with our software instead of wrestling our languages.
+
+
+This isn't meant to be an informative guide, but more a conversation starter. Give it a read, and send me an email [email](mailto:verdagon_epsa@verdagon.dev) or message me on [discord](https://discord.gg/SNB8yGH)! But try not to post this anywhere public, since it's only intended for friends, contributors, and sponsors.
+
+
+## Memory model
+
+Right now, the world and its programmers and our languages are *forced to choose* between simplicity and speed. And worse, they're forced to choose it for their *entire program*.
+
+When we use GC'd languages, we sacrifice speed for simplicity across the entire program: we can't escape the garbage collector. And when we use languages with borrow checking, we sacrifice simplicity for speed across the entire program: we can't escape the borrow checker. [# `unsafe` doesn't turn off the borrow checker like a lot of us thought it would; one still needs to manually obey the borrow checker. `Rc<RefCell<T>>` helps delay the borrow checker, but doesn't compose well with the rest of the language. I think we can avoid both of those problems with a new memory safety approach.]
+
+
+That's why I searched far and wide for different memory safety paradigms [# And found a lot! Constraint references, generational references, random generational references, regions, arenas, mutable value semantics, interaction nets, basil memory stacks, CHERI capabilities, neverfree, MMM++, SPARK, linear types, and linear reference splitting.] and eventually designed a blend of [linear types](https://vale.dev/linear-aliasing-model), [generational references](https://verdagon.dev/blog/generational-references), and [regions](https://verdagon.dev/blog/zero-cost-borrowing-regions-overview). It's a way we can code in a simple and reasonably fast way, and then _without virally changing our existing code_ [# This is important. Many languages have ways to add performance afterward, but it requires extensive refactoring, which I consider unhealthy. Some examples are `async`, arenas, borrow checking, etc. which virally spread and punch through our more solid abstractions and APIs, causing us to refactor the entire program.] drop into a much faster way of doing things.
+
+
+It's just one part of an overall strategy to *decouple our program's logic from performance*, so that we can solve our problem easier.
+
+
+Along those same lines, a lot of optimization comes down to allocation strategy. Vale by default uses `malloc` under the hood, and I'm planning on enabling custom allocators like [arenas](https://www.rfleury.com/p/untangling-lifetimes-the-arena-allocator), in a way that's decoupled from our program's logic.
+
+
+For example, we should be able to specify a default allocator (such as an arena) to use for an entire region or scope or function call. It would be amazing to call existing code with a different allocator, without having to change the existing code to do it. In other words, decouple performance from our program's logic. I wrote a bit about how this is possible in [this article](https://verdagon.dev/blog/zero-cost-refs-regions). [# AFAIK, Only Odin has been able to do this so far via their context system, and I think I see a way to make a memory-safe version of it.] [# Using an arena is great for any short-lived calls on predictable input data, but often only our caller knows if that's the case.]
+
+
+
+## Concurrency
+
+A guiding principle here is that *concurrency is for performance*. And like all performance concerns, we'd like to decouple them away from our program's logic as much as possible.
+
+
+To that end, we're planning on a new virtual thread mechanism that combines the performance async/await with the ease of goroutines, without function coloring or data coloring. [# By data coloring I mean infectious annotations like `Sync`/`Send`] I describe it a bit [here](https://github.com/Verdagon/Vale/blob/master/docs/concurrency/VirtualThreads.md). This should let us code the normal way without worrying about concurrency complexity, and it should let us add concurrency to existing code more easily.
+
+
+I also hope we can add [easier structured concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency) with `parallel foreach`, `concurrent foreach`, or `interleaved foreach` [# Interleaved foreach will unroll a loop and then interleave the iterations' instructions, to better harness instruction-level parallelism and pipelining in the CPU, and make cache misses more parallel.]. These should let us more rapidly experiment with introducing various kinds of concurrency to existing code, [# More specifically, code that already doesn't modify things outside the `foreach` scope; all of these make the `foreach` pure.] and more easily add it to new code.
+
+
+## Principle: Decoupling Logic and Performance
+
+So why do we care so much about decoupling these things? It comes down to some pragmatism about performance.
+
+
+To get the absolute _maximum_ performance out of some code, we need to throw a lot of complexity at it like SIMD, cache friendliness concerns, borrowing checking, instruction-level parallelism like pipelining and data dependencies, and so on. Of course, as we all know, that's almost always overkill. Very little code needs that kind of optimization enough to justify the added complexity.
+
+
+Instead, *there is a balance*, informed by two factors:
+
+ * *How often it the code is run.* Most of a program's time is spent in a small fraction of the code, known as the "hot path". Optimizing non-hot-path code is a waste of time and energy.
+ * *How easy it is to optimize code.* If it's easy to add in multi-threading, borrowing, etc. then the gains are worth that small amount of investment.
+
+
+Because most code is non-hot-path code, a language should make it so code is *flexible and reasonably fast* by default, and then make it as easy as possible to identify and optimize the hot path.
+
+
+It's a lot easier to optimize code when we can freely experiment with optimizing it. For example:
+
+ * Adding `pure` to a read-only [#readonly] function to make it use [immutable region borrowing](https://verdagon.dev/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing) to completely skip generation checks when accessing pre-existing data.
+ * Adding `Arena(10mb)'` before a pure call to make it use an arena allocator, e.g. `Arena(10mb)^FindPath(&map, start, end)`.
+ * Just adding `parallel(4)` in front of a read-only `foreach` loop to see how well it does when four threads share the load, without needing to refactor surrounding code to be `async` or refactor existing data to be `Sync`.
+
+
+This is, I believe, the best goal of a general-purpose language: be flexible and reasonably fast by default, and be decoupled enough to optimize existing code easily.
+
+
+<slice>
+#readonly: Read-only means the loop body or the called function produce new data instead of modifying pre-existing data (in other words, they're pure). But that's already the case for most functions in practice, or easily within reach of localized refactoring.
+</slice>
+
+## Principle: Enable Healthy Abstractions
+
+
+The higher levels of software engineering are all about using, designing, modifying, and protecting abstractions, so this is a very important point.
+
+
+To set the scene, here are some examples of good abstractions:
+
+ * The POSIX API; file descriptors allow us to read and write files the same way over all sorts of different operating systems and machines.
+ * The JVM, which gives our programs a solid interface so they can run on a lot more operating systems and interoperate with other languages.
+ * Threads allow us to run code on a separate core, without changing much about how it's written.
+
+
+These are solid abstractions that are reliable and don't need to change. People have been upgrading operating systems, the JVM, and threading for decades, and their APIs have remained stable and untouched.
+
+
+This is good software engineering. We can depend on these APIs, knowing that they won't change out from under us. With these abstractions, we can use our code in more situations and environments.
+
+
+In Vale, there's something in common with a lot of our techniques.
+
+ * Virtual threads, which don't need function coloring like `async`, or data coloring like `Sync`/`Send`.
+ * Allocators, which can be used for a function without changing a function's API.
+ * Regions, which are opt-in; a program doesn't need to use region annotations, and they're only downwardly infectious. If a function wants to use regions, it doesn't need to change its API.
+
+These techniques were chosen because *we can use them without changing our APIs*; they make it so our APIs are solid and our abstractions are healthy and stable.
+
+
+We intentionally avoid mechanisms that infectiously "punch through" our abstractions, which would make abstractions leaky and unstable.
+
+ * To do a long-lived operation, languages like Javascript require we add `async` to our function, our callers, our callers' callers, and so on, even if that means it changes a public API. Compare this to Go, whose concurrency doesn't have this drawback.
+ * To be able to modify an object, Rust requires that we use `&mut` to ensure that nobody else can access it, its owner, its owner's owner, and so on, changing callers' callers signatures, even through public APIs. It turns memory management into a infectious leaky abstraction. Garbage collection or generational references are a healthier option.
+ * More complicated proofs like in Coq require that we enforce assumptions far across the codebase, and these constraints also propagate throughout the codebase and through APIs.
+
+These "upwardly infectious" mechanisms require refactoring upward through all indirect callers. These mechanisms are harmful to our programs, and they mean we can't experiment with, optimize, update, and change our code as easily.
+
+
+A language should give us the tools to uphold healthy abstractions, so that we can have solid APIs that we can depend on. To do that, a language should avoid upwardly infectious constraints. [# Some constraints are fine, because they're less infectious. Static typing is fine because generics, interfaces, typeclasses, and wrapper objects help it so an object's static type doesn't have to be infectious.]
+
+
+By consistently going in this direction, I think Vale could be one of the best languages for software engineering, if we can get there.
+
+
+## Preventing Forgotten Promises [# Not talking about Javascript `Promise` objects here, different kind of promise.]
+
+
+I believe Vale can solve problems at compile time, problems that a lot of people don't even recognize as common yet.
+
+
+For example, imagine an `addSpaceshipToCache` function with a comment "You must remember to `removeSpaceshipFromCache` before you destroy the `Spaceship`!". Normally, we have to manually remember to do that. We forget all the time.
+
+Vale's [linear types](https://vale.dev/linear-aliasing-model) enable [higher RAII](https://verdagon.dev/blog/higher-raii-7drl), a technique of using un-droppable "reminder objects" that can only be destroyed by doing a specific operation, such as `removeSpaceshipFromCache`.
+
+
+Higher RAII can solve a _lot_ of problems:
+
+ * In other languages (Go, Rust) we might accidentally drop a channel and discard unreceived messages. In Vale, a channel's `Receiver` will be an un-droppable (linear) type that can only be destroyed after waiting for the "done" message from the `Sender`.
+ * In other languages, we might accidentally leak a background task (Go) or cancel a background task (Rust) that was doing something important. Vale requires the user to explicitly destroy a `Task` via `wait` or `destroy`.
+ * In other languages, an array-backed binary tree's node has only the indices of its children, we might destroy the node and forget to destroy the children. In Vale, the parent would hold un-droppable (linear) indices to its children, so we can't forget to explicitly `removeNode` them too.
+
+In general, when we know we'll need to remember to do something in the future, higher RAII helps us enforce that at compile-time.
+
+
+There are two halves to a program's correctness: [safety and liveness](https://en.wikipedia.org/wiki/Safety_and_liveness_properties). "Safety" is where we prevent bad things from happening, and static typing has largely solved that. "Liveness" is where we ensure that good things happen, and I think higher RAII is a major step towards solving that aspect.
+
+
+## Preventing Broken Updates
+
+Vale's regions system gives it an opportunity to solve *software transactional memory*.
+
+
+By adding a `transaction` keyword to a function, like `transaction func myFunction(...)`, it means that any writes to pre-existing mutable data will also cause an "reverse modification" to be added to a "rollback buffer". Then, if there's a panic inside the `transaction` function, it will use the buffer to revert all changes that have happened inside the `myFunction` call. In the same way that the compiler uses regions to keep mutable and immutable data separate, it can also keep transactional regions separate from regular mutable regions.
+
+
+With this, we can make sure that if there's a problem, we correctly reverse all of the changes we made since then. We won't leave any pre-existing data in an inconsistent state.
+
+
+Preventing forgotten promises and broken updates are both ways to uphold *data consistency*, which is one of the largest categories of bugs in computer science.
+
+
+## Principle: Solving Bugs at Compile Time
+
+Adding compile-time mechanisms to eliminate run-time problems is almost always the right call. Vale goes extremely far in this regard:
+
+ * Its single ownership eliminates memory leaks and double-frees.
+ * Regions allow us to completely guarantee that there will be no data races at run-time.
+ * Higher RAII helps eliminate forgotten promises.
+ * Transactional regions help eliminate broken updates.
+
+
+Of course, this goal isn't absolute. There is a limit, as pushing error detection to compile-time can conflict with the above principles of enabling healthy abstractions and decoupling logic and performance. That's why Vale intentionally doesn't use:
+
+ * Compile-time proofs like Coq, which require advanced knowledge of separation logic and other complex topics.
+ * A Rust-style borrow checker, which solves a few kinds of bugs [# Such as iterator invalidation, which is instead caught at run-time in more modern memory-safe languages.] compared to modern memory-safe languages but not enough to be worth turning memory management into a viral leaky abstraction.
+
+These are great mechanisms for those languages to have, but they don't fit with the principles we have here.
+
+
+Instead, we focus on mechanisms that allow us to solve a lot of bugs without adding too much unnecessary complexity to the user's code.
+
+
+## Solving Heisenbugs
+
+*Heisenbugs* are one of the most difficult kind of bug. When a bug only happens every other time you run the program, or worse, every hundredth time, it can be near impossible to debug. That's why, in Vale, the entire language is deterministic.
+
+
+This decision led to something called [perfect replayability](https://verdagon.dev/blog/perfect-replayability-prototyped), where we can record the user inputs (more precisely, everything that comes in via FFI) in one run and then use that recording in a second run to perfectly reproduce anything that happened the first time.
+
+
+We have one other surprise planned here: something called *flexible replayability*, where we can design certain APIs (files, network, OpenGL, etc.) to be exempt from replaying, using *opaque types*. For example, when interfacing with the file system, the file descriptors would be opaque types, and when we're replaying, the real current file descriptors are used instead of the values recorded in the first run. This means that when we replay, we can read the same files, see the same things happen on the screen, and so on.
+
+
+
+## Conclusion
+
+That's my ultimate vision for Vale; a programming language that can:
+
+ * Enable speed _and_ simplicity.
+ * Solve more bugs at compile time.
+ * Support healthy abstractions.
+
+...all while keeping the language easy, so that we can be helping people instead of wrestling the language.
+
+
+That's all! I hope you enjoyed this article, showing where I hope we can go with this endeavor.
+
+- Evan Ovadia
