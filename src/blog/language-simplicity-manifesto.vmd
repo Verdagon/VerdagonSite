@@ -10,6 +10,69 @@ sponsor: me
 ---
 
 
+<ignore>
+Too often, we lose sight of our goal.
+
+simplicity isnt just something that makes us feel nice, it helps us help our users.
+
+inherent complexity my butt:
+
+when computers started, we thought we would always have to think about how we handled global memory. then we invented a chunk of global memory called "the stack" and suddenly we could reason much more easily about our own function.
+
+we thought we would need to worry about other processes and what they need to do. it was inherent complexity of working with such complex needs. then processes were invented.
+
+we thought we would need to manage memory forever, and carefully track lifetimes. then garbage collection came out, and for the vast majority of software, this inherent complexity just didnt exist.
+
+inherent complexity is the wrong thing to think about.
+
+our job is to reduce complexity, inherent or otherwise, by usefully employing abstractions.
+
+to me, that's the major difference between programming and software engineering: designing good abstractions.
+
+when someone says "that complexity is unavoidable", it's often a way to justify their own broken abstractions.
+
+inherent complexity is often a lie.
+
+avoid complexity. make good abstractions.
+
+some people hate the word "abstraction". yet these are the same people who celebrate the world's most successful abstractions, like Linux and TCP. No, what they hate is bad abstractions. And duh, everyone hates bad abstractions. But they can't say "bad abstractions are bad".
+
+the only weapon we have to fight complexity is abstraction. and like any weapon, it can be misused. that doesn't mean we should forbid abstractions (borrow checker) or make the most powerful abstractions too easy (implementation inheritance), it means we should look at them with clear eyes and use them in the right places.
+
+avoiding complexity is easy. make your interface as simple as possible, and no simpler (link). make the caller aware of only what he needs to be aware of. this is how we *decouple* our code from other code, and make our programs more flexible, which helps us iterate and explore faster, which helps us help our users better.
+
+software is a living breathing thing. as soon as we sacrifice simplicity, we're setting the program up for long term failure.
+
+Unfortunately, many programmers just pay lip service to simplicity. They say they wan't simplicity, but they aren't willing to sacrifice anything for it, no matter how small.
+
+A programmer might reach for the complexity of async/await over threads, because it saves a tiny bit of memory. Suddenly, they have async annotations spreading virally throughout their code, blasting through abstractions, breaking their APIs, and causing refactoring at all indirect callsites.
+
+Instead of using garbage collection, a programmer might reach for a borrow checker, and suddenly the tiniest of leaves can cause a major refactor in the rest of a program.
+
+The problem is that these things leak through abstractions, and couple the caller to the callee in unnecessary ways. We sacrificed our simplicity for a little bit of performance. And then we patted ourselves on the back and said it was better in all ways that mattered.
+
+Simplicity is important. It helps us move faster. Software is a living breathing thing. As a programmer, *you will always be working on software that needs to change* to help its users. Software that resists change is software that resists helping its users.
+
+Imagine someone that's starting out, building something that they think users will love. Then they launch a beta, and discover that users actually needed something a bit different. Unfortunately, they designed their codebase for correctness, then performance, with simplicity as an afterthought. Everything is coupled so tightly that they need refactors in every corner.
+
+A codebase is constantly growing like that. Later on, that company has launched their product, and the users are filing feature requests like crazy. One person wants to use (feature) their new mapping software to map out all the kids on their school bus route. One person wants to use (feature) it to map out all the historical wildfires to better visualize and predict where the next ones will be. One wants to add a spreadsheet sync so that users can submit to a google forms and then they can go in and approve rows.
+
+Unfortunately, it takes them five times the amount of time, because their codebase is still so coupled. So they have to choose only one feature to work on. They choose the last one. Sucks for those other people. The bus driver still does things by hand. The wildfire person just doesn't predict wildfires.
+
+"But if we add Coq and theorem solvers to guarantee our correctness, then we can eliminate a bunch of edge cases and bring our crash rate down from 4% to 3%!"
+
+But that only helps 1% of users, who are doing weird exploratory things in the edge cases. In a userbase of 1000, that's 10 people. Wouldn't we rather help another 200 people who could use this once we have spreadsheet sync? The answer is pretty obvious.
+
+Imagine someone that's just starting out. It's a private alpha. Users in the real world are waiting for the public release, so it can help them. The vast majority of users have simple data, but there are a few dozen out there who have very complex data which is revealing some bugs. The only way to truly eliminate these classes of bugs is to spend two years adding borrow checking (1%), linear types (another 1%), and a theorem solver like Coq (for the last 2%). They spend that two years doing those things. For two years, the driver drives inefficient routes, the firefighters aren't predicting fires. Why? Because we needed perfection. Perfection hurt the users.
+
+*If your software only works for 99% of users that try it, that's great! You're helping a ton of people. Launch it.*
+
+We always need to focus on how much we're helping how many people. Crashes don't hurt people as much as their fixes sometimes. The obvious answer is a balance.
+
+So how do we balance those?
+
+</ignore>
+
 
 Tomorrow's languages need to be simpler than the ones we have today. That might sound obvious.
 
