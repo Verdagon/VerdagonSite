@@ -1,0 +1,352 @@
+---
+title: Healthy and unhealthy tech debt in compilers, servers, games, and apps
+author: Evan Ovadia
+date: Dec 16, 2021
+realm: blog
+path: blog/how-to-use-tech-debt-wisely
+layout: annotated
+namespace: c-blog m-annotated
+sponsor: me
+---
+
+
+Tech debt is when the current code is working but *continuously making it harder to achieve our goals* compared to some better alternate design.
+
+We've all seen it:
+
+ * The hack that helped us achieve some goal in the past but is hard to work around lately.
+ * A possible refactor that would make it _way easier_ to modify our configuration.
+ * The lack of automation in a certain kind of integration test.
+
+
+Obviously, *tech debt is bad*. We all know that.
+
+But we also know that *adding or leaving in the right kind of tech debt can be the better choice* when it means we can help the people we're trying to help, and we know how to stay on top of it.
+
+
+Hold my beer, because I'm about to write some heresy that I strongly believe in. These views have made me a much better software engineer and they've helped me achieve my most ambitious goals in game design, in Vale, and in larger teams at Google.
+
+
+Most blog posts will either talk about how it's absolutely good, or absolutely bad. Instead, I'm going to describe something more nuanced:
+
+ * How to recognize when it's the right choice to take on some tech debt, and when one needs to aggressively clean it up.
+ * What kinds of tech debt are helpful, and what kinds are dangerous.
+ * The right way to add tech debt such that it can be more easily cleaned up.
+
+
+<img src="../images/ValeDomino.png" style="width: 100%;"/>
+
+
+# A difficult topic
+
+I know I just triggered a good portion of readers by alluding that tech debt can be a good thing. This is a difficult topic because most of us are software engineers, and we're the last line of defense against _those dang product managers who always just want more and more features and don't understand how software works._ [# This is a trope of course, often reinforced by negativity bias. There are great product managers out there, which I'll talk about more below.]
+
+
+Those confrontations often make us more extreme than we really are, by necessity. We need to be strong because we're the ones invested in the long-term health of our codebase.
+
+
+But imagine that suddenly, there are no product managers. Imagine that your director was skilled at managing VPs' expectations, and trusts your judgment on how to best handle your codebase. [# This situation is sometimes unrealistic, but it serves as a good starting point for how to think about this kind of thing.]
+
+
+# The right question
+
+
+Together, you come up with _the right question_. The only question that matters, which serves as our guiding light.
+
+
+An experienced tech lead will recognize that this question *factors in code quality, documentation, accessibility, testing, developer velocity, mental health, reliability, readability, observability*, and a dozen other factors.
+
+
+There are no "while"s, but"s, or "unless"es in this question. It's a simple one.
+
+
+The question is: *How do we help people as much as we can, in the next ten years?* [#customers]
+
+
+Specific, actionable advice is further below, but first let's figure out what "helping people" actually means!
+
+
+<slice>
+#customers: A more realistic question would say _customers_ instead of people, but I only work on teams where the users are the customers. Even in Google, which has drastically fallen from grace, there were some pockets of goodness.
+
+I remember that on the Earth team, we had an amazing director that successfully made the case that by doing good, and helping Google's reputation, the engineers working on Earth were helping the company's bottom line five times more than the engineers over in Search and Ads.
+</slice>
+
+
+# Helping people
+
+When I was new to the Google Earth team, we had a [user summit](https://earthoutreachonair.withgoogle.com/events/geoforgood22) where we got to meet some actual users. At the time, I was still new and didn't really understand the value of these things.
+
+
+Then I talked to a history teacher from South Africa. Her students didn't own any computers, but she would connect her small laptop to an even smaller projector and draw points, lines, and polygons on a Earth map to help show where various historic events were.
+
+
+I had been programming for a decade already, but until that moment, I'd never realized, _truly_ realized, that there were real people on the other side of my code. These are the people I'm helping.
+
+
+At one point I asked her, "Are there any bugs that stop you from doing what you're doing?"
+
+
+She told me, "There are small bugs, sure, but nothing I can't work around. But you know what I'd really love? A 'next' button to move the view to certain areas! With that I could step through the map's areas and describe events better."
+
+
+Keep this answer in mind. This is exactly the kind of answer you want to aim for. I'll talk more about this in a bit.
+
+
+# Aligning seemingly conflicting priorities
+
+At our next team meeting, I claimed a couple refactoring tasks, a few bug fixes, and I also asked if I could work on that 'next' button.
+
+
+My manager saw me, thought a bit, and said yes. I later learned more about that moment, and what was going through his mind.
+
+
+I later asked my tech lead, "I refactor for my teammates, but I add features to help users. They seem to conflict, how do I prioritize them?"
+
+
+He explained, "There's actually no conflict here. Our only goal is to have as many solid features as we can:
+
+ * We refactor so that later, we can add solid features faster.
+ * We fix bugs to keep our existing features solid.
+ * We improve things to make our future features solid.
+
+*Our single goal is to help the users, which means having as many solid features as possible.*" [# There was more to this advice too, which involved a lot of human factors like steady pacing, health, managing stress and burnout, and so on. I'll talk more about that below.]
+
+
+When two priorities actually have the same goal in the end, focusing on that goal makes it easier to prioritize them. Probably obvious, but it wasn't to me at the time.
+
+
+With that, the priorities became clear: [# In this scheme, P1 means highest priority, P5 means lowest priority.]
+
+ * The first refactor, P1 because it's pretty central and slows down our features often.
+ * Fix bug #9, P1 because it breaks a feature for some users.
+ * Maybe take a vacation day, and I'll be rested and healthy for the next thing.
+ * Implement that 'next' button, P2.
+ * Fix bug #18, P3 because it has an easy user workaround.
+ * The other refactor, P3 since it's isolated and features rarely touch that area and it's isolated.
+
+
+# Tech debt sometimes hurts users, sometimes helps them
+
+
+Here's some basic rules of thumb, before we get into the more interesting tactical advice.
+
+
+When tech debt slows us down in adding solid features, that keeps us from helping the users. *We should fix that.*
+
+
+However, some tech debt is harmless, isolated, or doesn't get in the way much. If fixing it takes two weeks that we could instead use to add another solid feature, then we *shouldn't fix it.* The cure is worse than the disease, and the users would love that feature.
+
+
+When tech debt in the code causes user-visible bugs, that actually means you should fix your lack of tests. *Fix your testing tech debt* to keep your features solid even in the presence of tech debt in the code.
+
+
+Some manual testing that can be automated, saving us a person-hour every month. Fixing it would take 10 hours, but you'll be switching to a new testing framework anyway in six months. *Don't fix it.*
+
+
+Or suddenly, you realize a better way to architect part of your program which will save you a lot of time in the long run. Congratulations, you just found some tech debt.
+
+
+
+# More precise advice
+
+For the last couple months, I've been finishing cleaning up some tech debt from adding Vale's generics and regions. Here's how I approached it.
+
+
+*Tech debt involving APIs and crossing system boundaries is more important than isolated areas.*
+
+When you're writing a compiler, various stages communicate with each other by passing around `DeclareFunctionNode`, `IfNode`, `WhileNode`, `DeclareVarNode`, `CallFunctionNode` (and so on) classes. A lot of code works with these classes. If there's something confusing in the `DeclareFunctionNode`, that's high priority.
+
+However, if a certain stage has some confusing private logic that correctly updates a `DeclareVarNode`, that's low priority because that complexity is isolated to that one private function. [# The Vale compiler doesn't actually "update" nodes, it transforms them into new nodes, but the point still stands.]
+
+
+*Leave actionable TODOs and comments about how to clean up the tech debt you introduce or find.*
+
+The biggest risk of tech debt is forgetting that it exists. One needs to keep track of it _really_ well.
+
+Don't put it in a list where you can forget about it and never fix it, and don't leave it to the reviewer to catch. Instead:
+
+ * Leave some `assert(false)`s in the code with some comments.
+ * Leave some `TODO` comments in the relevant area.
+ * If it's egregious, put some `// DO NOT SUBMIT` comments in the codebase, and a pre-submit hook to detect and prevent those from being merged.
+ * If there's an unresolved quirk, write a doc on it and link to it from _every_ relevant area of the code.
+
+
+*Look honestly at your track record.*
+
+If you haven't paid off the important tech debt in the past, don't trust yourself to do it in the future.
+
+Similarly, if your manager or circumstances haven't let you pay off important tech debt in the past, don't trust them to do so now, and don't accrue it.
+
+
+*Tech debt in complex code is more important than simple code.*
+
+There's a certain part of the instantiation stage [# The instantiation stage is the one that actually generics the different versions of a generic function; it turns the `print<T>` function into `print<int>` and `print<bool>` functions.] that's _insanely_ complex. I can rarely understand it. Every time I go near it, I need to sacrifice two chickens and enter a week-long meditative trance to have any hope of modifying it correctly. I _fear_ that code.
+
+Even though I don't often touch that code, changes there have a higher risk of introducing bugs. More bugs come from that small rarely-touched code than the more often-modified code in the parser.
+
+
+*Tech debt affecting morale can be more important than tech debt that just takes time to fix.*
+
+Fixing that instantiator code was particularly important because when I'm trying to do something else, _I don't have the constitution to deal with this instantiator bullshit._ Every time an already-complex feature brought me into the instantiator, I could feel myself becoming depressed and anxious about it. I am human, after all.
+
+Those feelings are real, and they have a cost. I can push through them with willpower, but I only have so much willpower in a given day. On top of that, pushing through too often can lead to burnout, which takes a _long_ time to recover from. So, it's best to fix these areas sooner rather than later. [# On top of that, I was running out of chickens to sacrifice.]
+
+
+*Prefer exponential features to most tech debt.*
+
+Certain features can cause an exponential growth. Vale doesn't have many users yet, but from my time at Google:
+
+ * When they made it possible to embed a MyMaps map in a webpage, it quickly dwarved the normal editor view by something like 50x if I recall correctly.
+ * On Earth, when we added the mobile apps, they quickly became the vast majority of views.
+ * When MyMaps became compliant with certain regulations, U.S. schools could start using it in the classroom.
+
+These things opened the project up to entire new realms of users that we could help with our projects, and refactors can rarely benefit as many users as
+
+
+*Prefer exponential refactors to most features.*
+
+Most refactors are exponential too, though not to the same extent.
+
+For example, a refactor might make it so future features (and future refactors!) take half as much effort. 
+
+When comparing exponential features to exponential refactors, think about it like a mortgage:
+
+If your fixed-rate mortgage (say, 3-4%) [# As if that's possible any more!] is less than the average return of the stock market (6-7%), then consider putting any extra money you earn into the stock market.
+
+However, if you also have a high-interest car loan (10%) then you should pay that down first.
+
+The same thinking applies to tech debt. If a feature will exponentially grow your product faster than some tech debt will exponentially slow it, then add the feature first.
+
+Of course, most features aren't exponential, so I tend to prioritize refactors more.
+
+
+*Missing end-to-end tests are more important than refactors and cleanups.*
+
+Your refactors will introduce more bugs, unless they're caught by tests. As this happens more, you'll become less willing to refactor and simplify, and your codebase will become more complex and cause more bugs, ironically.
+
+There is no such thing as "if it compiles, it works." Nothing protects against logic bugs like good testing does. It's more important than intelligence, documentation, comments, and static typing combined.
+
+The main reason I can move so quickly is because of Vale's huge suite of tests (over a thousand and counting).
+
+
+*Tech debt in prototyping code doesn't matter.*
+
+Vale's "generics" feature [# Generics such as how `List<T>` can be either `List<int>` or `List<bool>`.] is stable, but the [regions feature is a prototype](/blog/first-regions-prototype).
+
+I expect the regions code to change very often, and go through many more iterations before it's finalized. That code still has a lot of `vimpl()`s and `TODO`s in it. Most of those will be made moot and go away naturally in the next iteration, so it's best to not fix them.
+
+So instead, I spent the time _mercilessly_ cleaning up tech debt in the generics code. I expect that code to be around for much longer and not go away, so might as well fix it now.
+
+
+*Feel free to accrue tech debt for experimental features.*
+
+Early on in Vale, I was experimenting with memory management techniques. I wanted to find something like borrow checking, but preferably something more flexible that could support things like observers, back-references, dependency references, callbacks, delegates, or other kinds of RAII.
+
+I tried two main approaches: [constraint references](https://verdagon.dev/blog/raii-next-steps) and then [generational references](https://verdagon.dev/blog/generational-references). I intentionally left some tech debt in the code for both.
+
+We discovered that constraint references weren't as good, so I deleted that code. I didn't have to fix it! That saved a lot of time, and after I cleaned up generational references, I used that saved time to add linear types and [Higher RAII](https://verdagon.dev/blog/higher-raii-7drl) to Vale.
+
+
+# When Tech Debt is Necessary
+
+Let's look at a simpler example where tech debt is not just the best option, but the _only_ option.
+
+
+In 2021, I made [a game](https://verdagon.itch.io/shattered-forest) for the [7 Day Roguelike Challenge](https://7drl.com/), a yearly gamejam event where people have a week to implement a game, and then get feedback from players.
+
+
+It's a great way to try out new ideas, and see if they're worth continuing, or if they need adjustment and changes.
+
+
+The challenge is ridiculously hard, and nobody survives their first attempt, because they *prioritize the wrong things.*
+
+
+Usually, a first attempt goes like this:
+
+ * Day 1: Start a basic random terrain generator for a Javascript game.
+ * Day 2: Encounter some type bugs. Convert code to Typescript, find the bug, fix it.
+ * Day 3: Fix an occasional KeyNotFoundException.
+ * Day 4: Refactor the code to be less error-prone, add some comments.
+ * Day 5: Refactor code to be more extensible, in case we want more features.
+ * Day 6: *Realize there's only two days left.* Panic. Add enemies, half of basic combat.
+ * Day 7: Fix bugs in combat. Start working on items, menus, win conditions, but *run out of time.*
+
+
+They have a working terrain generator, but no game. Users can't play it, and they'll never know if it was a good idea or not. What went wrong?
+
+
+Their mistake was in days 4 and 5. *They should not have refactored,* and probably shouldn't even have added that many comments.
+
+
+In fact, they also made a mistake in day 3, when they fixed the root causes of the KeyNotFoundException, instead of putting a temporary band-aid hack in.
+
+
+The game would have been poorly written, undocumented, and not very extensible, but it would have been playable and successful. That's better than having no game at all.
+
+
+# Tech Debt in a Growing Project
+
+In the above example, their time during the 7DRL week is much more valuable than their time after the 7DRL week, so they needed to do the highest-impact things in that week.
+
+
+A similar situation occurs in growing projects and teams.
+
+
+Let's say that someone saved up enough money that they could quit and live off savings for 2 years to start a business around their webapp idea.
+
+
+A skilled programmer would focus on quality from the beginning. They would make sure they're using a powerful database with proper replication and sharding, they'd document everything, put it on the cloud for scalability, make sure it's multi-cloud to avoid vendor lock-in, and make sure everything is in a language like Haskell or Rust that prioritizes correctness over everything else. They would launch at the 1.5-year mark, and run out of money by the end of two years.
+
+
+An effective programmer would instead use a more relaxed language and run it on a single machine, similar to [Hacker News](https://news.ycombinator.com/item?id=16076041), who's still using that same setup [years later](https://news.ycombinator.com/item?id=28479595). The programmer would launch at the 2-month mark, and let their userbase and income grow while they do their cleanups.
+
+
+The insight is that *your time is more valuable early on,* and some things have a much better return-on-investment than having perfect code early on. It can be better to take on some tech debt, and use that saved time to launch something that will have a better payoff.
+
+
+So how do we factor that in?
+
+
+# Surviving Short-Term Helps Users Long-Term
+
+Basically, be aware of limited resources. Imagine how much you'll help users, and then multiply that by the risk of the project dying before then.
+
+
+In the 7DRL challenge, time was the limited resource. They'll always have seven days, and they can add more people, and spend as much money as they want.
+
+
+In the webapp example, money and time were the limited resources.
+
+
+Sometimes, attention span is the limited resource, like in this [Zain Rizvi article](https://www.zainrizvi.io/blog/do-more-by-doing-less/). This plays out often in the open source ecosystem; people don't realize the limits of their own attention span. They work on an amazing library, and it never even gets to version 0.2 because their plans are so ambitious. [# Vale could probably be described like this, depending on when we say the project started.]
+
+
+Or perhaps morale is a limited resource. A certain early Vale feature almost destroyed me. [# Templates and generics. Luckily it's better nowadays, especially after the recent refactors.] I was so demoralized that I almost gave up on the entire project. I threw a hail mary and sprinted for the finish, racking up massive amounts of tech debt. I survived, paid off the tech debt, and Vale is still here.
+
+
+Sometimes, user trust and reputation is the limited resource. If we promise the users something and then don't deliver it, we start to look like vaporware, which has a particularly unfortunate precedent in the realm of programming languages. This is one reason I sprinted to complete the [regions prototype](/blog/first-regions-prototype); it had been three years since I first posted about it, and that didn't look great.
+
+
+We should still ask the question, *How do we help people as much as we can, in the next ten years?*
+
+
+However, if there's a clear limited resource (time, money, morale, trust), we need to multiply that number by how likely we are to survive until then. [# Or some more complex formula. A simple multiply doesn't really take enough human factors into account.]
+
+
+# Conclusion
+
+The Vale compiler is almost 150,000 lines and pretty healthy. I got it to this point by being aware of the benefits and costs of tech debt, and prioritizing what mattered.
+
+
+I tend to sprint to prototype a feature, and leave a _lot_ of notes for myself on how to clean it up once it's done. And then I aggressively clean it up and follow through, because I want to keep my good track record, so I can trust myself enough in the future when I want to add tech debt again.
+
+
+It's a stellar balance. Finishing a prototype early gives me a major morale boost, and using the early prototype tells me if I should:
+
+ * Start finalizing and cleaning up the feature, or
+ * Partially or completely blast it away (and its tech debt, saving time), or
+ * Restart implementation of the feature, using what I learned.
+
+
+That's all for now! I hope you enjoyed this article.

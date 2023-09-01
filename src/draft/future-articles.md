@@ -2,6 +2,25 @@
 
 # Publish Order
 
+It seems these can come next:
+
+ * SCBACT: Should Checks Be At Compile Time
+ * ACBG: Abstractions Can Be Good
+ * STRP: Solve the right problems
+ * MTSE: Mastered Things Seem Easy
+ * ERWVHS: The Escape Route, and Why Vale Has Semicolons
+ * HRBAO: How Region Borrowing Avoids Overhead
+ * HUTDW: How to use tech debt wisely
+ * FUGB: Fuck You Give Banana
+ * WLDSKAM: Lang Designers Should Know About Memory
+ * FIBEE: Vale's First Immutable Borrowing Example, Explained Step by Step
+ * WACN: Writing a Compiler Nomadically
+ * MSG: Memory Safety Grimoire", peripheries=
+ * HDNHLP: How Demonic Names Help Large Programs
+ * ECECSR: EC vs ECS in Roguelikes
+ * DPRACV: Destructor Parameters in Rust, Austral, C++, and Vale
+
+
 digraph {
     # These are ones I could write about but not really excited to, so hiding them
     # WTUFG [label="WTUFG: Whether\nto Use <>\nfor Generics"];
@@ -1556,33 +1575,7 @@ maybe work in CRDTs?
 
 # How to Use Tech Debt Wisely (HUTDW)
 
-Make sure you're doing it for the right reasons. the question is: what are you buying with this tech debt?
-
- * Fuck you give banana
- * funding
- * notoriety, fame, renown
- * congratulations
- * a sanity check on where the project is heading
-
-1:2 to 1:5, talking about how valuable it is to do various things when working on a project. saving yourself two hours later on helps you a little bit, but getting your stuff earlier is 1:5.
-
-your time now is _extremely_ valuable. much more valuable than it will be 5 years from now. optimize for growth right now, because then, someone else can do that thing.
-
-
-TAKE NOTES for god sake. dont leave it to the reviewer to catch opportunities, because it's impossible!
-
-
-do alternating sprinting/cleanup.
-
- * we often just blast away parts of the prototype. hacks put in place. its okay as long as all of them are known.
- * this helps because getting far gets us a much better picture of what we'll actually need from the surrounding infrastructure. this is why it's so important for a language to be refactorable, and why i chose scala for the frontend instead of something like c, c++, or rust. (lol)
-
-
-Always pay it down. The first time you don't, you are no longer allowed to follow this approach. (You are doing something else, and you need to come up with a different name.)
-
-
-i dont know if vale will be here two years from now. we might not have the sponsors for that. so its good to just take note of those long term things and solve it when we get there. otherwise we fizzle out and do zero good. its better to prove the concepts exist, for the next language to take over.
-
+See how-to-use-tech-debt-wisely.vmd
 
 
 # Difference Between Software Engineering and Artistry (DSEAA)
@@ -2110,6 +2103,8 @@ just as structured programming lifted us up out of assembly forever, i think thi
 
 # Languages need to solve the right problems (STRP)
 
+(this all sounds good, but its channeling something that i'm not sure we want to channel. it doesn't have much substance that will resonate with users and move the needle. it might be better to appeal to their get-things-done sense first, build on that, and then show how it directly conflicts with making things correct.)
+
 It's easy for us in our little bubble to forget the people who actually use our languages. Ash is making games. Jen is making a note-taking app. James is making a forms-based web app.
 
 But when we talk about languages, we don't talk about things that will really help them make those things. We talk about things like zero-cost abstractions and mutability which are so far removed from what actually matters.
@@ -2206,6 +2201,8 @@ mention:
 write an article on assertions
 
 have a section on  should i use type state programming or the type system for all guarantees? say no, because they tend to fall apart in the presence of encapsulation and decoupled concerns
+
+see https://www.reddit.com/r/ProgrammingLanguages/comments/16225sf/which_checks_shouldnt_be_moved_to_compile_time/
 
 
 # Abstractions Can Be Good (ACBG)
