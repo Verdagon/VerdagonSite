@@ -203,7 +203,7 @@ It also means that this approach is actually viable, and could be desirable for 
 The above benchmarks compared Vale's safe mode to Vale's unsafe modes, for a more accurate comparison of the memory safety approaches.
 
 
-However, there are still a few things to do before Vale can really go toe-to-toe with languages like C and C++. [#easter]
+However, there are still a few things to do before Vale can really go toe-to-toe with languages like C and C++.
 
  * I'll need to start a Vale-specific pre-optimizer, since LLVM's optimizer seems to have some problems reasoning about generations and immutability.
  * Vale still needs to support inline data, instead of the temporary solution of putting all structs on the heap. (Note that that wouldn't affect the above benchmarks, which didn't use any structs.)

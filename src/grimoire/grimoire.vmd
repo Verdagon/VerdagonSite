@@ -1,98 +1,252 @@
 ---
-title: The Memory Safety Grimoire
-subtitle: Components and Spells for Making Memory Safe Languages
-realm: grimoire
+title: Borrow checking, RC, GC, and the Eleven (!) Other Memory Safety Approaches
+subtitle: The Memory Safety Grimoire, Part 1
+realm: blog
 path: grimoire/grimoire
 layout: annotated
 namespace: c-blog m-annotated
 ---
 
 
+One such fellow named Zeke came into my server one day.
+
+"Wait, so with generational references, we now have four ways to do memory safety, besides tracing GC, reference counting, and borrow checking?"
+
+Evan: "There are actually fourteen by my count. Probably more!" [# And I'd bet that someone on reddit or HN will comment on some I haven't heard before, and I'll have to add to the list!]
+
+Zeke: "Fourteen?!"
+
+I've gotten so used to it that it's not surprising to me anymore, so it's always a delight to see people's surprise when I tell them this.
+
+
+Evan: "Indeed," and I proceed to show him _the list_.
+
+Zeke: "How did you find all these?!"
+
+
+At this point, I likely told him some nonsense, like "I just kept my eyes open and searched and collected them gradually over the years" but I think that you, my dear readers, deserve to know *the truth*. [# Or perhaps this entire article is just a clever ruse, the [mask behind the mask](https://hpmor.com/chapter/35), and the truth still remains a secret.]
+
+
+I hope that this truth will help you understand the sheer number of memory safety approaches out there, and maybe even help you design your own!
+
+
+# A Curséd Tome, and Ancient Memory Safety
+
+Mid-2023, a team of archaeologists discovered [an ancient Mayan city in Campeche](https://www.reuters.com/world/americas/ancient-maya-city-discovered-mexican-jungle-2023-06-21/). I was on the ground as the team's consulting software engineer, as the Mayans were known as some of the earliest and most powerful practitioners of the software arts.
+
+The hours are long and there's always the chance of being kidnapped and ransomed by the marauding bands of [white-nosed coatis](https://www.fodors.com/world/mexico-and-central-america/mexico/yucatan-and-campeche-states/experiences/news/photos/10-fantastic-beasts-of-the-yucatan-and-where-to-find-them), [# They probably wouldn't be so endangered if they robbed banks instead, like [monkeys](https://zeenews.india.com/india/bizzare-monkey-steals-bag-with-rs-4-lakh-throws-currency-notes-outside-registry-office-in-up-2332462.html) and [snakes](https://globalnews.ca/news/9560059/calgary-poisonous-snake-bank-robbery-re-arrest/) do. Their 180-degree ankles would be invaluable for heisting.] but nobody asks me if I can add an RSS feed to a DBMS, so there's that. [# Free cookies to anyone who got [the reference](https://github.com/docker/cli/issues/267#issuecomment-695149477)!]
+
+
+We made it to the central pyramid, and discovered a pedestal with a large book on it. It seemed impossible for a book to survive for thousands of years, but our team lead [Ivan Spracj](https://inah.gob.mx/boletines/descubren-antigua-ciudad-maya-campeche-la-nombran-ocomtun-columna-de-piedra) explained that modern paper degrades much more quickly than the [amate](https://en.wikipedia.org/wiki/Amate) paper the Mayans used. Their ancient techniques were better than ours, both in paper and memory safety. Hopefully, this book contained the former and the latter, similar to the ancient borrow checking codex that Graydon Hoare found in the [Kukulkan pyramid](https://www.theguardian.com/world/2016/nov/17/mexican-pyramid-has-two-more-inside-scientists-discover) in 2016.
+
+
+And sure enough, it was. With my heart pounding, I carefully opened the book. I couldn't read the glyphs without my equipment, but from the illustrations, it indeed seemed to be about memory safety!
+
+
+# The Open Door
+
+
+Before this, we only had three conflicting choices for memory safety, each with it's own tradeoffs:
+
+ * Garbage collection [# By "garbage collection", we're referring to tracing garbage collection.] is easy and flexible and has high throughput, but uses much more memory and has nondeterministic pauses.
+ * Reference counting is simple and uses less memory, but is slow and can leak cycles. [# With good use of weak references, one can avoid the leaks.]
+ * Borrow checking is faster and allows for aliasing inline data [# "Inline data" means we can have a struct's memory live on the stack, or inside another struct's memory, or directly in an array next to the other arrays' elements' memory. This is the default in C, and impossible in e.g. Javascript.], but can cause complexity and can't do basic patterns like [observers](https://en.wikipedia.org/wiki/Observer_pattern). [# Luckily we can work around this limitation with reference counting!]
+
+
+But we've long suspected that the Mayans had ways to blend these together at a more fundamental level.
+
+
+We've certainly tried before. For example, to work around the borrow checker in Rust we can put an object in an `Rc<RefCell<T>>` to make it reference counted, but that just delays the borrow checker to later when we `borrow`/`borrow_mut` the contents.
+
+
+We've also suspected that the Mayans had a way that reference counting and garbage collection approaches could use inline data, which are objects whose memory is inside another object's memory, similar to how C works. Go [anonymous structs](https://blog.boot.dev/golang/anonymous-structs-golang/) and C#'s `struct`s come close, but we usually can't make references to them: C#'s `ref`'s [restrictions](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/ref-struct) show how far we have to go. Did the Mayans have a way?
+
+
+Some ancient writings also describe a way to make fast languages that are not only safe but also _correct_ in a way that no languages are today [# Except for [Austral](https://borretti.me/article/introducing-austral)!], functional languages that use neither GC nor RC under the hood, [# This is referring to Kindelia's [HVM](https://github.com/HigherOrderCO/HVM) project, actually!] and ways we can have unbounded reference counted objects _without a count integer_. [# This is like Mattheiu's fascinating [static-rc](https://github.com/matthieu-m/static-rc), but there might be an "unbounded" version possible, where we don't need to know the number of references up-front.] How did they do all this?
+
+
+This is why I was excited to find this tome! Perhaps it had the answers.
+
+
+# Impossibly Prophetic
+
+As I deciphered the first few pages, I was shocked to find that it was referencing _things that hadn't happened yet_. It was referring to elucent's [Basil](https://degaz.io/blog/632020/post.html) language, Fernando's [Austral](https://borretti.me/article/introducing-austral), and Marco's [Forty2](http://forty2.is/) language. And yet the book is hundreds of years old, as confirmed by carbon dating!
+
+
+Somehow, the Mayans were looking _forward in time_ to techniques that were invented by people alive _today_. I have no idea how that's possible.
+
+
+And still, there's an entire half of this tome that I can't decipher at all. They build on strange higher concepts that don't exist in our world yet. [# Almost as if their CPU designs were slightly different than our own, in a key way that unlocked more possibilities. I'm still scratching my head on this one.] Other pages seem to mention laws we haven't yet discovered. And there's one technique that I've tried to re-engineer thirty one (!) times, [# This is referring to Hybrid-Generational Memory, one of my most elusive goals. I've gotten close by combining regions and generational references, but not in the automatic way that the Mayans seem to describe.] without success. Perhaps one of you can solve the rest of this puzzle!
+
+
+# The List
+
+To keep this post short, [# Because I've wasted all this space with the dramatic buildup, my bad!] I'll assume the reader knows the basics of reference counting, (tracing) garbage collection, and knows how borrow checking works at a high level. Even so, this is a _very_ dense, compact overview of each technique, mainly meant as a starting point. *Don't worry, I'll be posting many follow-up posts that describe each one much more clearly and how it fits into the larger puzzle.* Afterward, I'll also talk about the interesting gaps in the puzzle, and the hints that might lead to discovery there.
+
+
+Without further ado, here's the list!
+
+
+*Move-only programming* was the most surprising one to me. In this, every object can only be known to one variable (or field or array element), and that one "owner" can give it up to transfer it to another variable, field, array element, or function parameter or return. In Java terms, only one reference can point to an object at any given time.
+
+Some of you may recognize these as [affine types](https://en.wikipedia.org/wiki/Substructural_type_system#Affine_types), but will be surprised to learn that we can [write entire programs](https://verdagon.dev/blog/linear-types-borrowing) like this, without making any more references to any objects, if we're willing to go through some acrobatics. Various languages blend this with different techniques: Austral has [linear types](https://austral-lang.org/linear-types), [# Rust has [borrow checking](https://doc.rust-lang.org/rust-by-example/scope/borrow.html), and Vale has the [linear-aliasing model](https://vale.dev/linear-aliasing-model). I suspect the tome is hinting at other possible blends too. [# Specifically, if we can add Pony-style `val` to it, we might get an interesting result.]
+
+
+*Reference counting* is fairly mainstream, but most will be surprised to learn that it can coexist with tracing GC ([like in Python](https://devguide.python.org/internals/garbage-collector/index.html) and [Nim](https://nim-lang.org/blog/2020/10/15/introduction-to-arc-orc-in-nim.html)), but it turns out that there's a [whole spectrum](https://courses.cs.washington.edu/courses/cse590p/05au/p50-bacon.pdf) between the two.
+
+And as it turns out, reference counting can be [blended with immutable region borrowing LINK HERE](link here) to greatly reduce its cache misses, which no mainstream language has done yet. [# I couldn't resist prototyping this, so the Vale compiler actually has a flag that switches Vale from generational references to RC so we can see this in action.] [# [Nim](https://nim-lang.org/) could theoretically do this, but I was unable to convince Araq that it was possible. I thought for a while that Rust could do this, but it's unfortunately foiled by the `RefCell` escape hatch.]
+
+
+*Borrow checking* lets our code be as fast as C and almost as safe as Haskell [# I say almost because Rust's single-ownership nature sometimes introduces failure conditions that wouldn't exist in Haskell.]. [Austral](https://borretti.me/article/introducing-austral) takes it a step further: it's not only safe, but also _correct_ by adding [liveness](https://en.wikipedia.org/wiki/Safety_and_liveness_properties) via linear types which can ensure that some future action will happen. This is a pattern I call [Higher RAII](https://verdagon.dev/blog/higher-raii-7drl) in Vale, but it will naturally occur in any language with linear types. [# Haskell can have linear types too! I foresee a future where functional programming and linear types are actually the best choice for safety-critical systems that can handle nondeterministic GC pauses. And the Mayans mention a new way that we can nearly eliminate those pauses...]
+
+
+*Regions* are my favorite technique. Many of us know of Cyclone's scope-based regions, but [Forty2](http://forty2.is/), [Verona](https://github.com/microsoft/verona), [Pony's iso](https://tutorial.ponylang.io/reference-capabilities/guarantees.html#mutable-reference-capabilities), and our very own [Vale](https://vale.dev/) take it to the next level: we can store regions anywhere, including inside objects and arrays. Vale also lets us mutably alias regions and then [immutably borrow](https://verdagon.dev/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing) them, which makes them _much_ easier to use. [# It also opens the door to a lot more interesting techniques, see [this](https://verdagon.dev/blog/zero-cost-borrowing-regions-overview) for more.]
+
+
+*Arena-only programming* is where we never use malloc or free, and [always use arenas instead](https://www.rfleury.com/p/untangling-lifetimes-the-arena-allocator), even for function returns. This is a familiar paradigm to users of C, Zig, and especially Odin which has a way to [automatically decouple code from allocator strategy](https://odin-lang.org/docs/overview/#implicit-context-system). When we combine arena-only programming with other spell components, we get entire new memory safety approaches. [# Specifically, we can combine it with generational references, regions, constraint references, or MMM++.] For example, [Verona](https://github.com/microsoft/verona)'s design allows us to have an [arena for each region](https://lobste.rs/search?q=verona+arena&what=comments&order=newest) [# If someone knows of some documentation about this, let me know! Until then, David's excellent comments are the best explanation I can find.]
+
+
+*Stack arenas* is an approach that's spiritually similar to arena-only programming, but it's automatic and does it for every stack frame. Elucent's [Basil](https://degaz.io/blog/632020/post.html) used to do this! It wasn't efficient, but the Mayans mention something about combining it with other techniques to make it a _lot_ faster. I can kind of see what they mean [# I _think_ it's compatible with reference counting, and I'm fairly certain it's compatible with linear types.] but I haven't seen anyone try it yet.
+
+
+*[Generational References](/blog/generational-references)* is a technique that lets us know whether a pointer is pointing at a valid object, by comparing a pointer's accompanying "remembered" generation number to the "current" generation number living in the object it's pointing at. We increment an object's generation number whenever we want to destroy it. This approach is made much faster by [regions](https://verdagon.dev/blog/zero-cost-borrowing-regions-overview): we never have to do that comparison if the object is in a temporarily immutable region, which we can establish with a `pure` function or block.
+
+
+*Random Generational References* is an even faster variant that lets us have "inline data", in other words it lets us put structs on the stack and inside arrays or other structs. This is similar to [memory tagging](https://source.android.com/docs/security/test/memory-safety/arm-mte), but much more reliable because of a wider tag (64 bits instead of 4) and when paired with [perfect determinism](https://verdagon.dev/blog/perfect-replayability-prototyped), much more secure. We're currently blending this with regions in [Vale](https://vale.dev/), hoping to get something near the speed of C while being as simple and flexible as Go or Java.
+
+
+*MMM++* [# I'm sure this has a better name, someone let me know!] is where objects are allocated from global arrays, and slots in those arrays are released and reused for other objects of the same type, thus avoiding use-after-free's normal memory unsafety problems. This comes with [other considerations too](https://verdagon.dev/blog/when-to-use-memory-safe-part-1#the-safer-way-to-use-mmm-languages) too make it memory safe. See also [Arrrlang](https://verdagon.dev/blog/myth-zero-overhead-memory-safety) for a simpler language example. This is how a lot of embedded, safety-critical, and real-time software works today. [# Including many servers, databases, and games. For example, [TigerBeetleDB](https://github.com/tigerbeetledb/tigerbeetle/blob/main/docs/TIGER_STYLE.md#safety) has a similar set of rules.]
+
+
+*Tracing garbage collection* is familiar to all of us, but there's a surprising twist: there's a secret way to make a garbage collector without the stop-the-world pauses! [Pony](https://www.ponylang.io/) does this: by separating each actor into its own little world, each actor can do its own garbage collection without stopping the other ones. Its [ORCA](https://tutorial.ponylang.io/appendices/garbage-collection.html) mechanism then enables sharing data between the actors via reference counting.
+
+[Verona](https://github.com/microsoft/verona) then takes this a step further by adding regions, giving the user more fine-grained control over when and where garbage collection might happen, and lets them use a regular bump allocator instead for a region if they wish.
+
+If Verona or a new language allowed us to set the maximum memory for a GC'd region, that would make the entire approach _completely deterministic_, solving the biggest problem for garbage collection (in my opinion). Don't tell anyone I said this, but I strongly believe this is going to be the most widely used paradigm 30 years from now.
+
+
+
+*Interaction nets* are a _very_ fast way to manage purely immutable data _without_ garbage collection or reference counting, implemented in the [HVM](https://github.com/HigherOrderCO/HVM) runtime for Haskell. HVM starts with linear types (like move-only programming), but then adds an extremely efficient lazy `.clone()` primitive, so it can strategically clone objects instead of referencing them. Check out its [guide](https://github.com/HigherOrderCO/HVM/blob/master/guide/HOW.md) to learn more! [# And if someone has a better explanation, please send it to me! I don't understand interaction nets that well. I _think_ it's actually a blend of automatic borrowing and cloning, but the guide says it's not really borrowing, so I'm not sure.]
+
+
+*Constraint references* is a blend of reference counting and single ownership (note that I'm talking about actual single ownership, not borrow checking). In this approach, every object has a single owner, doesn't necessarily need to be on the heap, and has a counter for all references. When we try to destroy the object, we can assert that there are no other references to this object.
+
+This is used pretty often. Some [game developers](https://discord.com/channels/402956206529970177/402956206529970180/451828861861101569) have been using this for a long time. It can be used as the memory safety model for an entire language, like in the [Gel](https://web.archive.org/web/20220111001720/https://researcher.watson.ibm.com/researcher/files/us-bacon/Dingle07Ownership.pdf) language. It supports a lot more patterns than borrow checking (intrusive data structures, graphs, observers, back-references, dependency references, callbacks, delegates, many forms of RAII, etc.) but it does its checking at run-time. Halting in production mode is often undesirable, so this technique shines the most when we can fall back to a different strategy in release mode.
+
+
+*Linear reference counting* is an elusive concept, where we can completely eliminate the counter integer, and do all of the reference counting at compile time. No language can do this today, but there might be a way to get close with linear types. [# Matthieu's [static-rc](https://github.com/matthieu-m/static-rc) crate gets pretty close to this, but without linear types in Rust, it has to leak under certain conditions.] Basically, we have two types of linear reference:
+
+ * A "tine" reference remembers (in its type, at compile-time) L, the number of forks to get from the original value to here.
+ * A "fork" reference holds the original value (or a tine reference [# This is another difference between this idea and static-rc crate, I believe this will allow us to "borrow the borrow references" in objects, without lifetimes, rather than just on the stack.]), and remembers L and also N, the number of L+1 tine references created at the same time as this fork reference. Reclaiming the contents requires destroying this and all (N) of the L+1 tine references.
+
+I don't expect anyone to understand that rushed explanation, but I hope to write an article soon on this! [# I also talked about it a bit [here](https://discord.com/channels/398263331808346123/734119020613075052/1135196844360736798) and [here](https://discord.com/channels/398263331808346123/734119020613075052/1137411293310099546) and [here](https://discord.com/channels/398263331808346123/734819934760075264/1141854334171222098). If someone knows how to make better publicly-accessible discord logs, let me know!]
+
+! I'm not actually sure what kind of architectural restrictions it might impose, how situational it is, or if it even works at all. It's just something ~~I came up with~~ _the Mayans wrote about_ as a hypothetical avenue to explore.
+
+
+*Mutable value semantics* is a very interesting approach. Imagine a Java or Swift where every object has exactly one reference pointing to it at any given time. It's like a Rust with no shared references (`&`), only unique references (`&mut`) which can't be stored in structs. [# Or, imagine move-only programming with `&mut` added on top.] It's simple, fast, and powerful, though we may have to `.clone()` a little more often than even Rust programs. [Hylo](https://www.hylo-lang.org/) uses mutable value semantics, with extra ergonomics like `subscript` on top to make it easier to work with. It's a very promising sweet spot of performance vs. simplicity tradeoff.
+
+
+*[CHERI](https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/)* is a project that's attempting to make hardware and a compiler that can run languages like C in a memory-safe way. In CHERI, every 64-byte pointer also comes with a 64-byte "capability" which expresses what can be done with that pointer, to achieve spatial memory safety. [Cornucopia](https://ieeexplore.ieee.org/document/9152640) adds temporal memory safety to that with special allocators that don't reuse memory in a page until it's empty and all of the existing capabilities have been revoked [# This is an important memory safety concept: Memory unsafety comes not from use-after-free, but _use-after-reuse_. In fact, even that's too loose; memory unsafety comes from "use after shape change", which I'll explain later in the grimoire.] via an application-wide memory sweep done concurrently in the background. If a new language used a system like this plus some techniques to prevent use-after-free on the stack, it could have a brand new memory safety model nobody's seen before.
+
+
+*Ada/SPARK* has a mechanism where a pointer cannot point to an object that is more deeply scoped than itself. If you imagine the stack growing right, [# "But Evan, stacks grow down!" [Listen here](https://memedrop.io/meme/ZRy5yVV68X7m), no it doesn't, nobody knows the orientation of the RAM chip in the computer.] pointers can only point left. This is somewhat similar to mutable value semantics or borrow checking. It also offers memory pools and subpools, where each pointer can be associated with a pool (or subpool), and the entire pool is freed when it goes out of scope. [# From [fghvbnvbnfe](https://news.ycombinator.com/item?id=14216128).]
+
+
+*Neverfree* doesn't count, but I'll mention it as a bonus item just for fun. Basically, just don't call `free`! If you never `free` memory, you can't use-after-free, which instantly solves the hardest part of memory safety. [# One might need to also add some bounds checking and a few other measures, but it's a start!] The idea is from this famous [email conversation](https://devblogs.microsoft.com/oldnewthing/20180228-00/?p=98125):
+
+Norman Cohen said:
+
+> The only programs I know of with deliberate memory leaks are those whose executions are short enough, and whose target machines have enough virtual memory space, that running out of memory is not a concern. (This class of programs includes many student programming exercises and some simple applets and utilities; it includes few if any embedded or safety-critical programs.)
+
+Kent Mitchell replied:
+
+> I was once working with a customer who was producing on-board software for a missile. In my analysis of the code, I pointed out that they had a number of problems with storage leaks. Imagine my surprise when the customers chief software engineer said "Of course it leaks". He went on to point out that they had calculated the amount of memory the application would leak in the total possible flight time for the missile and then doubled that number. They added this much additional memory to the hardware to "support" the leaks. Since the missile will explode when it hits its target or at the end of its flight, the ultimate in garbage collection is performed without programmer intervention.
+
+It kind of makes sense in a way. If you have a program that uses all the memory all the way until the end (like `sort`), why not skip the expensive `free`s and let the OS clean it up when the process exits? You can't use-after-free if you never `free`!
+
+
+# What do we do with this avalanche of knowledge?!
+
+I want you, the reader, to go forth and *design a new memory safety model*!
+
+The world needs it: every well-known language's memory safety model either adds artificial complexity or slowdowns, and we could all use something simple yet fast.
+
+I also hope that with all this knowledge, someone can find a way to [retrofit memory safety onto C++](https://verdagon.dev/blog/vale-memory-safe-cpp). Most people say it's impossible, but then again, most people also thought there were only three memory safety methods. Perhaps they just lack imagination.
+
+
+# The Simple Answer
+
+The above discovery and deciphering of the grimoire is too long of an answer for most people, so when they ask me how I learned about all these things, I usually say that I've been reading [r/programminglanguages](https://www.reddit.com/r/ProgrammingLanguages/) and [lobste.rs](https://lobste.rs/), talking with other language designers like [Jon Goodwin](https://cone.jondgoodwin.com/), Jonathan Burns, [Blake Anderson](https://rhovas.dev/), and [Jake Fecher](https://antelang.org/), and a lot of thinking.
+
+
+However, there's a secret ingredient even in that. Just trying to think isn't enough, our own brains tend to get in the way, such as via [functional fixedness](https://www.verywellmind.com/what-is-functional-fixedness-2795484) and [status quo bias](https://en.wikipedia.org/wiki/Status_quo_bias).
+
+
+So I'm going to tell you a technique that helped me come up with generational references, their randomized variant, linear reference counting, Vale's advances in regions, and helped me with interviews and software architecture in general.
+
+
+To come up with a new idea, *tell yourself that existing methods aren't _that_ great, the world needs something better in some way, and then believe and _really internalize_ that the better idea exists, just _barely_ within your reach.* [# It could even help to pretend you're someone else who believes this, though that's a separate skill that itself requires a lot of practice.] This gives us the motivation and the true confidence that we can come up with something new.
+
+
+Then, every time you come up with an idea, apply the same technique to that idea as well. We humans tend to fall in love with our first idea, which blinds us to the rest. There are always more ideas out there!
+
+
 <ignore>
+This technique is what helped me break out of the beliefs that reference counting has been solved and that borrow checking is perfect.
 
 
-article: RefCell's Lost Twin: The Scope Tether
+We tend to idealize and romanticize existing techniques, because we (and everyone else in our friend groups and filter bubbles) get personally attached to what we merely _prefer_, and then we [confirmation bias](https://en.wikipedia.org/wiki/Confirmation_bias) ourselves into a creativity dead-end.
 
+
+The above technique helps us combat our own functional fixedness, and give us the motivation and confidence to find the next idea.
+
+We also tend to underestimate complexity in hindsight (the [expert blind spot](https://nscblog.com/continual-learning/understanding-understanding-the-expert-blind-spot/)) and because we programmers are masochistic.
 </ignore>
 
 
-In 2017, [a new pyramid was uncovered at the Dahshur Necropolis](https://www.smithsonianmag.com/smart-news/new-pyramid-discovered-egypt-180962813/), which contains some of Egypt's most ancient pyramids. Langdon Roberts, a world-renowned [Computational Egyptologist](https://escholarship.org/uc/item/0fk4n4gv), was able to decipher the hieroglyphs: they described how ancient egyptians made memory safe programs, using *techniques we've never seen before!*
+
+# More in the Grimoire
+
+The above list is not complete, of course. There are some half-deciphered hints and building blocks in the grimoire that can help assist memory safety models.
 
 
-Previously, we only knew of the "Usual Three" ways for a language to have memory safety:
-
- * Garbage collection [# By "garbage collection", we're referring to tracing garbage collection.]
- * Reference counting
- * Borrow checking
+! Beware: We don't know which of these techniques actually help memory safety, and which summon ancient demons. Proceed at your own risk!
 
 
-And new languages had to weigh their benefits and drawbacks respectively:
+Here's just a handful:
 
- * Easy to use, has high throughput, but uses more memory and has nondeterministic pauses.
- * Easy to implement, uses less memory, but is slow and can leak. [# With good use of weak references, one can avoid the leaks.]
- * Faster, but is more difficult and can't do basic patterns like [observers](https://en.wikipedia.org/wiki/Observer_pattern). [# There are some unidiomatic ways around this limitation, such as `Rc` and `unsafe`.]
-
-
-But no longer! With this tome of secrets, our secret *memory safety grimoire,* a daring new language can *design their own memory model!*
-
-
-# Memory Safety: Scratching the Surface
-
-"That's impossible!" one might say, "memory safety is already a solved problem!"
+ * *[Type stability](https://engineering.backtrace.io/2021-08-04-slitter-a-slab-allocator-that-trusts-but-verifies/)* is the knowledge that _use-after-free isn't the enemy_, just a simplistic approximation of it. The real memory safety problems arise when we access some memory after we've released and reused it for something of a different type. [# "Shape stability" takes that a step further: we can reuse e.g. an integer's memory for a float and still not trigger memory unsafety, so really the problem is when we confuse a pointer for an integer or vice versa.]
+ * *Final references* (like in Java) can help a lot in designing memory safety models. I won't explain too much here, but [email](verdagon_epsa@verdagon.dev) or discord me (Verdagon) and I can explain there (you'll see why).
+ * *Unique References*, in other words, guaranteeing that you have the only usable reference to an object, has been the key breakthrough in more approaches than I can count, including borrow checking, mutable value semantics, move-only programming, etc. There are even techniques that can make any object temporarily unique (like [how Swift's inout works](https://news.ycombinator.com/item?id=15294334), or how in generational references we can just temporarily change the generation).
+ * *Change detectors* is a mechanism that will track at run-time whether something's been changed. Java collections [use a modCount](https://stackoverflow.com/a/34629665/1424454) to prevent modifying while iterating, and one could conceivably use this to assist in memory safety as well.
+ * *Check-on-set* is a pattern where we check at run-time if we're allowed to modify an object in a certain way. The best example of this how we can [freeze](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/freeze) a Javascript object, and whenever we modify an object, the runtime will assert it's not frozen. Anything that can guarantee an object immutable could be used for a memory safety approach.
+ * *Thread isolation* is where we guarantee that an object is only visible to one thread at a given time. This property has helped enable borrow checking, generational references, Vale's immutable region borrowing, and faster forms of reference counting. It's likely important to other potential memory safety approaches.
+ * *Page Headers* are where an allocator can strategically put metadata about an object at the top of its 4096-byte page.
+ * *Fat pointers* is where some other data always accompanies a pointer. The biggest example of this is Rust's [trait references](https://stackoverflow.com/questions/57754901/what-is-a-fat-pointer) and Vale uses it for its [generational references](/blog/generational-references) memory safety approach.
+ * *[Top-byte ignore](https://www.linaro.org/blog/top-byte-ignore-for-fun-and-memory-savings/)* refers to how some CPUs ignore the top byte of any particular pointer, so you can conveniently put anything you want there. You can even simulate top-byte-ignore on other systems by manually masking that byte off before dereferencing. This can be used to e.g. store how far the reference count integer is, so that you can point to the interior of a reference counted object. There are more arcane ways to use bits in the middle and end too. [# We can use the bits in the middle by manually specifying the address `mmap` should give us, and we can use the bits in the end if we know the alignment of the data we're pointing to.]
 
 
-We used to think so too, until we excavated some hieroglyphs that show us: The Usual Three are all just part of a *larger puzzle with many pieces missing*.
+You would be surprised how many little tricks can be used to assist memory safety models!
 
+There are lot more I could list here, but my mana is running low so I'll save them for a later article.
 
-Over the last few years, a [cabal of languages](https://reddit.com/r/ProgrammingLanguages) have deciphered and explored this surprising array of tools for making new memory models.
+If you know of any more memory safety techniques, or want to see in-progress decipherings, then come to the #grimoire channel in the [Vale discord](https://discord.com/invite/SNB8yGH)!
 
-For example:
-
- * Type stability, which has all the benefits of the borrow checker without its restrictions, in exchange for more memory.
- * Compile time reference counting, which blends reference counting and borrow checking.
- * Generational memory, which lets u embed objects inside other objects and alias references for free.
- * Scope tethering, which help enable borrow references.
- * Region borrow checking, which enables pure structured concurrency.
-
-
-
-# Beholding the Grimoire
-
-The first few finished translations are here, and we expect to post a new one every two weeks. It's hard to predict, but we expect upwards of 30 entries.
-
-
-*Beware:* We don't know which of these techniques actually help memory safety, and which summon ancient demons. Proceed at your own risk!
-
-
- * [Generational Memory](/grimoire/generational-memory.vmd)
- * [Type Stability](/grimoire/type-stability.vmd)
- * [Isolates](/grimoire/isolates.vmd)
- * [Constraint References](/grimoire/constraint-references.vmd)
- * [Final References](/grima/final-references)
- * [Inline Data](/grimoire/inline-data.vmd)
- * [Unique References](/grimoire/unique-references.vmd)
- * Change Detectors
- * Check-on-set
- * Thread Isolation
- * Hardened Boundaries
+<ignore>
+ * Hardened boundaries
  * Runtime Checking Purity
  * Extending Lifetime
  * Asserting Lifetime
  * Containing Lifetime
- * Shape Stability
  * Deep Copying
  * Allocators
- * Page Headers
  * Freeze References
- * Top-Byte-Ignore, Memory Tagging
  * Aspect Tracking
  * Generational Index
- * Region Borrow Checking
  * Pure Functions
  * Hierarchy Borrowing
- * Basil Stacks
  * Immutability
- * Borrow Checking
  * Scope Tethering
  * Undead Cycle
  * Single Ownership
@@ -101,39 +255,28 @@ The first few finished translations are here, and we expect to post a new one ev
  * Stack Scanning
  * Reserved Memory
  * Remembering Scope in Object
- * Reference Smuggling (a.k.a. Fat Pointers)
- * Pointer Smuggling (Using pointers' unused bits)
- * Address Smuggling (Specifying address middle bits)
+</ignore>
 
 
-If you know of any more memory safety techniques, or want to see in-progress decipherings, then come to the #grimoire channel in the [Vale discord](https://discord.com/invite/SNB8yGH)!
+# That's all!
+
+I hope you enjoyed this article!
 
 
-# Using the Grimoire
-
-To design a memory model, it one must start with a foundation. So far we've identified seven techniques which can be used as foundations:
-
- * Garbage collection (e.g. Java)
- * Reference counting (e.g. Swift)
- * Borrow checking (e.g. Rust)
- * Generational memory (e.g. Vale)
- * Memory tagging (unknown)
- * Type stability (unknown)
- * Basil stacks (unknown)
+In the next post, I'll talk about all the ways to blend reference counting and regions using the techniques mentioned in the grimoire, so keep an eye out on our [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), [discord server](https://discord.gg/SNB8yGH), or [subreddit](https://reddit.com/r/vale)!
 
 
-After that, one would try to add other techniques from the grimoire.
+Donations and sponsorships for Vale are currently paused, but if you like these articles, please [Donate to Kākāpō Recovery](https://www.doc.govt.nz/kakapo-donate) and let me know! I love those little birds.
 
 
-Careful, as some techniques do not mix well! For example, inline memory can conflict with final references in some case, and requires extra measures such as unique references to resolve the conflict. One must tread carefully!
+Cheers!
 
+- Evan Ovadia
 
-# Afterword
+<slice new-color="afterword"/>
 
-From Langdon Roberts' journal:
+# Thank you!
 
-> We are only halfway through our deciphering, but we can already see that the ancient Egyptians did things _very_ differently from us. It's as if they went down a completely different path.
+I want to give a huge thanks to [Arthur Weagel](https://github.com/aweagel), [Kiril Mihaylov](https://github.com/KirilMihaylov), [Radek Miček](https://github.com/radekm), [Geomitron](https://github.com/Geomitron), [Chiuzon](https://github.com/chiuzon), [Felix Scholz](https://github.com/soupertonic), [Joseph Jaoudi](https://github.com/linkmonitor), [Luke Puchner-Hardman](https://github.com/lupuchard), [Jonathan Zielinski](https://github.com/tootoobeepbeep), [Albin Kocheril Chacko](https://github.com/albinkc), [Enrico Zschemisch](https://github.com/ezschemi), [Svintooo](https://github.com/Svintooo), [Tim Stack](https://github.com/tstack), [Alon Zakai](https://github.com/kripken), [Alec Newman](https://github.com/rovaughn), [Sergey Davidoff](https://github.com/Shnatsel), [Ian (linuxy)](https://github.com/linuxy), [Ivo Balbaert](https://github.com/Ivo-Balbaert/), [Pierre Curto](https://github.com/pierrec), [Love Jesus](https://github.com/loveJesus), [J. Ryan Stinnett](https://github.com/jryans), [Cristian Dinu](https://github.com/cdinu), and [Florian Plattner](https://github.com/lasernoises) and a _very_ generous anonymous donor for sponsoring Vale over all these years.
 
-> It says here that they can fit an infinitely large reference counter into just one bit. They can see when an object is dead, without keeping it allocated. They can stop time, freeze the world, and explore it at their leisure, without incurring the normal run-time costs. How is any of this possible?
-
-> My friends, we all thought we had solved memory safety. I'm starting to think... that we haven't even scratched the surface.
+My recent medical troubles may have forced me to stop coding and led me to pause donations and sponsorships, but your support all this time is still giving me spirit and strength. My recovery is going well (I'm able to write articles!) so hopefully I'll be back to 100% soon!

@@ -1,0 +1,33 @@
+---
+title: RC, Regions, and How to Combine Memory Models
+subtitle: Part 1 of the Memory Safety Grimoire
+realm: blog
+path: grimoire/rc-regions
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+A guy named Jason came into my server one day.
+
+Jason: "Wait, so with generational references, we now have four ways to do memory safety, besides tracing GC, reference counting, and borrow checking?"
+
+Evan: "There are actually fifteen by my count. Probably more!"
+
+Jason: "Fifteen?!"
+
+
+I've collected them so gradually over the years that it's not surprising to me anymore, so it's always a delight to see people's surprise when I tell them this.
+
+Yes, there are fifteen!
+
+
+We all know of the traditional three:
+
+ * Reference counting
+ * Tracing garbage collection
+ * Borrow checking
+
+And by now, a lot of my readers know of the fourth:
+
+ * Generational references (plus their probabilistic flavor)
+

@@ -130,8 +130,8 @@ Here's the above snippet again:
 ```vale
 pure func printShipNames(tenShips &List<Ship>) {
   foreach i in 0..tenShips.len() {
-    ship = tenShips[i]; // Generation check here
-    name = ship.name; // Generation check here
+    ship = tenShips[i]; // No generation check here
+    name = ship.name; // No generation check here
     println(name);
   }
 }
@@ -168,7 +168,7 @@ The Vale compiler sees these two facts:
  * We're making a non-owning reference from `myShips` which we know is alive, so we know this non-owning reference points to something alive.
 
 
-It then creates a raw reference [# You can almost think of a "raw reference" as just a regular pointer. Under the hood, it sometimes also contains an offset integer that can later be used to recover the generation. This raw reference is sometimes 128 bits wide, and sometimes 64 bits, depending on the object and the CPU (we can use [top-byte-ignore](https://en.wikichip.org/wiki/arm/tbi) on ARM CPUs, and might put a offset-to-generation integer in there, though thats only a tentative design).] (without a generation) pointing to `ship`, and passes it to `printShipNames`.
+It then creates a raw reference [# You can almost think of a "raw reference" as just a regular pointer. Under the hood, it sometimes also contains an offset integer that can later be used to recover the generation. This raw reference is sometimes 128 bits wide, and sometimes 64 bits, depending on the object and the CPU (we can use [top-byte-ignore](https://en.wikichip.org/wiki/arm/tbi) on ARM CPUs, and might put a offset-to-generation integer in there, though thats only a tentative design).] (without a generation) pointing to `myShips`, and passes it to `printShipNames`.
 ////
 ```vale
 func callerFuncA() {

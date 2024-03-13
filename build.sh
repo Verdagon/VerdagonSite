@@ -437,15 +437,15 @@ if [ $TARGET == "myth-zero-overhead-memory-safety" ] || [ $TARGET == "all" ] ; t
   fi
 fi
 
-if [ $TARGET == "making-regions-part-7-results" ] || [ $TARGET == "all" ] ; then
-  echo "Doing making-regions-part-7-results"
-  echo $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/making-regions-part-7-results src/draft/making-regions/making-regions-part-7-results.vmd
-  eval $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/making-regions-part-7-results src/draft/making-regions/making-regions-part-7-results.vmd
-  if [ $? != 0 ]; then
-    echo "Failed!"
-    exit 1
-  fi
-fi
+# if [ $TARGET == "making-regions-part-7-results" ] || [ $TARGET == "all" ] ; then
+#   echo "Doing making-regions-part-7-results"
+#   echo $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/making-regions-part-7-results src/draft/making-regions/making-regions-part-7-results.vmd
+#   eval $VMD_SITE_GEN $MODE $ROOT --compiler_dir $VALESTROM --out public/blog/making-regions-part-7-results src/draft/making-regions/making-regions-part-7-results.vmd
+#   if [ $? != 0 ]; then
+#     echo "Failed!"
+#     exit 1
+#   fi
+# fi
 
 if [ $TARGET == "first-regions-prototype" ] || [ $TARGET == "all" ] ; then
   echo "Doing first-regions-prototype"

@@ -20,3 +20,8 @@ talk about "red tape syndrome"
 infectious problem: everyone above you needs to approve something youre doing. why does everyone care if youre doing this thing?
 
 they give you reasons, but then you look at the next company over and they avoid the problem completely by thinking about the problem a different way. makes you wonder, what went wrong?
+
+
+
+
+async drop is actually a huge sign of this infectiousness being bad. drop() has a solid contract, and async wants to punch right through it.
