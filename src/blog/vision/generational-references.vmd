@@ -6,7 +6,6 @@ realm: blog
 path: blog/generational-references
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: me
 ---
 
 
@@ -620,7 +619,7 @@ Generational references and regions also enable some pretty amazing new features
  * [Higher RAII](https://vale.dev/guide/structs#higher-raii): Vale's type system can use ownership to ensure that we don't forget to call a function at some point in the future, and its destructors can take in arguments and return values.
 
 
-There are also a few more features that regions will enable, involving concurrency, transactions, and unique security benefits. [# One of the benefits of [sponsoring Vale](https://github.com/sponsors/ValeLang) is that you get access to all our future plans, and get to ask questions about them!] They're a little too early in the design phases to explain here, but stay tuned!
+There are also a few more features that regions will enable, involving concurrency, transactions, and unique security benefits. They're a little too early in the design phases to explain here, but stay tuned!
 
 
 <slice />
@@ -710,7 +709,9 @@ It's unknown if this is actually possible, but until we can rule it out, we'll w
 
 
 
+<ignore>
 <$include "/sponsoring.vmd"/>
+</ignore>
 
 
 <ignore>

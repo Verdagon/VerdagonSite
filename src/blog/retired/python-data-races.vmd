@@ -6,7 +6,6 @@ realm: blog
 path: blog/python-data-races
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: me
 ---
 
 ! Note: I wrote this article with an unusual (and partially incorrect) definition of data race. To get the most out of this article, one could interpret "data race" as "race condition". The greater theme of this article is unchanged: that a language (such as Javascript or most flavors of Python) cannot avoid concurrency problems by making everything single-threaded under the hood. Happy reading!
@@ -144,7 +143,7 @@ Someday, perhaps problems like these will be a thing of the past!
 This might all sounds pretty obvious to Python veterans, but it was surprising to me. Maybe it will be surprising to others!
 
 
-Thanks for reading! If you want to discuss more, come by the [r/Vale](http://reddit.com/r/vale) subreddit or the [Vale discord](https://discord.gg/SNB8yGH), and if you enjoy these articles or want to support our efforts, please [sponsor us on GitHub!](https://github.com/sponsors/ValeLang)
+Thanks for reading! If you want to discuss more, come by the [r/Vale](http://reddit.com/r/vale) subreddit or the [Vale discord](https://discord.gg/SNB8yGH).
 
 
 - Evan O

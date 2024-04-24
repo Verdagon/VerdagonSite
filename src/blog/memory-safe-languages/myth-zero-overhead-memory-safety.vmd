@@ -6,7 +6,6 @@ realm: blog
 path: blog/making-regions-part-3-chasing-myths
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: me
 ---
 
 
@@ -342,9 +341,6 @@ See you next time,
 
 
 <div><center><img src="/images/quetzalcoatl.jpg" style="max-height: 300px;"/><div style="opacity: .8">Bonus: The Quetzalcoatl! Not quite a bird,<br />but very much a badass winged serpent!</div></center></div>
-
-
-<$include "/sponsoring.vmd" />
 
 
 

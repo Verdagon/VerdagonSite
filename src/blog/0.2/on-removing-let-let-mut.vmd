@@ -6,7 +6,6 @@ realm: blog
 path: blog/on-removing-let-let-mut
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: us
 ---
 
 
@@ -258,6 +257,7 @@ Thanks for visiting, and we hope you enjoyed this article!
 In the coming weeks, we'll be writing more about our "region borrow checker" which helps eliminate Vale's memory safety overhead, so subscribe to our [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), or the [r/Vale](https://reddit.com/r/vale) subreddit, and come hang out in the [Vale discord](https://discord.gg/SNB8yGH)!
 
 
+<ignore>
 If you found this interesting, please consider sponsoring us:
 
 <center>
@@ -278,3 +278,4 @@ With your help, we can write nonsense like this more often!
 
 
 <$include "/sponsoring.vmd"/>
+</ignore>

@@ -6,7 +6,6 @@ realm: blog
 path: blog/concept-functions
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: us
 ---
 
 
@@ -176,7 +175,11 @@ Note how neither requires that `calcDamage` be a method of the type, they can be
 
 # That's all!
 
-Thanks for reading, we hope you enjoyed this article! And if you're impressed with our [track record](https://vale.dev/roadmap) and believe in the direction we're heading, please consider sponsoring us on github:
+Thanks for reading, we hope you enjoyed this article!
+
+
+<ignore>
+And if you're impressed with our [track record](https://vale.dev/roadmap) and believe in the direction we're heading, please consider sponsoring us on github:
 
 <center>
   <a href="https://github.com/sponsors/ValeLang" class="donate-button">
@@ -190,7 +193,5 @@ Thanks for reading, we hope you enjoyed this article! And if you're impressed wi
 With your support, we can bring easier generics to programmers worldwide!
 
 
-
-
-
 <$include "/sponsoring.vmd"/>
+</ignore>

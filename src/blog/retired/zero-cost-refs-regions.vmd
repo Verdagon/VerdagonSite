@@ -7,7 +7,6 @@ realm: blog
 path: blog/zero-cost-refs-regions
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: me
 ---
 
 ! Note: This article was published before Vale switched to [generational references](/blog/generational-references) from RC. Now, read-only regions eliminate generation checks, rather than RC overhead.

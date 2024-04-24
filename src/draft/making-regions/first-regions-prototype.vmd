@@ -213,7 +213,9 @@ However, there are still a few things to do before Vale can really go toe-to-toe
 After this is merged in, I'll be making the standard library use regions so that every user will benefit from them, even if their main program code doesn't use regions directly.
 
 
+<ignore>
 It's a pretty ambitious endeavor, so it's not clear how long this will take. With enough sponsorship I can work on this full-time, so if you believe in the direction we're heading, please consider sponsoring on [GitHub](https://github.com/sponsors/ValeLang) or [Patreon](https://www.patreon.com/user/about?u=5018675)!
+</ignore>
 
 
 <slice/>
@@ -231,8 +233,9 @@ Cheers!
 - Evan Ovadia
 
 
-
+<ignore>
 <$include "/sponsoring.vmd"/>
+</ignore>
 
 
 <ignore>

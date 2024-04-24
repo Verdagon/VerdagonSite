@@ -6,7 +6,6 @@ realm: blog
 path: blog/comparing-hgm-traditional-reference-counting
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: me
 ---
 
 

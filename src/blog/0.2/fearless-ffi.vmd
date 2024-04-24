@@ -20,7 +20,9 @@ Vale takes a big step forward here, by isolating unsafe and untrusted code and k
 This page describes the proof-of-concept we have so far, plus the next steps. It involves some borderline-insane acrobatics with *inline assembly*, *bitwise xor and rotate*, and *two simultaneous stacks*. Buckle up!
 
 
+<ignore>
 If you're impressed with our [track record so far](https://vale.dev/roadmap) and believe in the direction we're heading, please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)! We can't do this without you, and we appreciate all the support you've shown.
+</ignore>
 
 
 # The Challenge: Leaky Unsafe
@@ -401,6 +403,7 @@ Thanks for visiting, and we hope you enjoyed this article!
 In the coming weeks, we'll be writing more about our "deterministic replayability" proof-of-concept which eliminates heisenbugs and helps us reproduce race conditions, so subscribe to our [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), or the [r/Vale](https://reddit.com/r/vale) subreddit, and come hang out in the [Vale discord](https://discord.gg/SNB8yGH)!
 
 
+<ignore>
 If you found this interesting, please consider sponsoring us:
 
 <center>
@@ -421,3 +424,4 @@ With your help, we can bring more of these features into the world!
 
 
 <$include "/sponsoring.vmd"/>
+</ignore>

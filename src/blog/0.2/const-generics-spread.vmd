@@ -6,7 +6,6 @@ realm: blog
 path: blog/const-generics-spread
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: us
 ---
 
 
@@ -139,6 +138,7 @@ Thanks for visiting, hope you enjoyed it!
 In the coming weeks, I'll be writing more about our "Fearless FFI" plans which will help us more safely use external C code, so subscribe to our [RSS feed](https://verdagon.dev/rss.xml) [twitter](https://twitter.com/vale_pl), or the [r/vale](https://reddit.com/r/vale) subreddit, and come hang out in the [Vale discord](https://discord.gg/SNB8yGH)!
 
 
+<ignore>
 If you found this interesting, please consider sponsoring us:
 
 <center>
@@ -161,3 +161,4 @@ With your help, we can write this kind of nonsense more often!
 
 
 <$include "/sponsoring.vmd"/>
+</ignore>

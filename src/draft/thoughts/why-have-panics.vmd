@@ -6,7 +6,6 @@ realm: blog
 path: blog/why-have-panics
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: me
 ---
 
 

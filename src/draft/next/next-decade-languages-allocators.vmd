@@ -6,7 +6,6 @@ realm: blog
 path: blog/next-decade-languages-allocators
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: me
 ---
 
 

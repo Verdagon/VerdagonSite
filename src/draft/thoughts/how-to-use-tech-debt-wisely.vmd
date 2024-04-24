@@ -6,7 +6,6 @@ realm: blog
 path: blog/how-to-use-tech-debt-wisely
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: me
 ---
 
 

@@ -29,7 +29,10 @@ It's sometimes tempting to think that we've reached the end of programming langu
 
 Welcome to the *Next Gen Language Features* series, where we talk about surprising language features that are on the horizon, and could soon change the way we program.
 
+
+<ignore>
 I hope you enjoy it, and if you'd like us to continue, please consider [sponsoring us](https://github.com/sponsors/ValeLang)!
+</ignore>
 
 
 <slice/>
@@ -360,6 +363,7 @@ Thanks for visiting, and I hope you enjoyed this read!
 In the coming weeks, I'll be writing more about how upcoming languages use *regions* to give them speed and fearless concurrency while remaining simple. Subscribe to our [RSS feed](https://verdagon.dev/rss.xml) or the [r/Vale](https://reddit.com/r/vale) subreddit, and come hang out in the [Vale discord](https://discord.gg/SNB8yGH)!
 
 
+<ignore>
 If you found this interesting, please consider sponsoring us:
 
 <center>
@@ -380,3 +384,4 @@ I'd love to keep writing articles like this for a long time. Big thanks to our s
 
 
 <$include "/sponsoring.vmd"/>
+</ignore>

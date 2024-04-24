@@ -6,7 +6,6 @@ realm: blog
 path: blog/seamless-fearless-structured-concurrency
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: me
 ---
 
 
@@ -231,8 +230,9 @@ It was exciting to finally use it! I come from a heavy C++ and Rust background, 
 Thanks for reading! In the coming weeks, I'll be writing more about the Vale 7DRL experience, so subscribe to our [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), or the [r/Vale](https://reddit.com/r/vale) subreddit, and come hang out in the [Vale discord](https://discord.gg/SNB8yGH).
 
 
+<ignore>
 If you want to support our work, please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
-
+</ignore>
 
 
 <slice new-color="afterword"/>

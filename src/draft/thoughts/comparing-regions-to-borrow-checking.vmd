@@ -6,7 +6,6 @@ realm: blog
 path: blog/comparing-regions-to-borrow-checking
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: us
 ---
 
 

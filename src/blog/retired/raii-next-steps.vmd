@@ -7,7 +7,6 @@ realm: blog
 path: blog/next-steps-raii
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: me
 ---
 
 ! Note: This article was published before we changed from constraint references to generational references.

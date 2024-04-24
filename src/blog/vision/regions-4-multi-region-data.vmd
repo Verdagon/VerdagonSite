@@ -7,7 +7,6 @@ realm: blog
 path: blog/zero-cost-borrowing-regions-part-4-multi-region-data
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: us
 ---
 
 
@@ -257,6 +256,7 @@ Next up is [Part 5](/blog/zero-cost-borrowing-regions-part-5-region-scoped-data)
 *That's all for now!* We hope you enjoyed this article. Stay tuned for the next article, which shows how one-way isolation works.
 
 
+<ignore>
 If you're impressed with our [track record](https://vale.dev/roadmap#recent-additions) and believe in the [direction we're heading](https://vale.dev/roadmap), please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
 
 <center>
@@ -269,6 +269,7 @@ If you're impressed with our [track record](https://vale.dev/roadmap#recent-addi
 </center>
 
 With your support, we can bring regions to programmers worldwide.
+</ignore>
 
 
 See you next time!

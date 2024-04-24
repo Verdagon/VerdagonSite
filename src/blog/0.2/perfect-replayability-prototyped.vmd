@@ -7,7 +7,6 @@ realm: blog
 path: blog/perfect-replayability-prototyped
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: us
 ---
 
 
@@ -29,7 +28,12 @@ By using this technique, we were able to finish making [Incendian Falls](https:/
 <img src="/images/incendian.png" width="100%"/>
 
 
-*The prototype was just merged in, you can play with this feature today.* [# If you're impressed with our track record and believe in the direction we're heading, please consider [sponsoring us on github](https://github.com/sponsors/ValeLang)! We can't do this without you, and we appreciate all the support you've shown.]
+*The prototype was just merged in, you can play with this feature today.*
+
+
+<ignore>
+[# If you're impressed with our track record and believe in the direction we're heading, please consider [sponsoring us on github](https://github.com/sponsors/ValeLang)! We can't do this without you, and we appreciate all the support you've shown.]
+</ignore>
 
 
 # What and Why
@@ -231,6 +235,7 @@ We described this feature in pretty broad strokes! Those who want to read more o
 In the coming weeks, we'll be writing more about "immutable calling" which helps eliminate memory safety overhead, so subscribe to our [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), or the [r/Vale](https://reddit.com/r/vale) subreddit, and come hang out in the [Vale discord](https://discord.gg/SNB8yGH)!
 
 
+<ignore>
 We hope you enjoyed this! And if you believe in the direction we're heading, please consider sponsoring us on github!
 
 <center>
@@ -251,3 +256,4 @@ With your support, we can bring an end to all heisenbugs!
 
 
 <$include "/sponsoring.vmd"/>
+</ignore>

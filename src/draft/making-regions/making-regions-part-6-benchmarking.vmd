@@ -7,7 +7,6 @@ realm: blog
 path: blog/making-regions-part-2-generics
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: us
 ---
 
 

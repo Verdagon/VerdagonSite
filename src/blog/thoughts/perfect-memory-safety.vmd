@@ -6,7 +6,6 @@ realm: blog
 path: blog/thoughts-on-perfect-memory-safety
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: me
 ---
 
 

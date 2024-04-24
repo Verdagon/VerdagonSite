@@ -6,7 +6,6 @@ realm: blog
 path: blog/thoughts-language-complexity
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: me
 ---
 
 

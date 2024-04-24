@@ -7,7 +7,6 @@ realm: blog
 path: blog/making-regions-part-2-generics
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: us
 ---
 
 
@@ -116,7 +115,7 @@ I thought so too!
 
 #early: We do have a prototype of multi-region functions working, actually! We have a few more articles about regions, the prototype, and its results queued up.
 
-Feel free to [email me](mailto:vbmrp2g@verdagon.dev) if you'd like an early look. Our sponsors also get everything early, so [consider sponsoring](https://github.com/sponsors/ValeLang)!
+Feel free to [email me](mailto:vbmrp2g@verdagon.dev) if you'd like an early look.
 </slice>
 
 
@@ -343,6 +342,12 @@ func thrice<x' rw>(a x'int) x'int {
 *That's all for now!* I hope you enjoyed this article. Keep an eye out for the next one on our [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), [discord server](https://discord.gg/SNB8yGH), or [subreddit](https://reddit.com/r/vale)!
 
 
+See you next time!
+
+- Evan Ovadia
+
+
+<ignore>
 If you're impressed with our [track record](https://vale.dev/roadmap#recent-additions) and believe in the [direction we're heading](https://vale.dev/roadmap), please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
 
 <center>
@@ -357,11 +362,7 @@ If you're impressed with our [track record](https://vale.dev/roadmap#recent-addi
 With your support, we can bring regions to programmers worldwide.
 
 
-See you next time!
-
-- Evan Ovadia
-
-
 
 
 <$include "/sponsoring.vmd"/>
+</ignore>

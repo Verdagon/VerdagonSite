@@ -7,7 +7,6 @@ realm: blog
 path: blog/hybrid-generational-memory
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: me
 ---
 
 ! Note: This design later evolved into the [cell](/blog/zero-cost-borrowing-regions-part-2-isolates#cells) mechanism, which is how the language automatically temporarily freezes regions for read-only operations. This post is up to show the history and what led to the newer design.
@@ -112,5 +111,3 @@ Some potential weaknesses to explore:
 
 
 
-
-<$include "/sponsoring.vmd"/>

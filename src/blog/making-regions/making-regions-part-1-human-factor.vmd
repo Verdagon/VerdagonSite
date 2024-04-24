@@ -7,7 +7,6 @@ realm: blog
 path: blog/making-regions-part-1-human-factor
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: us
 ---
 
 
@@ -167,7 +166,13 @@ In the next post, I'll talk about the massive yak that reared up when when tryin
 *That's all for now!* I hope you enjoyed this article. Keep an eye out for the next one on our [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), [discord server](https://discord.gg/SNB8yGH), or [subreddit](https://reddit.com/r/vale)!
 
 
+See you next time!
 
+- Evan Ovadia
+
+
+
+<ignore>
 If you're impressed with our [track record](https://vale.dev/roadmap#recent-additions) and believe in the [direction we're heading](https://vale.dev/roadmap), please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
 
 <center>
@@ -182,11 +187,7 @@ If you're impressed with our [track record](https://vale.dev/roadmap#recent-addi
 With your support, we can bring regions to programmers worldwide.
 
 
-See you next time!
-
-- Evan Ovadia
-
-
 
 
 <$include "/sponsoring.vmd"/>
+</ignore>

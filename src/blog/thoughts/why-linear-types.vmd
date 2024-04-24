@@ -6,7 +6,6 @@ realm: blog
 path: blog/why-languages-should-have-linear-types
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: me
 ---
 
 

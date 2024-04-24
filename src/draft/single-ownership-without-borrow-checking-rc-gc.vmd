@@ -6,7 +6,6 @@ date: June 15, 2023
 path: blog/single-ownership-without-borrow-checking-rc-gc
 layout: annotated
 author: Evan Ovadia
-sponsor: me
 namespace: c-blog m-annotated
 ---
 
@@ -555,7 +554,9 @@ Austral uses linear types for its memory safety, and built their entire language
 Next week I'll be writing about how we can use these techniques (and a few others) to design some memory safety for C++, so keep an eye on the [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), [discord server](https://discord.gg/SNB8yGH), or [subreddit](https://reddit.com/r/vale)!
 
 
+<ignore>
 *That's all for now!* If you enjoyed this article, please consider [sponsoring](https://github.com/sponsors/ValeLang)!
+</ignore>
 
 
 See you next time!
@@ -564,4 +565,6 @@ See you next time!
 - Evan Ovadia
 
 
+<ignore>
 <$include "/sponsoring.vmd" />
+</ignore>

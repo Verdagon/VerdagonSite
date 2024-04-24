@@ -313,8 +313,6 @@ Perhaps the server could compile the most common ones (x86, Arm, etc.)? Or lazil
 
 *Costs:* Vale is a completely free open-source language, and we don't have enough donations coming in to support cloud building.
 
-(By the way, you should totally [sponsor Vale](https://github.com/sponsors/ValeLang), I'd love to do this full-time!)
-
 Perhaps we could just make the server a distributed cache, and have the users' machines do the compilation themselves. There might be some trust aspects to resolve there though.
 
 
@@ -358,4 +356,6 @@ Cheers!
 - Evan Ovadia
 
 
+<ignore>
 <$include "/sponsoring.vmd"/>
+</ignore>

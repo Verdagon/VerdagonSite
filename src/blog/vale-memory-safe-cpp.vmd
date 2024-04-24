@@ -6,7 +6,6 @@ date: June 22, 2023
 path: blog/vale-memory-safe-cpp
 layout: annotated
 author: Evan Ovadia
-sponsor: me
 namespace: c-blog m-annotated
 ---
 
@@ -1121,7 +1120,12 @@ This isn't the only blend, of course. There are more!
 ...but this article is already 20+ pages! So let's stay with this blend for now.
 
 
-Let me know if you want to hear about those, and I'll be happy to make this into a series. (Also consider sponsoring on [patreon](https://patreon.com/verdagon) or [GitHub](https://github.com/sponsors/ValeLang)!)
+Let me know if you want to hear about those, and I'll be happy to make this into a series.
+
+
+<ignore>
+(Also consider sponsoring on [patreon](https://patreon.com/verdagon) or [GitHub](https://github.com/sponsors/ValeLang)!)
+</ignore>
 
 
 <slice />
@@ -1214,7 +1218,9 @@ Huge thanks to [mttd](https://www.reddit.com/r/ProgrammingLanguages/comments/14g
 Thats it! I hope you enjoyed this whirlwind tour of the various ways we can add memory safety to C++.
 
 
+<ignore>
 If you enjoyed this article, please consider donating via [patreon](https://patreon.com/verdagon) or [GitHub](https://github.com/sponsors/ValeLang)! With your support, I can write articles like this more often, and perhaps even do it full-time one day.
+</ignore>
 
 
 If you have any questions, feel free to message me on [twitter](https://twitter.com/verdagon), the [discord server](https://discord.gg/SNB8yGH), or [subreddit](https://reddit.com/r/vale).
@@ -1236,5 +1242,3 @@ Languages like [Carbon](https://github.com/carbon-language/carbon-lang) and [Cpp
 c++ cant do it because we need to put the things in the object up front, and those might be irrelevant by the time we drop, or we might not know them that early. rust can do even less because it punishes references in fields.
 </ignore>
 
-
-<$include "/sponsoring.vmd" />

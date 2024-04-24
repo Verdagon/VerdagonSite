@@ -7,7 +7,6 @@ realm: blog
 path: blog/cross-platform-core-vision
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: me
 ---
 
 App development is one of the fastest-growing areas of software engineering today. There are [3.5 billion smartphone users](https://www.statista.com/statistics/330695/number-of-smartphone-users-worldwide/) in the world, using [2.2 million](https://buildfire.com/app-statistics/) App Store apps and [2.8 million](https://buildfire.com/app-statistics/) Play Store apps. Many of those have counterparts on the web, too.

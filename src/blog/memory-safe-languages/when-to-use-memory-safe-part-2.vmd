@@ -7,7 +7,6 @@ realm: blog
 path: blog/when-to-use-memory-safe-part-2
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: me
 ---
 
 
@@ -554,6 +553,7 @@ I hope this post has given you a broader perspective on how various memory safet
 If you're interested in this kind of thing, then check out [Part 1](https://verdagon.dev/blog/when-to-use-memory-safe-part-1) which talks about memory safety in unsafe languages, and keep an eye out for the next parts on our [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), [discord server](https://discord.gg/SNB8yGH), or [subreddit](https://reddit.com/r/vale)!
 
 
+<ignore>
 If you found this interesting or entertaining, please consider sponsoring me:
 
 <center>
@@ -571,6 +571,7 @@ With your help, I can write this kind of nonsense more often!
 Cheers,
 
 - Evan Ovadia
+</ignore>
 
 
 <ignore>

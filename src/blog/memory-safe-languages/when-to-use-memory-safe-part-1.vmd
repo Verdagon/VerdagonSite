@@ -7,7 +7,6 @@ realm: blog
 path: blog/when-to-use-memory-safe-part-1
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: me
 ---
 
 
@@ -410,6 +409,7 @@ Thanks for reading! I hope this post has been intriguing and enlightening.
 In the coming weeks I'll be continuing this series, so subscribe to the [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), or the [subreddit](https://reddit.com/r/vale), and come hang out in the [discord server](https://discord.gg/SNB8yGH)!
 
 
+<ignore>
 If you found this interesting or entertaining, please consider sponsoring me:
 
 <center>
@@ -422,4 +422,4 @@ If you found this interesting or entertaining, please consider sponsoring me:
 </center>
 
 With your help, I can write this kind of nonsense more often!
-
+</ignore>

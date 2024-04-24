@@ -6,7 +6,6 @@ realm: blog
 path: blog/hgm-static-analysis-part-1
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: me
 ---
 
 

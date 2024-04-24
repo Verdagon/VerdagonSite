@@ -6,7 +6,6 @@ realm: blog
 path: blog/first-100k-lines
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: us
 ---
 
 
@@ -318,6 +317,7 @@ Thanks for visiting, and I wish you the best of luck in your first 100,000 lines
 In the coming weeks, I'll be posting the next article in the [Implementing a New Memory Safety Approach](https://verdagon.dev/blog/making-regions-part-1-human-factor) series, so subscribe to our [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), or the [r/Vale](https://reddit.com/r/vale) subreddit, and come hang out in the [Vale discord](https://discord.gg/SNB8yGH).
 
 
+<ignore>
 If you found this interesting or entertaining, please consider sponsoring me:
 
 <center>
@@ -336,3 +336,4 @@ With your help, I can write this kind of nonsense more often!
 
 
 <$include "/sponsoring.vmd"/>
+</ignore>

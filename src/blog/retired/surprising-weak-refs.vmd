@@ -7,7 +7,6 @@ realm: blog
 path: blog/hybrid-generational-memory
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: me
 ---
 
 
@@ -384,6 +383,7 @@ Thanks for reading! In the coming weeks, I'll be writing about how we can augmen
 
 
 
+<ignore>
 If you found this interesting, please consider sponsoring us:
 
 <center>
@@ -396,11 +396,13 @@ If you found this interesting, please consider sponsoring us:
 </center>
 
 With your help, we can write articles like this more often!
+</ignore>
 
 
 - Evan Ovadia
 
 
 
-
+<ignore>
 <$include "/sponsoring.vmd"/>
+</ignore>

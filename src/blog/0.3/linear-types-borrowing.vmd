@@ -6,7 +6,6 @@ date: June 1, 2023
 path: blog/linear-types-borrowing
 layout: annotated
 author: Evan Ovadia
-sponsor: me
 namespace: c-blog m-annotated
 ---
 
@@ -580,4 +579,6 @@ Cheers,
 - Evan Ovadia
 
 
+<ignore>
 <$include "/sponsoring.vmd"/>
+</ignore>

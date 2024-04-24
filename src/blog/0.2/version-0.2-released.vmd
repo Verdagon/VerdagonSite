@@ -21,7 +21,9 @@ This version has been prioritizing ease of use, enabling much larger Vale projec
 You can find the [version 0.2 binaries here](https://github.com/ValeLang/Vale/releases/tag/v0.2.0).
 
 
+<ignore>
 Try it out, and if you like what you see, consider [sponsoring us on GitHub!](https://github.com/sponsors/ValeLang) This is a free project for the good of all, and with your help, we can continue working on it for longer. [#longer]
+</ignore>
 
 
 Below are the new features in 0.2, enjoy!
@@ -86,11 +88,6 @@ Higher RAII can be also be used for more powerful [type-state programming](http:
 
 
 <slice>
-#longer: We're particularly excited to prototype the [region borrow checker](/blog/zero-cost-borrowing-regions-overview), which could help Vale approach C++'s speed by getting rid of the vast majority of our memory safety overhead, and enable concurrency features like described in [Seamless, Fearless, Structured Concurrency](/blog/seamless-fearless-structured-concurrency).
-
-We've been looking forward to this version for a long time!
-
-
 #tsp: Type-state programming is a way to use the compiler to ensure that specific functions are only callable when the object is in a certain state. This is all tracked via the type system, with zero run-time overhead.
 </slice>
 
@@ -352,6 +349,7 @@ Also keep an eye out for our next series of articles, which paint a more holisti
 Here's to a great year, and a great version!
 
 
+<ignore>
 Thanks for reading, we hope you enjoyed this article! And if you're impressed with our [track record](https://vale.dev/roadmap) and believe in the direction we're heading, please consider sponsoring us on github:
 
 <center>
@@ -370,3 +368,4 @@ With your support, we can work on this full-time, and bring speed and safety to 
 
 
 <$include "/sponsoring.vmd"/>
+</ignore>

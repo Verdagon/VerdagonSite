@@ -6,7 +6,6 @@ realm: blog
 path: blog/generational-references-v2
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: me
 ---
 
 

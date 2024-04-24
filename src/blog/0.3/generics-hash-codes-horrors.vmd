@@ -6,7 +6,6 @@ realm: blog
 path: blog/generics-hash-codes-madness
 layout: annotated
 namespace: c-blog m-annotated
-sponsor: me
 ---
 
 
@@ -165,6 +164,7 @@ In the next post, I'll talk about implementing regions to make a sort of "opt-in
 
 
 
+<ignore>
 If you're impressed with our [track record](https://vale.dev/roadmap#recent-additions) and believe in the [direction we're heading](https://vale.dev/roadmap), please consider [sponsoring us on GitHub](https://github.com/sponsors/ValeLang)!
 
 <center>
@@ -187,3 +187,4 @@ See you next time!
 
 
 <$include "/sponsoring.vmd"/>
+</ignore>
