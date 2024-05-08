@@ -942,7 +942,7 @@ It wouldn't be a Languages ∩ Architecture blog without considering the archite
 
 So how does higher RAII do?
 
-Aside from all the above powers, there are two more benefits, and one more downside.
+Aside from all the above powers, there's one more downside, two more benefits, and one Major Implication™.
 
 
 The first extra benefit is that *a function can influence the future, not just the past*.
@@ -962,6 +962,17 @@ The downside, however, is that `linear`ity can be an *upwardly viral constraint*
 Upwardly viral constraints, like `async`/`await` [#async] and Rust's borrow references, [#borrowing] can be harmful in some cases as they cause the rest of the program to change much more than other static constraints.
 
 This drawback can be mitigated, however. The containing struct `A` can define its own custom `drop()` function which calls the proper functions to destroy `B`, if it has the right arguments handy. If it doesn't, we'll need to refactor to change `A` (and possibly others who indirectly contain `A`) to be `linear`.
+
+
+The *major implication* of higher RAII is that it can bring a language much closer to the ever-elusive goal of *correctness*.
+
+A lot of languages nail the *first half* of correctness: *safety*. Safety is the assurance that "bad things don't happen", for example, a panic, a crash, or a use-after-free.
+
+But no languages nail the *second half* of correctness: *liveness*. As [Hillel Wayne once said](https://www.hillelwayne.com/post/safety-and-liveness/), liveness is the assurance that "good things _do_ happen". By adding linear types and higher RAII, a language can get much closer to this.
+
+There's one language in particular that could really shine here one day: *Austral*, which combines linear types and borrow checking. [# Vale can also shine here when one uses [move-only programming and regions](/blog/linear-types-borrowing) to eliminate generation checks.]
+
+If Austral enables higher RAII on its linear types, it could be _the_ language to bring correctness to the mainstream in a way that's simple enough to not require users to learn advanced category theory. And that's a _huge deal_.
 
 
 <slice>
