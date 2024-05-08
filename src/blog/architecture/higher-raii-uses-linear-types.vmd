@@ -2,7 +2,7 @@
 title: Higher RAII, and the Seven Lost Uses of Linear Types
 subtitle: Linear types + whitelisted destroyers = powers yet unimagined
 author: Evan Ovadia
-date: May 9th, 2024
+date: DRAFT
 realm: blog
 path: blog/higher-raii-uses-linear-types
 layout: annotated
