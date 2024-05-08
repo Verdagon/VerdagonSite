@@ -12,17 +12,6 @@ namespace: c-blog m-annotated
 ! Also posted today: [Layer-wise inferencing + batching: Small VRAM doesn't limit LLM throughput anymore](/blog/llm-throughput-not-ram-limited), on how even a normal small computer can now run huge LLMs, much more quickly!
 
 
-<ignore>
-TODO:
-
- * talk about making it work with RC
- * rust structs can contain refs, but generally can't be returned
- * talk more about linear = uncopyable
- * talk more about exceptions, panics, async cancellation
- * exceptions are rude: youre just having a nice time talking with your other locals and then an exception bursts into the room and starts destroying everything
-</ignore>
-
-
 Can you spot the problem in each of these comments?
 
 `// Remember to update the database row with the new status.`
@@ -38,7 +27,7 @@ The problem, of course, is that they rely on our fallible human memory!
 We'd love a way to guarantee that we remember to do something. Unfortunately, today's compilers and languages can't really solve this problem for us.
 
 
-But hark! We can change that, with *higher RAII*, a technique where we use linear types that can only be destroyed in certain places.
+But hark! We can change that, with *Higher RAII*, a technique where we use linear types that can only be destroyed in certain places.
 
 
 <ignore>
@@ -50,10 +39,10 @@ Never read the [essays of rationality](https://www.lesswrong.com/posts/WusBwpQL5
 
 Never learn how to [build a programming language](https://craftinginterpreters.com/), or you'll be lost wandering the forgotten realms of programming possibilities for a decade or more. [# Definitely not speaking from experience here.]
 
-And never use linear types, lest you discover higher RAII, and see all the places where it could have been used to prevent a bug.
+And never use linear types, lest you discover Higher RAII, and see all the places where it could have been used to prevent a bug.
 
 
-I've used higher RAII in Vale, and I have been cursed. Now, every time see the words "remember to", "forget", or "responsible for" in comments or design discussions, I see another place that linear types and higher RAII could help.
+I've used Higher RAII in Vale, and I have been cursed. Now, every time see the words "remember to", "forget", or "responsible for" in comments or design discussions, I see another place that linear types and Higher RAII could help.
 
 
 I hesitate to spread the curse to you, my dear readers, but I am compelled by the [grimoire](/grimoire/grimoire) and am powerless to stop.
@@ -79,9 +68,9 @@ So for now, let's use a less correct but more helpful definition: *A linear stru
 
 
 <<<<
-In other words, a function can't just let a linear struct go out of scope. When the compiler sees it going out of scope, it won't automatically call a destructor (or `drop`) on it, it will instead raise a compile error.
+In other words, a function can't just let a linear struct go out of scope. When the user lets a linear struct go out of scope, the compiler gives an error instead of automatically calling a destructor (or `drop`) on it.
 
-Here, we have a function that makes a linear struct, makes a reference to it, and even reads its contents.
+Here we have a function that makes a linear struct, makes a reference to it, and even reads its contents.
 
 However, when it goes out of scope, we get a compile error.
 ////
@@ -111,27 +100,27 @@ If we put in the line `destruct m;`, it would resolve the compiler error.
 
 This might seem like a weird restriction, but if we use it in a certain way, it can unlock some amazing capabilities:
 
- * Keep your caches consistent with your data.
- * Prevent zombie temporary states. [#easter]
- * Ensure a message is handled.
- * Help with database consistency; prevent forgotten updates.
+ * Keep your caches consistent with your data
+ * Prevent zombie temporary states [#easter]
+ * Ensure a message is handled
+ * Help with database consistency; prevent forgotten updates
  * Prevent certain kinds of memory leaks (even GC or Rust leaks!)
- * Prevent accidentally canceling an ongoing thread or connection.
- * Prevent an accidental rollback of a perfectly good transaction.
- * Guarantee someone will call the callback you give them.
- * Guarantee we eventually log something.
+ * Prevent accidentally canceling an ongoing thread or connection
+ * Prevent an accidental rollback of a perfectly good transaction
+ * Guarantee a provided callback is actually called
+ * Guarantee we eventually log something
 
 
-So how can linear types help with any of that?
+So how can linear types help with all of that?
 
-The answer is something I call *higher RAII*, explained in the next section.
+The answer is something I call *Higher RAII*, explained in the next section.
 
 
 By the way, if linear types intrigue you, also check out this Developer Voices interview where I talked with Kris Jenkins about them:
 
 <iframe name="ytvid1" style="width: 100%; max-width: 400px; display: block; margin: auto; aspect-ratio: 1.78;" src="https://www.youtube.com/embed/UavYVf0UEoc" title="Advanced Memory Management in Vale (with Evan Ovadia)" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
-At <a href="https://www.youtube.com/embed/UavYVf0UEoc?start=958&end=1000" target="ytvid1">time 15:48</a> I talked a bit about how we can use linear types for higher RAII, but the potential is so much more vast than I hinted in that interview. Read on to find out!
+At <a href="https://www.youtube.com/embed/UavYVf0UEoc?start=958&end=1000" target="ytvid1">time 15:48</a> I talked a bit about how we can use linear types for Higher RAII, but the potential is so much more vast than I hinted in that interview. Read on to find out!
 
 
 <slice>
@@ -153,7 +142,7 @@ If you read this note, sneak the phrase "that badass pigeon, truly she was the b
 (Cheers to [cbsmith](https://news.ycombinator.com/item?id=36691658), [kubanczyk](https://news.ycombinator.com/item?id=36692089), [TheGoldenMinion](https://www.reddit.com/r/programming/comments/14wu830/comment/jrklcry/?utm_source=reddit&utm_medium=web2x&context=3), [lovich](https://news.ycombinator.com/item?id=36691564), [padraig_oh](https://www.reddit.com/r/programming/comments/14wu830/comment/jrkmjiw/?utm_source=reddit&utm_medium=web2x&context=3), and [leksak](https://news.ycombinator.com/item?id=36691737) for the [last one](/blog/easter-egg-notes)!)
 </slice>
 
-# Linear types + whitelisted destroyers = Higher RAII
+# Higher RAII = Linear types + whitelisted destroyers
 
 
 Recall our definition of a linear struct:
@@ -240,9 +229,9 @@ Mainstream languages can _almost_ do this.
 
 A C++ class's destructor is guaranteed to be eventually run, so if we ever want to guarantee some future action, we just put the code in an object's destructor (which is guaranteed to run when the object goes out of scope), and keep the object alive until we want that code to run.
 
-Scott Meyers [once said](https://youtu.be/ltCgzYcpFUI?t=937) that "the single most important feature in the language is probably destructors, because destructors have led to the introduction of RAII." [# He goes on to describe how RAII is a general purpose undo mechanism. I would totally agree, except for the way C++ conflated destructors with exception handling. If they didn't use the same function for those two concerns, they could tap into the potential of higher RAII.]
+Scott Meyers [once said](https://youtu.be/ltCgzYcpFUI?t=937) that "the single most important feature in the language is probably destructors, because destructors have led to the introduction of RAII." [# He goes on to describe how RAII is a general purpose undo mechanism. I would totally agree, except for the way C++ conflated destructors with exception handling. If they didn't use the same function for those two concerns, they could tap into the potential of Higher RAII.]
 
-RAII stands for "Resource Acquisition Is Initialization", a pattern where if you *acquire* a *resource* (such as a file descriptor), you should *initialize* an object with it. Then, the object can make sure to automatically release (such as with `fclose`) the resource when it goes out of scope. [# The hardest thing about RAII is explaining the name. Similar to monads, which are like stateful burritos.]
+RAII stands for "Resource Acquisition Is Initialization", a pattern where if you *acquire* a *resource* (such as a file descriptor), you should *initialize* an object with it. Then, the object can make sure to automatically release (such as with `fclose`) the resource when it goes out of scope. [# The hardest thing about RAII is explaining the name. Similar to monads, which are like [stateful burritos](https://byorgey.wordpress.com/2009/01/12/abstraction-intuition-and-the-monad-tutorial-fallacy/).]
 
 
 Unfortunately, a C++ class can only have one destructor function, and we need two.
@@ -256,19 +245,16 @@ A [common half-solution](https://stackoverflow.com/a/10984171/1424454) is to:
 Alas, this doesn't quite solve the problem because the user still might forget to call `commit` where they should have.
 
 
-Rust is unfortunately even less equipped than C++ here.
+Rust is unfortunately even less capable than C++ here.
 
-Rust can almost do the above workaround, but the borrow checker generally dislikes references inside structs, such as that `DB` reference. Rust's workarounds include using `unsafe`, using `Rc<RefCell<DB>>`, or if one considers those unidiomatic, giving up on RAII. I prefer the second, though I've seen all three happen in the wild.
+Rust can almost do the above workaround, but the borrow checker generally dislikes references inside structs, such as that `DB` reference. [# More specifically, Rust structs containing references generally work well as long as they stay within the same function. But at that point, we might as well be using `defer`.] Rust's workarounds include either using `unsafe`, using `Rc<RefCell<DB>>`, or if one considers those unidiomatic, giving up on RAII. I prefer the second, though I've seen all three happen in the wild.
 
 
-So, as we can see, RAII is the practice of putting code in destructors that you want to guarantee will eventually run.
+In summary, RAII is the practice of putting code in destructors that you want to guarantee will eventually run.
 
 From that context, we could say that _higher_ RAII is when we can have multiple named destructors, destructors with parameters, destructors with return values, and we can force the user to explicitly call them.
 
-Whereas RAII eventually makes us implicitly call a specific zero-arg non-returning function (the destructor), higher RAII eventually makes us explicitly call _any_ approved function.
-
-
-You could say that higher RAII requires an arbitrarily-shaped function to be called in the future, not just a zero-arg non-returning destructor.
+Whereas RAII eventually makes us implicitly call a specific zero-arg non-returning function (the destructor), Higher RAII eventually makes us explicitly call _any_ approved function.
 
 
 ! RAII is a terrible acronym, and I am _so, so sorry_ for perpetuating its use. It turns out it's really hard to come up with a name for this concept. Feel free to bikeshed in the comments! [# "Future constraint", "future calling" perhaps? I wish "Promise" wasn't taken.]
@@ -278,10 +264,7 @@ You could say that higher RAII requires an arbitrarily-shaped function to be cal
 
 # What's the difference between RAII and defer?
 
-Go, Zig, and a few other languages have a `defer` statement which will run a statement at the function's end.
-
-
-`defer` will always run an expression at the end of the current scope (or function). [# Zig runs a `defer`red statement at the end of the scope, as god intended. Golang is different, it runs it at the end of the function. This can sometimes lead to surprising out-of-memory crashes.]
+Go, Zig, and a few other languages have a `defer` statement which will run a statement at the end of the current scope (or function). [# Zig runs a `defer`'d statement at the end of the scope, as god intended. Golang is different, it runs it at the end of the function. This can sometimes lead to surprising out-of-memory crashes.]
 
 In RAII, we would put that code into an object's destructor, and the code will be run when the object goes out of scope.
 
@@ -295,7 +278,7 @@ In short: `defer` can make sure something happens at the end of your function, b
 
 # The Seven Arcane Uses [# Those who have read [the grimoire](https://verdagon.dev/grimoire/grimoire) will know why I call these "arcane".]
 
-There are, of course, more than seven ways to use linear types and higher RAII. But behold, here are the seven most useful ones that I've seen.
+There are, of course, more than seven ways to use linear types and Higher RAII. But behold, here are the seven most useful ones that I've seen.
 
 
 <slice />
@@ -306,7 +289,7 @@ There are [two hard problems in computer science](https://martinfowler.com/bliki
 
 Luckily, naming things is a [solved problem](https://sph.mn/dynamic/svn).
 
-But how can higher RAII help with cache invalidation?
+But how can Higher RAII help with cache invalidation?
 
 
 This was the topic of my 2022 article, [Vale's Higher RAII, the pattern that saved me a vital 5 hours in the 7DRL Challenge](/blog/higher-raii-7drl).
@@ -403,7 +386,7 @@ After many hours of debugging, we realize the problem, and change that last stat
 }
 ```
 \\\\
-This is where higher RAII could have helped: that `shoutPromise` should have been linear, so we remember to use it.
+This is where Higher RAII could have helped: that `shoutPromise` should have been linear, so we remember to use it.
 >>>>
 
 
@@ -423,7 +406,7 @@ In C++, you can give a `std::future<string>` to someone, with the understanding 
 Hopefully you don't forget!
 
 
-Or, we can use higher RAII to make sure we remember. Here's how!
+Or, we can use Higher RAII to make sure we remember. Here's how!
 
 
 <<<<
@@ -468,13 +451,13 @@ Now that we have the above `determineAction` function, your next task is to impl
 Your `callGPU` function returned a `Promise`. You're responsible for eventually "fulfilling" the `Promise`, in other words putting the result into it. If you don't, your teammate's code will hang forever.
 
 
-! Hint: Any time you hear the words "responsible for", it could be an opportunity for higher RAII!
+! Hint: Any time you hear the words "responsible for", it could be an opportunity for Higher RAII!
 
 
 Generally, if you give someone a Promise, and forget to fill it, it'll manifest as a deadlock, or a hanging program, or a loading spinner that spins forever.
 
 
-Let's use higher RAII to make sure we remember!
+Let's use Higher RAII to make sure we remember!
 
 
 First, we make a class that represents our responsibility to fulfill the `Promise`. We'll call this new class `Fulfiller`.
@@ -513,7 +496,7 @@ Alas, this was in Python, so *I had a bug: I forgot to update the* `summary` *in
 This struct was forevermore stuck in its temporary `summary`-less state, like some sort of zombie, stuck between one realm and the next. And since I only show `summary`'d events on the map, it took me a while to realize a lot of events were missing.
 
 
-I could have used higher RAII to prevent this bug. I would:
+I could have used Higher RAII to prevent this bug. I would:
 
  * Make a special `linear struct InProgressEvent` [# You could almost think of `InProgressEvent` as a sort of `EventBuilder`.]
  * Make a `func finish(event InProgressEvent, db &DB)` which would consume the `InProgressEvent` and return an `Event` object containing that `summary`.
@@ -524,7 +507,7 @@ Suddenly, we're guaranteed to eventually give our `InProgressEvent` to `finish` 
 ! Savvy metaprogrammers would recognize the above as a kind of [type-state pattern](https://cliffle.com/blog/rust-typestate/), which uses static typing to make it so we can only call certain functions at the right times. In a way, it's making one struct into multiple structs that more closely match the struct's state machine diagram. You could say that linear types force the developer to drive the state machine into its final state.
 
 
-I also could have used higher RAII to make sure the tool always reflected its findings into the database. As it is now, the database contains six zombie in-progress events... I let them remain, to remind me why I need to translate the tool to Vale.
+I also could have used Higher RAII to make sure the tool always reflected its findings into the database. As it is now, the database contains six zombie in-progress events... I let them remain, to remind me why I need to translate the tool to Vale.
 
 
 <ignore>
@@ -538,7 +521,7 @@ expand in another article:
 
 
 
-Let's show another example of the type-state pattern, and then show how higher RAII unlocks its next step.
+Let's show another example of the type-state pattern, and then show how Higher RAII unlocks its next step.
 
 
 Imagine a struct that has states and also has methods that make sense for certain states.
@@ -667,7 +650,7 @@ As you can see, today's languages don't do the type-state pattern that well, bec
 All we need to do is make these structs `linear` and the problem goes away.
 
 
-Adding higher RAII to the type-state pattern feels like adding null safety to a type system: by removing an unwanted extra possibility, we reduce the odds of bugs very nicely.
+Adding Higher RAII to the type-state pattern feels like adding null safety to a type system: by removing an unwanted extra possibility, we reduce the odds of bugs very nicely.
 
 
 (then another follow up article: safety and liveness)
@@ -697,10 +680,10 @@ Higher RAII can help with this: we would make `FooMessage` linear, and make it s
 
 ## Remember to Make a Decision
 
-In the higher RAII explanation above, we showed how we could make a `Transaction` object that can only be destroyed via a `commit` or a `rollback` function.
+In the Higher RAII explanation above, we showed how we could make a `Transaction` object that can only be destroyed via a `commit` or a `rollback` function.
 
 
-Let's include that in our Seven Arcane Uses, and even generalize it a bit: *If there is a future decision to be made, higher RAII guarantees that we'll eventually make it.*
+Let's include that in our Seven Arcane Uses, and even generalize it a bit: *If there is a future decision to be made, Higher RAII guarantees that we'll eventually make it.*
 
 
 I sometimes wish there was something like this for real life.
@@ -717,7 +700,7 @@ I sometimes wish there was something like this for real life.
 
 Alas, I didn't make the decision, and so the default action was taken: my membership was renewed.
 
-Truly, life would be better with higher RAII.
+Truly, life would be better with Higher RAII.
 
 
 <slice />
@@ -731,7 +714,7 @@ Did you know that even garbage collected languages (like Java) [can have memory 
 
 Imagine the above cache invalidation example in Java: the forgotten `Goblin` reference in the `HashMap<Location, Goblin> locationToGoblinCache` will prevent the GC from reclaiming it, effectively "leaking" it.
 
-So we can already see how higher RAII could help with leaks, by preventing that kind of accidental outstanding strong reference.
+So we can already see how Higher RAII could help with leaks, by preventing that kind of accidental outstanding strong reference.
 
 
 Of all the mainstream languages, I'd say modern C++ is the most resistant to memory leaks, and you'll see why.
@@ -795,7 +778,7 @@ We end up with architectures where a lot of collections' structs have IDs referr
 With this collectionization, the risk for this kind of "memory leak" increases.
 
 
-But higher RAII can help!
+But Higher RAII can help!
 
 
 Let's pretend Rust has a `linear` keyword, and see what happens.
@@ -865,7 +848,7 @@ Let's make a special `LinearHashMap` with these three adjustments:
 This isn't _completely_ immune to problems: we'd still have a bug if we give one map's LinearKey to another map. Solving that will require a little more effort. [# We can make the LinearKey bound to the map's lifetime, or we can use an assertion, or make a different type for every map, or there are a few other solutions out there.]
 
 
-! This is kind of similar to the cache invalidation example. In the cache invalidation example, we used higher RAII to enforce consistency between two maps. In this example, we're using it to know an ID isn't dangling.
+! This is kind of similar to the cache invalidation example. In the cache invalidation example, we used Higher RAII to enforce consistency between two maps. In this example, we're using it to know an ID isn't dangling.
 
 
 This particular use case shows an ability with much larger implications, and allows a lot of *spooky knowledge at a distance.* [# A taste: Here, some code can see that the LinearKey exists, and know that the corresponding object still exists. This technique can be used to, for example, elide generation checks and eliminate many classes of errors.] If you follow this curséd path, you'll eventually arrive at the nebulous "linear reference counting" concept I hinted at in [the grimoire](/grimoire/grimoire). [# A hint: We can use the existence of a linear reference as proof that the pointee object still exists, because the object can't be destroyed until the linear references are returned to it.]
@@ -880,7 +863,7 @@ By the way, also check out Niko Matsakis's [blog post](https://smallcultfollowin
 Higher RAII is powerful, as we can see. However, I suspect there's something even more powerful hidden here somewhere. I'll try to explain.
 
 
-In higher RAII, we know that *if we make a linear struct, we can guarantee some future action.*
+In Higher RAII, we know that *if we make a linear struct, we can guarantee some future action.*
 
 However, we also know something more: *if a linear struct exists, we know that that future action hasn't happened yet.*
 
@@ -890,7 +873,7 @@ In that last example, `get` uses the `&LinearKey`'s existence to assume that it 
 In other words, it sees the `&LinearKey` and knows that `remove` hasn't happened yet, because `remove` destroys the `LinearKey`.
 
 
-We've already seen how we can use higher RAII to guarantee some future action. Here, higher RAII is _also_ informing us that some future action (`remove`) _hasn't happened yet_, and therefore that something (`get`) is safe to do.
+We've already seen how we can use Higher RAII to guarantee some future action. Here, Higher RAII is _also_ informing us that some future action (`remove`) _hasn't happened yet_, and therefore that something (`get`) is safe to do.
 
 
 This seems like some sort of *spooky knowledge at a distance*. I can't quite wrap my head around it, but I suspect there could be some pretty big implications.
@@ -902,7 +885,7 @@ This _might_ also include the "linear reference counting" idea mentioned in [the
 
 <slice />
 
-# Can other languages add higher RAII?
+# Can other languages add Higher RAII?
 
 Yes! It generally fits most cleanly into single-ownership-based languages (C++, Rust, Austral, Mojo, Carbon, CppFront, etc.), and Haskell shows us that GC'd languages could have luck too.
 
@@ -910,9 +893,9 @@ Yes! It generally fits most cleanly into single-ownership-based languages (C++, 
 To walk this path, there are a few steps a language has to follow.
 
 
-First, let's address *exceptions and panics*. The reason that regular RAII requires a zero-argument destructor is that an in-flight exception (or panic) will unwind the stack, destroying everything in its path. To do this, it calls a zero-argument destructor or `drop()` function. So what does an in-flight exception do for a linear type?
+First, let's address *exceptions, panics, and async cancellation*. The reason that regular RAII requires a zero-argument destructor is that an in-flight exception (or panic, or `async` task cancellation) will unwind the stack, destroying everything in its path. [# Exceptions are rather rude, aren't they? You're just having a nice time talking with your fellow local variables and then an exception bursts into the room and starts destroying everything.] To do this, it calls a zero-argument destructor or `drop()` function. So what does an in-flight exception do for a linear type?
 
-The answer: add a separate `onException` function for the type, which can handle this case. We shouldn't conflate exception handling with destructors.
+The answer: we can add a separate `onException` function for any linear type; we don't have to conflate exception handling with destructors. This `onException` would take ownership of the type and attempt to correctly dispose of it. One can imagine a few other mechanisms to help with this too. [#onException]
 
 
 Second, *when dealing with generics* (like the `T` in `List<T>`), they need to take out the assumption that `T` has a destructor or a zero-argument `drop()` function.
@@ -922,25 +905,36 @@ This can require some standard library changes: a function like [std::vector<T>:
 In Vale, that function instead returns the popped element, so the caller can decide what to do with it.
 
 
-Third, [email me](mailto:verdagon_epsa@verdagon.dev), because there's a lot of interesting design decisions to be made about whether a _type_ is linear, or *our _usage_ of a type is linear.*
+Third, *reconcile it with the aliasing* introduced by reference counting or garbage collection. One would assume that a reference-counted type can't have Higher RAII, but that's not true: we just need a single reference to be designated as the linear reference. This is similar to how `unique_ptr`, constraint references (from [the grimoire](/grimoire/grimoire#the-list)), and generational references work: one reference is a special "owning reference".
+
+
+Fourth, [send me an email](mailto:verdagon_epsa@verdagon.dev), because there's a lot of interesting hidden design decisions to be made about whether a _type_ is linear, or *our _usage_ of a type is linear.*
 
 These design decisions go straight to the original definition of linear types and affect, for example, whether `linear struct` literally means "a linear struct", or whether it just means "a `drop()`-less struct", a subtle distinction that can have quite a few benefits and tradeoffs.
 
-I hope to write an article about this at some point, but [the grimoire](/grimoire/grimoire) compels me to complete it first!
+I hope to write an article about this at some point, but I am compelled by unholy sorcery to complete [the grimoire](/grimoire/grimoire) first.
 
 
-Ironically, there's a chance that by adding higher RAII to Vale, I might also be *indirectly adding it for Rust*: I _may_ have found a way that Vale can automatically and seamlessly call directly into Rust libraries, without user-written bindings, even though Rust doesn't have a stable ABI.
+Ironically, there's a chance that by adding Higher RAII to Vale, I might also be *indirectly adding it for Rust*: I _may_ have found a way that Vale can automatically and seamlessly call directly into Rust libraries, without user-written bindings, even though Rust doesn't have a stable ABI.
 
-If I'm right, then it'll be possible to use Vale's higher RAII with Rust libraries, just by reinterpreting Rust types as linear. I hope to prototype this over the next several months, so stay tuned!
+If I'm right, then it'll be possible to use Vale's Higher RAII with Rust libraries, just by reinterpreting Rust types as linear. I hope to prototype this over the next several months, so stay tuned!
 
 
-<slice />
+<slice>
+#onException: Even though this whole scheme is a big improvement, `onException` would still be a zero-arg no-return-value function, which is a similar challenge as RAII's destructors. We could:
+
+ * Allow `onException` to return data, which is collected and processed later somehow.
+ * Have the thread register a `onExceptedLinearStruct` function which introspects the type of the given linear type, and specially handles it.
+ * Last resort, add it to a global list for handling later.
+
+But even without these measures, we've still reduced the problem drastically and enabled higher RAII, which is an improvement.
+</slice>
 
 # Implications for Software Architecture
 
 It wouldn't be a Languages ∩ Architecture blog without considering the architectural implications of a feature!
 
-So how does higher RAII do?
+So how does Higher RAII do?
 
 Aside from all the above powers, there's one more downside, two more benefits, and one Major Implication™.
 
@@ -949,9 +943,9 @@ The first extra benefit is that *a function can influence the future, not just t
 
 Today's languages already make it easy to control the past: `second(f)` can require that you first call `first()`, by taking in a parameter `f` that only `first` returns.
 
-However, this is one-sided. `first()` has no control over whether we ever call `second()`. We solve that with higher RAII, by making that intermediate type `linear`.
+However, this is one-sided. `first()` has no control over whether we ever call `second()`. We solve that with Higher RAII, by making that intermediate type `linear`.
 
-In other words, *higher RAII makes it twice as easy to use your API correctly.*
+In other words, *Higher RAII makes it twice as easy to use your API correctly.*
 
 
 The second extra benefit is that it *helps understandability* in certain cases. In RAII, a `drop()` function will be called invisibly and automatically, which _looks_ nice but can make a system harder to understand and debug in some cases, especially stateful ones. By requiring destruction to be explicit, we make it easier to see what's going on with our data, which reduces artificial complexity.
@@ -964,15 +958,15 @@ Upwardly viral constraints, like `async`/`await` [#async] and Rust's borrow refe
 This drawback can be mitigated, however. The containing struct `A` can define its own custom `drop()` function which calls the proper functions to destroy `B`, if it has the right arguments handy. If it doesn't, we'll need to refactor to change `A` (and possibly others who indirectly contain `A`) to be `linear`.
 
 
-The *major implication* of higher RAII is that it can bring a language much closer to the ever-elusive goal of *correctness*.
+The *major implication* of Higher RAII is that it can bring a language much closer to the ever-elusive goal of *correctness*.
 
 A lot of languages nail the *first half* of correctness: *safety*. Safety is the assurance that "bad things don't happen", for example, a panic, a crash, or a use-after-free.
 
-But no languages nail the *second half* of correctness: *liveness*. As [Hillel Wayne once said](https://www.hillelwayne.com/post/safety-and-liveness/), liveness is the assurance that "good things _do_ happen". By adding linear types and higher RAII, a language can get much closer to this.
+But no languages nail the *second half* of correctness: *liveness*. As [Hillel Wayne once said](https://www.hillelwayne.com/post/safety-and-liveness/), liveness is the assurance that "good things _do_ happen". By adding linear types and Higher RAII, a language can get much closer to this.
 
 There's one language in particular that could really shine here one day: *Austral*, which combines linear types and borrow checking. [# Vale can also shine here when one uses [move-only programming and regions](/blog/linear-types-borrowing) to eliminate generation checks.]
 
-If Austral enables higher RAII on its linear types, it could be _the_ language to bring correctness to the mainstream in a way that's simple enough to not require users to learn advanced category theory. And that's a _huge deal_.
+If Austral enables Higher RAII on its linear types, it could be _the_ language to bring correctness to the mainstream in a way that's simple enough to not require users to learn advanced category theory. And that's a _huge deal_.
 
 
 <slice>
@@ -989,10 +983,10 @@ Fortunately, we can mitigate the upwardly viral spread with `.clone()`s or refer
 <ignore>
 # Linear Types' Future
 
-There are a few languages with linear types, most notably [Haskell](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/linear_types.html), [Vale](https://vale.dev/), and [Austral](https://austral-lang.org/linear-types), and only Vale has gone further and added higher RAII.
+There are a few languages with linear types, most notably [Haskell](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/linear_types.html), [Vale](https://vale.dev/), and [Austral](https://austral-lang.org/linear-types), and only Vale has gone further and added Higher RAII.
 
 
-I personally hope that a lot more languages add linear types and higher RAII... but it's not as easy as it sounds.
+I personally hope that a lot more languages add linear types and Higher RAII... but it's not as easy as it sounds.
 
 
 It's not hard to get basic linear types working:
@@ -1017,7 +1011,7 @@ There's so much more I could write here!
 
 I especially wanted to talk more about the benefit of "a function can influence the future, not just the past", because it has a lot more implications than what I explained here.
 
-I also wanted to talk about how higher RAII would have helped Floridians throw fish at Alabama, but it got so long that I had to move it into my other article, [Layer-wise inferencing + batching: Small VRAM doesn't limit LLM throughput anymore](/blog/llm-throughput-not-ram-limited). Alas!
+I also wanted to talk about how Higher RAII would have helped Floridians throw fish at Alabama, but it got so long that I had to move it into my other article, [Layer-wise inferencing + batching: Small VRAM doesn't limit LLM throughput anymore](/blog/llm-throughput-not-ram-limited). Alas!
 
 
 I hope you all enjoyed this post! It's the collection of many years of experimenting and thinking about this wildly obscure topic. I'm grateful I have all of you to share it with.
@@ -1069,7 +1063,7 @@ I hope you enjoyed this article!
 
 
 
-   * what % of bugs could have been prevented with higher raii?
+   * what % of bugs could have been prevented with Higher raii?
      * probably depends on how many things can be represented by linear RC.
 
 
