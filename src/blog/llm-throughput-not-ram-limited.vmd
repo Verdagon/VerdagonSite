@@ -13,6 +13,8 @@ namespace: c-blog m-annotated
 
 <ignore>
 
+ * add slices
+ * actually called layer-wise inferencing?
  * make it clear that we're streaming _from disk_
  * mention https://github.com/SJTU-IPADS/PowerInfer
  * more cool events
@@ -29,7 +31,7 @@ Currently, the general consensus is that *you can't really run larger LLMs* on o
 But now, you can run an LLM much larger than your VRAM to *answer a yes/no question every 5 seconds* on average, for throughput use cases. [# This means cases where latency doesn't matter, where you're fine waiting a while to get a result.]
 
 
-This is possible with *layer-wise inferencing with batching*, where we stream an LLM's layers from the hard drive into VRAM, and run each layer against multiple in-progress prompts before moving on to the next layer.
+This is possible with *batching and layer-wise inferencing* from disk, where we stream an LLM's layers from the hard drive into VRAM, and run each layer against multiple in-progress prompts before moving on to the next layer.
 
 
 <ignore>
@@ -196,15 +198,16 @@ If you want to do something like this, I recommend looking into [FlexGen](https:
 ! Linear programming is different from linear types, about which I [posted another article today](/blog/higher-raii-uses-linear-types)!
 
 
-On top of that, AirLLM leaves a lot of performance on the table:
+On top of that, AirLLM leaves a lot of performance on the table: [#blockwise] It doesn't load the next layer ahead of time, even if there's room for it. It waits until inferencing is done. If it loaded the next layer while we did inferencing on this one, we could get those faster times (like 4.85s) on much smaller batch sizes than 500.
 
- * It doesn't load the next layer ahead of time, even if there's room for it. It waits until inferencing is done.
- * AirLLM has a [block-wise quantization](https://github.com/lyogavin/Anima/tree/main/air_llm#model-compression---3x-inference-speed-up) option for 3x speedup, but it doesn't work on Mac and probably won't [until bitsandbytes better supports Mac](https://github.com/TimDettmers/bitsandbytes/issues/1020).
 
+<slice>
+#blockwise: AirLLM also has a [block-wise quantization](https://github.com/lyogavin/Anima/tree/main/air_llm#model-compression---3x-inference-speed-up) option for 3x speedup, but it doesn't work on Mac and probably won't [until bitsandbytes better supports Mac](https://github.com/TimDettmers/bitsandbytes/issues/1020). This looked promising for a speedup, but I actually suspect it won't help us here.
+</slice>
 
 # The takeaways
 
-Honestly, this doesn't really change anything, I just added an existing technique to an existing tool so I could do a thing on my Mac.
+Honestly, this doesn't really change anything. I just added an existing technique to an existing tool so I could do a thing on my Mac.
 
 
 However, what most people don't know, and the main reason I wrote a whole post about this journey, is to show people that *normal computers can run larger LLMs with reasonable throughput* for some use cases.
