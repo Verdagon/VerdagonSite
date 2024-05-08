@@ -158,6 +158,26 @@ if [ $TARGET == "grimoire" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
+if [ $TARGET == "higher-raii-uses-linear-types" ] || [ $TARGET == "all" ] ; then
+  echo "Doing higher-raii-uses-linear-types"
+  echo $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/blog/higher-raii-uses-linear-types src/blog/architecture/higher-raii-uses-linear-types.vmd
+  eval $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/blog/higher-raii-uses-linear-types src/blog/architecture/higher-raii-uses-linear-types.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
+if [ $TARGET == "llm-throughput-not-ram-limited" ] || [ $TARGET == "all" ] ; then
+  echo "Doing llm-throughput-not-ram-limited"
+  echo $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/blog/llm-throughput-not-ram-limited src/blog/llm-throughput-not-ram-limited.vmd
+  eval $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/blog/llm-throughput-not-ram-limited src/blog/llm-throughput-not-ram-limited.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
 if [ $TARGET == "generational-references-v1" ] || [ $TARGET == "all" ] ; then
   echo "Doing generational-references-v1"
   echo $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/blog/generational-references-v1 src/blog/retired/generational-references-v1.vmd

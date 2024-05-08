@@ -28,7 +28,7 @@ Vale is bringing three innovations into the programming languages world:
 
  * Generational references, where the compiler will make sure the object is alive when we dereference a reference to it. [# Generational references are faster than reference counting, and gives us control over our memory layouts for better performance. It's also more flexible than borrow checking, and gives us more freedom with our architectures!]
  * The [region borrow checker](/blog/zero-cost-borrowing-regions-overview) (mentioned in [Seamless, Fearless, and Structured Concurrency](https://verdagon.dev/blog/seamless-fearless-structured-concurrency)) which improves upon Rust's borrow checker to handle shared mutable objects.
- * *Higher RAII*, where we can tell the compiler to make sure we call a function at some point in the future.
+ * *Higher RAII*, where we use linear types to make sure we explicitly call a function at some point in the future, even past the current scope.
 
 
 Let's hear more about that last one!
@@ -46,7 +46,7 @@ Higher RAII is based on C++'s "RAII" [# RAII stands for Resource Acquisition is 
 With Higher RAII, we can ensure that we eventually call *any* function... even ones with parameters, return values, even ones that don't destroy the object.
 
 
-Imagine that you're dropping your laptop off at a repair shop. They tie a wristband with an ID around your wrist. This is a "Higher RAII" wristband, in that:
+Imagine that you're dropping your laptop off at a repair shop. They tie a wristband with an ID number around your wrist. This is a "Higher RAII" wristband, in that:
 
  * You're not able to remove this wristband.
  * They will remove this wristband from your wrist when you pick your laptop up.
