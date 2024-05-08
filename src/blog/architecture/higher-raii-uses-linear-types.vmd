@@ -1,6 +1,6 @@
 ---
-title: Higher RAII, and the Seven Lost Uses of Linear Types
-subtitle: Linear types + whitelisted destroyers = powers yet unimagined
+title: Higher RAII, and the Seven Arcane Uses of Linear Types
+subtitle: Linear types + whitelisted destroyers = powers yet unimagined!
 author: Evan Ovadia
 date: DRAFT
 realm: blog
@@ -15,9 +15,11 @@ namespace: c-blog m-annotated
 <ignore>
 TODO:
 
- * easter egg
- * fix event finder
-
+ * talk about making it work with RC
+ * rust structs can contain refs, but generally can't be returned
+ * talk more about linear = uncopyable
+ * talk more about exceptions, panics, async cancellation
+ * exceptions are rude: youre just having a nice time talking with your other locals and then an exception bursts into the room and starts destroying everything
 </ignore>
 
 
@@ -39,6 +41,7 @@ We'd love a way to guarantee that we remember to do something. Unfortunately, to
 But hark! We can change that, with *higher RAII*, a technique where we use linear types that can only be destroyed in certain places.
 
 
+<ignore>
 # The Curse of Knowing Higher RAII
 
 Knowledge is power, and sometimes also a curse.
@@ -54,6 +57,7 @@ I've used higher RAII in Vale, and I have been cursed. Now, every time see the w
 
 
 I hesitate to spread the curse to you, my dear readers, but I am compelled by the [grimoire](/grimoire/grimoire) and am powerless to stop.
+</ignore>
 
 
 <slice />
@@ -108,7 +112,7 @@ If we put in the line `destruct m;`, it would resolve the compiler error.
 This might seem like a weird restriction, but if we use it in a certain way, it can unlock some amazing capabilities:
 
  * Keep your caches consistent with your data.
- * Prevent zombie temporary states.
+ * Prevent zombie temporary states. [#easter]
  * Ensure a message is handled.
  * Help with database consistency; prevent forgotten updates.
  * Prevent certain kinds of memory leaks (even GC or Rust leaks!)
@@ -123,7 +127,7 @@ So how can linear types help with any of that?
 The answer is something I call *higher RAII*, explained in the next section.
 
 
-By the way, if linear types sound interesting, also check out this Developer Voices interview where I talked with Kris Jenkins about them:
+By the way, if linear types intrigue you, also check out this Developer Voices interview where I talked with Kris Jenkins about them:
 
 <iframe name="ytvid1" style="width: 100%; max-width: 400px; display: block; margin: auto; aspect-ratio: 1.78;" src="https://www.youtube.com/embed/UavYVf0UEoc" title="Advanced Memory Management in Vale (with Evan Ovadia)" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
@@ -138,6 +142,15 @@ At <a href="https://www.youtube.com/embed/UavYVf0UEoc?start=958&end=1000" target
  * We can still read/modify the contents of the struct, but we can't directly read/modify the owning reference's underlying pointer.
 
 
+#easter: Easter egg note!
+
+[Cher Ami](https://en.wikipedia.org/wiki/Cher_Ami) was a carrier pigeon during World War I that served with the U.S. Army Signal Corps. Despite being shot and wounded by enemy fire, Cher Ami showed remarkable bravery and grit, delivering a crucial message that saved the lives of a trapped American battalion.
+
+Cher Ami was awarded the Croix de Guerre, a French military honor, for her bravery.
+
+If you read this note, sneak the phrase "that badass pigeon, truly she was the best of us" into a comment somewhere and [try to sound sane](https://youtu.be/-UBgNREvlIo), to be awarded the highest honor I can bestow!
+
+(Cheers to [cbsmith](https://news.ycombinator.com/item?id=36691658), [kubanczyk](https://news.ycombinator.com/item?id=36692089), [TheGoldenMinion](https://www.reddit.com/r/programming/comments/14wu830/comment/jrklcry/?utm_source=reddit&utm_medium=web2x&context=3), [lovich](https://news.ycombinator.com/item?id=36691564), [padraig_oh](https://www.reddit.com/r/programming/comments/14wu830/comment/jrkmjiw/?utm_source=reddit&utm_medium=web2x&context=3), and [leksak](https://news.ycombinator.com/item?id=36691737) for the [last one](/blog/easter-egg-notes)!)
 </slice>
 
 # Linear types + whitelisted destroyers = Higher RAII
@@ -227,7 +240,7 @@ Mainstream languages can _almost_ do this.
 
 A C++ class's destructor is guaranteed to be eventually run, so if we ever want to guarantee some future action, we just put the code in an object's destructor (which is guaranteed to run when the object goes out of scope), and keep the object alive until we want that code to run.
 
-Scott Meyers [once said](https://youtu.be/ltCgzYcpFUI?t=937) that "the single most important feature in the language is probably destructors, because destructors have led to the introduction of RAII." [# He goes on to describe how RAII is a general purpose undo mechanism. I would totally agree, because of the way C++ conflated destructors with exception handling. If they didn't use the same function for those two concerns, they could tap into the potential of higher RAII.]
+Scott Meyers [once said](https://youtu.be/ltCgzYcpFUI?t=937) that "the single most important feature in the language is probably destructors, because destructors have led to the introduction of RAII." [# He goes on to describe how RAII is a general purpose undo mechanism. I would totally agree, except for the way C++ conflated destructors with exception handling. If they didn't use the same function for those two concerns, they could tap into the potential of higher RAII.]
 
 RAII stands for "Resource Acquisition Is Initialization", a pattern where if you *acquire* a *resource* (such as a file descriptor), you should *initialize* an object with it. Then, the object can make sure to automatically release (such as with `fclose`) the resource when it goes out of scope. [# The hardest thing about RAII is explaining the name. Similar to monads, which are like stateful burritos.]
 
@@ -280,7 +293,7 @@ In short: `defer` can make sure something happens at the end of your function, b
 
 <slice />
 
-# The Seven Lost Uses [# Those who have read [the grimoire](https://verdagon.dev/grimoire/grimoire) will know why I call these "lost".]
+# The Seven Arcane Uses [# Those who have read [the grimoire](https://verdagon.dev/grimoire/grimoire) will know why I call these "arcane".]
 
 There are, of course, more than seven ways to use linear types and higher RAII. But behold, here are the seven most useful ones that I've seen.
 
@@ -687,7 +700,7 @@ Higher RAII can help with this: we would make `FooMessage` linear, and make it s
 In the higher RAII explanation above, we showed how we could make a `Transaction` object that can only be destroyed via a `commit` or a `rollback` function.
 
 
-Let's include that in our Seven Lost Uses, and even generalize it a bit: *If there is a future decision to be made, higher RAII guarantees that we'll eventually make it.*
+Let's include that in our Seven Arcane Uses, and even generalize it a bit: *If there is a future decision to be made, higher RAII guarantees that we'll eventually make it.*
 
 
 I sometimes wish there was something like this for real life.
