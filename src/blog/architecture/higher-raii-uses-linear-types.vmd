@@ -916,7 +916,7 @@ These design decisions go straight to the original definition of linear types an
 I hope to write an article about this at some point, but [the grimoire](/grimoire/grimoire) compels me to complete it first!
 
 
-Ironically, there's a chance that by adding higher RAII to Vale, I might also be *indirectly adding it for Rust*: I _may_ have found a way that Vale can automatically and seamlessly call directly into Rust libraries, without user-written bindings.
+Ironically, there's a chance that by adding higher RAII to Vale, I might also be *indirectly adding it for Rust*: I _may_ have found a way that Vale can automatically and seamlessly call directly into Rust libraries, without user-written bindings, even though Rust doesn't have a stable ABI.
 
 If I'm right, then it'll be possible to use Vale's higher RAII with Rust libraries, just by reinterpreting Rust types as linear. I hope to prototype this over the next several months, so stay tuned!
 
