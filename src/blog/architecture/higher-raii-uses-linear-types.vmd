@@ -1,0 +1,1096 @@
+---
+title: Higher RAII, and the Seven Lost Uses of Linear Types
+subtitle: Linear types + whitelisted destroyers = powers yet unimagined
+author: Evan Ovadia
+date: DRAFT
+realm: blog
+path: blog/higher-raii-uses-linear-types
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+! Also posted today: [Layer-wise inferencing + batching: Small VRAM doesn't limit LLM throughput anymore](/blog/llm-throughput-not-ram-limited), on how even a normal small computer can now run huge LLMs, much more quickly!
+
+
+<ignore>
+TODO:
+
+ * easter egg
+</ignore>
+
+
+Can you spot the problem in each of these comments?
+
+`// Remember to update the database row with the new status.`
+
+`// Remember to remove(&cache, entityRef) before you destroy the entity!`
+
+`// Remember to fulfill this promise with the result of the calculation.`
+
+
+The problem, of course, is that they rely on our fallible human memory!
+
+
+We'd love a way to guarantee that we remember to do something. Unfortunately, today's compilers and languages can't really solve this problem for us.
+
+
+But hark! We can change that, with *Higher RAII*, a technique where we use linear types that can only be destroyed in certain places.
+
+
+# The Curse of Knowing Higher RAII
+
+Knowledge is power, and sometimes also a curse.
+
+Never read the [essays of rationality](https://www.lesswrong.com/posts/WusBwpQL5bMgdZtmz/some-of-the-best-rationality-essays), [# And never read [Harry Potter and the Methods of Rationality](https://hpmor.com/) ([audiobook rss and mp3](https://hpmorpodcast.com/?page_id=56)) for the same reason.] or you'll suddenly see everywhere the flaws and imperfections of our ways of thinking, and ever be pulled toward a better self.
+
+Never learn how to [build a programming language](https://craftinginterpreters.com/), or you'll be lost wandering the forgotten realms of programming possibilities for a decade or more. [# Definitely not speaking from experience here.]
+
+And never use linear types, lest you discover Higher RAII, and see all the places where it could have been used to prevent a bug.
+
+
+I've used higher RAII in Vale, and I have been cursed. Now, every time see the words "remember to", "forget", or "responsible for" in comments or design discussions, I see another place that linear types and Higher RAII could help.
+
+
+I hesitate to spread the curse to you, my dear readers, but I am compelled by the [grimoire](/grimoire/grimoire) and am powerless to stop.
+
+
+# What's a linear type?
+
+
+If you look up linear types online, you'll find a lot of misleading definitions, like *a linear type is a type that can't be aliased, can't be cloned, and must be "used" exactly once.* [# [Wikipedia](https://en.wikipedia.org/wiki/Substructural_type_system#Linear_type_systems): "Linear types correspond to linear logic and ensure that objects are used exactly once."] [# [martriay](https://medium.com/@martriay/rust-and-linear-types-a-short-guide-4845e9f1bb8f): "the constraint that each variable can be used exactly once" (though they explain the motivations really well)] [# [Cornell](https://www.cs.cornell.edu/courses/cs4110/2018fa/lectures/lecture29.pdf): In linear logic, you have to “use” every premise exactly once to construct the conclusion.] [# [austral-lang.org](https://austral-lang.org/linear-types): a value of a linear type is a value that can only be used once.]
+
+
+I say it's "misleading" because as Vale shows us, you can have a linear struct without any of the above restrictions.
+
+ * You can read/modify it as much as you like.
+ * You can copy it.
+ * You can make aliases to it.
+
+
+So for now, let's use a less correct but more helpful definition: *A linear struct must eventually be _explicitly_ destroyed.* [#acrobatics]
+
+
+<<<<
+In other words, a function can't just let a linear struct go out of scope. When the compiler sees it going out of scope, it won't automatically call a destructor (or `drop`) on it, it will instead raise a compile error.
+
+Here, we have a function that makes a linear struct, makes a reference to it, and even reads its contents.
+
+However, when it goes out of scope, we get a compile error.
+////
+```vale
+linear struct MyStruct {
+  m int;
+}
+
+func foo() {
+  // x is type MyStruct.
+  x = MyStruct(42);
+
+  // Can make a reference.
+  // r is type &MyStruct.
+  r = &x;
+
+  // Can read contents
+  println(r.m);
+
+  // ERROR: Undestructed linear `x`.
+}
+```
+\\\\
+If we put in the line `destruct m;`, it would resolve the compiler error.
+>>>>
+
+
+This might seem like a weird restriction, but if we use it in a certain way, it can unlock some amazing capabilities:
+
+ * Keep your caches consistent with your data.
+ * Prevent zombie temporary states.
+ * Ensure a message is handled.
+ * Help with database consistency; prevent forgotten updates.
+ * Prevent certain kinds of memory leaks (even GC or Rust leaks!)
+ * Prevent accidentally canceling an ongoing thread or connection.
+ * Prevent an accidental rollback of a perfectly good transaction.
+ * Guarantee someone will call the callback you give them.
+ * Guarantee we eventually log something.
+
+
+So how can linear types help with any of that?
+
+The answer is something I call *Higher RAII*, explained in the next section.
+
+
+By the way, if linear types sound interesting, also check out this Developer Voices interview where I talked with Kris Jenkins about them:
+
+<iframe name="ytvid1" style="width: 100%; max-width: 400px; display: block; margin: auto; aspect-ratio: 1.78;" src="https://www.youtube.com/embed/UavYVf0UEoc" title="Advanced Memory Management in Vale (with Evan Ovadia)" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+At <a href="https://www.youtube.com/embed/UavYVf0UEoc?start=958&end=1000" target="ytvid1">time 15:48</a> I talked a bit about how we can use linear types for higher RAII, but the potential is so much more vast than I hinted in that interview. Read on to find out!
+
+
+<slice>
+#acrobatics: One can reconcile the two definitions with enough mental acrobatics. We could say that marking a Vale struct as `linear` means its _owning reference_ is linear.
+
+ * We'd define "use" as "destroy"; now we can only use the linear type once.
+ * Even though we can alias the struct (with a generational reference), we can't alias/clone the owning reference.
+ * We can still read/modify the contents of the struct, but we can't directly read/modify the owning reference's underlying pointer.
+
+
+</slice>
+
+# Linear types + whitelisted destroyers = Higher RAII
+
+
+Recall our definition of a linear struct:
+
+> A linear struct must eventually be _explicitly_ destroyed.
+
+Higher RAII adds a bit at the end:
+
+> A linear struct must eventually be _explicitly_ destroyed *by a specific function* (or functions).
+
+
+Imagine we have a `Transaction` struct in our program. We want to guarantee that we eventually call `commit` or `rollback` with it.
+
+
+To set this up, we need to do three things.
+
+
+<<<<
+First, *make the struct linear*.
+
+Here's some Vale as an example. [# The HEAD version does this, stable and older versions still use the `#!DeriveStructDrop` keyword.]
+////
+```vale
+linear struct Transaction {
+  ...
+}
+```
+>>>>
+
+This means the struct can never go out of scope; it can never be automatically destroyed. It must be _explicitly_ destroyed now, such as with Vale's `destruct` keyword.
+
+
+<<<<
+Second, *create the functions* that take ownership of the object and explicitly destroy it.
+////
+```vale
+func commit(trx Transaction, db &DB) {
+  ... // code to commit the transaction
+
+  destruct trx; // Explicitly destroy
+}
+func rollback(trx Transaction, db &DB) {
+  ... // code to rollback the transaction
+
+  destruct trx; // Explicitly destroy
+}
+```
+\\\\
+(Note the parameter `Transaction` isn't `&Transaction`; the functions take ownership of the instance, not a reference to it.)
+>>>>
+
+
+Third, make sure that *_only_ those functions can destroy the object*. Luckily, this is already how Vale's `destruct` works: only the struct's own file can use `destruct`. One can imagine other language mechanisms to ensure this though.
+
+
+Higher RAII is where *we use linear types that can only be destroyed in certain places,* and that's exactly what we just did.
+
+
+We've succeeded in our goal! If anyone owns a `Transaction` object, they can't let it go out of scope and they can't destroy it, they _must_ transfer it to someone else or call `commit` or `rollback` on it.
+
+
+In other words, the program cannot forget to call `commit` or `destroy` on a `Transaction` object.
+
+
+This sounds pretty simple, but has _huge_ benefits if used well.
+
+
+# Why "Higher RAII?"
+
+Linear types are rarely used like this. The world has generally only used linear types for:
+
+ * Resources, like a `file`, so only one person in the program can access it at a time.
+ * [Capabilities](https://borretti.me/article/how-capabilities-work-austral); one can make an un-cloneable linear type to represent, say, the user's permission to use the camera this one time.
+ * Memory safety; if every object has only one reference pointing to it, then use-after-free is impossible.
+
+
+Here, we're using linear types to *guarantee that a future operation eventually happens.*
+
+
+Mainstream languages can _almost_ do this.
+
+
+A C++ class's destructor is guaranteed to be eventually run, so if we ever want to guarantee some future action, we just put the code in an object's destructor (which is guaranteed to run when the object goes out of scope), and keep the object alive until we want that code to run.
+
+Scott Meyers [once said](https://youtu.be/ltCgzYcpFUI?t=937) that "the single most important feature in the language is probably destructors, because destructors have led to the introduction of RAII." [# He goes on to describe how RAII is a general purpose undo mechanism. I would totally agree, because of the way C++ conflated destructors with exception handling. If they didn't use the same function for those two concerns, they could tap into the potential of higher RAII.]
+
+RAII stands for "Resource Acquisition Is Initialization", a pattern where if you *acquire* a *resource* (such as a file descriptor), you should *initialize* an object with it. Then, the object can make sure to automatically release (such as with `fclose`) the resource when it goes out of scope. [# The hardest thing about RAII is explaining the name. Similar to monads, which are like stateful burritos.]
+
+
+Unfortunately, a C++ class can only have one destructor function, and we need two.
+
+A [common half-solution](https://stackoverflow.com/a/10984171/1424454) is to:
+
+ 1. Put the above `db` parameter in as a class member `DB* db;`, since C++ destructors have no parameters.
+ 1. Have a `commit` method, which also sets a `committed` boolean to true.
+ 1. In the destructor, run `rollback`'s logic if the `committed` boolean is false.
+
+Alas, this doesn't quite solve the problem because the user still might forget to call `commit` where they should have.
+
+
+Rust is unfortunately even less equipped than C++ here.
+
+Rust can almost do the above workaround, but the borrow checker generally dislikes references inside structs, such as that `DB` reference. Rust's workarounds include using `unsafe`, using `Rc<RefCell<DB>>`, or if one considers those unidiomatic, giving up on RAII. I prefer the second, though I've seen all three happen in the wild.
+
+
+So, as we can see, RAII is the practice of putting code in destructors that you want to guarantee will eventually run.
+
+From that context, we could say that _higher_ RAII is when we can have multiple named destructors, destructors with parameters, destructors with return values, and we can force the user to explicitly call them.
+
+Whereas RAII eventually makes us implicitly call a specific zero-arg non-returning function (the destructor), higher RAII eventually makes us explicitly call _any_ approved function.
+
+
+You could say that higher RAII requires an arbitrarily-shaped function to be called in the future, not just a zero-arg non-returning destructor.
+
+
+! RAII is a terrible acronym, and I am _so, so sorry_ for perpetuating its use. It turns out it's really hard to come up with a name for this concept. Feel free to bikeshed in the comments! [# "Future constraint", "future calling" perhaps? I wish "Promise" wasn't taken.]
+
+
+# What's the difference between RAII and defer?
+
+Go, Zig, and a few other languages have a `defer` statement which will run a statement at the function's end.
+
+
+`defer` will always run an expression at the end of the current scope (or function). [# Zig runs a `defer`red statement at the end of the scope, as god intended. Golang is different, it runs it at the end of the function. This can sometimes lead to surprising out-of-memory crashes.]
+
+In RAII, we would put that code into an object's destructor, and the code will be run when the object goes out of scope.
+
+
+They sound like two equivalent approaches, but RAII is more flexible: we can return the object to our caller, so the caller can decide when the destructor is run. Or, we put the object into another object, and the parent object can decide when it's run.
+
+In short: `defer` can make sure something happens at the end of your function, but RAII can make sure that something happens _even past_ the end of your function.
+
+
+# The Seven Lost Uses [# Those who have read [the grimoire](https://verdagon.dev/grimoire/grimoire) will know why I call these "lost".]
+
+There are, of course, more than seven ways to use linear types and higher RAII. But behold, here are the seven most useful ones that I've seen.
+
+
+## Cache Invalidation
+
+There are [two hard problems in computer science](https://martinfowler.com/bliki/TwoHardThings.html): cache invalidation, naming things, and off-by-one errors.
+
+Luckily, naming things is a [solved problem](https://sph.mn/dynamic/svn).
+
+But how can Higher RAII help with cache invalidation?
+
+
+This was the topic of my 2022 article, [Vale's Higher RAII, the pattern that saved me a vital 5 hours in the 7DRL Challenge](/blog/higher-raii-7drl).
+
+I'll try to summarize below, but check out the article for a more in-depth explanation!
+
+
+My game had two data structures:
+
+ * `levelGoblins List<Goblin>`
+ * `locationToGoblinCache HashMap<Location, &Goblin>`
+
+...and they must always be in sync.
+
+*This, of course, had a risk:* Accidentally removing from the list but not the cache.
+
+So I did two things:
+
+ * Made a `linear struct GoblinInCacheToken`, returned by `addGoblinRefToCache`, and only ever destroyed by `removeGoblinRefFromCache`.
+ * Changed `levelGoblins`'s type to `List<(Goblin, GoblinInCacheToken)>`.
+
+Now, removing from `levelGoblins` will give us not only the `Goblin`, but also the linear `GoblinInCacheToken`, and the only way to get rid of the `GoblinInCacheToken` is to hand it to `removeGoblinRefFromCache`.
+
+
+Suddenly, we've *statically guaranteed* that we'll remove from both the list and the cache!
+
+
+## Get the Result of a Thread or Future
+
+
+C++'s `std::future` (and Javascript's `Promise`) is conceptually a little box that, at some point, will contain the result of some long-running operation. 
+
+
+For example, let's say that each `Goblin` on our level has a read-only (but expensive!) `determineAction` function.
+
+
+In this `determineAction`, we want to do two things in parallel:
+
+ * Find a path to the player.
+ * Figure out what to shout at the player if there is no path.
+
+That second step will involve calling an LLM on the GPU.
+
+
+<<<<
+Our code could look like this.
+////
+```
+async function determineAction(
+    level: Level,
+    goblin: Goblin,
+    player: Player) {
+
+  // shoutPromise will eventually contain
+  // the result string to shout.
+  const shoutPromise: Promise<string> =
+    callGPU("taunt", goblin.personality);
+
+  // Expensive!
+  const path: Location[] =
+    findPathAStar(
+      level, goblin.loc, player.loc);
+
+  return FollowPathAction(path);
+}
+```
+\\\\
+Here, we're sending the goblin's personality array to the "shout" function on the GPU, which runs an LLM.
+
+While that's going, we're doing some expensive pathfinding, to figure out if there's a path to the player.
+
+
+Then at the end, we return what the goblin should do this turn.
+
+
+*But wait! There's a bug here!*
+
+We sent the request to the GPU, but forgot to actually _use_ the result.
+>>>>
+
+
+<<<<
+After many hours of debugging, we realize the problem, and change that last statement to this code.
+////
+```
+  ...
+  if (path) {
+    return FollowPathAction(path);
+  } else {
+    return ShoutAction(await shoutPromise);
+  }
+}
+```
+\\\\
+This is where higher RAII could have helped: that `shoutPromise` should have been linear, so we remember to use it.
+>>>>
+
+
+I suspect a lot of--maybe even most--`Promise`s should be linear.
+
+
+! Some of you might have seen something like this! This is similar to C++'s `[[nodiscard]]`, C#'s `MustUseReturnValueAttribute`, or Rust's `#[must_use]`. However, those are easily confused: we could e.g. put the result into a struct's member, and then accidentally drop the struct. These measures only look at the current scope, they don't follow the struct throughout its entire lifetime through the program.
+
+
+## Remember to Resolve a Future
+
+In C++, you can give a `std::future<string>` to someone, with the understanding that eventually, you will put a `string` into it.
+
+
+Hopefully you don't forget!
+
+
+Or, we can use higher RAII to make sure we remember. Here's how!
+
+
+<<<<
+First, we make a linear type that represents "our vow to put a string into that future".
+
+We'll call it `FutureVow`. [# I wanted to call it `Promise` but Javascript makes that confusing.]
+////
+```vale
+linear struct FutureVow<T> {
+  future &Future<T>;
+}
+```
+>>>>
+
+
+Then, we make sure that whenever we make a `Future`, we also make a corresponding `FutureVow`.
+
+In Vale, that would mean changing `Future`'s constructor to also return the `FutureVow` at the same time, [# Not terribly difficult, just make the default constructor private and then make a new function called `Future` that returns a tuple.] but one can imagine many mechanisms to ensure one is never created without the other.
+
+
+<<<<
+Then, we add a function `set` which consumes our FutureVow.
+////
+```vale
+func set<T>(vow FutureVow<T>, x T) {
+  vow.future.set(x);
+  destruct vow;
+}
+```
+\\\\
+Now there's no way to get rid of a `FutureVow` except by calling this `set` function.
+>>>>
+
+
+Success! Now it's guaranteed that we'll eventually set every `Future`'s value. [# "Guarantee" could be a strong word here. A determined programmer can get around this by, for example, panicking the program first.]
+
+
+<ignore>
+Now that we have the above `determineAction` function, your next task is to implement the `callGPU` function, from the `callGPU("taunt", goblin.personality)` line above.
+
+
+Your `callGPU` function returned a `Promise`. You're responsible for eventually "fulfilling" the `Promise`, in other words putting the result into it. If you don't, your teammate's code will hang forever.
+
+
+! Hint: Any time you hear the words "responsible for", it could be an opportunity for higher RAII!
+
+
+Generally, if you give someone a Promise, and forget to fill it, it'll manifest as a deadlock, or a hanging program, or a loading spinner that spins forever.
+
+
+Let's use higher RAII to make sure we remember!
+
+
+First, we make a class that represents our responsibility to fulfill the `Promise`. We'll call this new class `Fulfiller`.
+
+! If you're familiar with JS/TS, this `Fulfiller` class would just be a linear wrapper around the Promise's `resolve` and `reject` callbacks.
+
+ * First, we mark our `Fulfiller<T>` class as `linear`.
+ * Then, we add a function `fulfill(fulfiller: Fulfiller<T>, value: T)` which takes and destroys the `fulfiller` instance, and fulfills the corresponding `Promise<T>` object.
+ * Finally, we make sure that _only_ `fulfill` can destroy a `Fulfiller<T>`.
+
+Now, it's impossible to forget to fulfill a promise!
+</ignore>
+
+## Prevent Leaks
+
+We all know that manually-managed-memory languages (like C) can leak memory, from forgetting to call `free`. We also know that reference-counted languages can leak memory, from reference cycles.
+
+
+Did you know that even garbage collected languages (like Java) [can have memory leaks too](https://stackoverflow.com/a/10619408/1424454)?
+
+Imagine the above cache invalidation example in Java: the forgotten `Goblin` reference in the `HashMap<Location, Goblin> locationToGoblinCache` will prevent the GC from reclaiming it, effectively "leaking" it.
+
+So we can already see how higher RAII could help with leaks, by preventing that kind of accidental outstanding strong reference.
+
+
+Of all the mainstream languages, I'd say modern C++ is the most resistant to memory leaks, and you'll see why.
+
+
+Surprisingly, even Rust is more vulnerable to memory leaks than C++! I'll show you what I mean by translating a C++ Red-Black tree to idiomatic Rust, and how it introduces the risk for memory leaks.
+
+
+<<<<
+Let's say you have this C++ Red-Black Tree node class.
+////
+```c++
+template<typename T>
+class RBNode {
+public:
+  T data;
+  unique_ptr<RBNode<T>> left;
+  unique_ptr<RBNode<T>> right;
+  RBNode<T>* parent;
+  Color color;
+};
+```
+\\\\
+This has an implicit destructor. When we delete a node, the destructor will automatically delete (and call the destructors for) its `left` and `right` children.
+>>>>
+
+
+<<<<
+Now let's translate this to Rust. The borrow checker doesn't like it when a node can be pointed at by multiple places, so we'll *"collectionize"*: we'll put all these nodes in a collection, a HashMap, and have nodes refer to each other by `u64` IDs.
+////
+```
+struct RBNode<T> {
+  data: T,
+  color: Color,
+  parent: Option<u64>,
+  left: Option<u64>,
+  right: Option<u64>,
+};
+```
+>>>>
+
+
+We would store all these nodes in a `HashMap<u64, RBNode<T>>`, and separately keep track of which is the root node.
+
+This is great! There's no way to use-after-free, which was a potential problem in the C++ version.
+
+
+However, we've just introduced another possible bug.
+
+Remember how when we delete a C++ node, its destructor would automatically delete the node's children?
+
+Unfortunately, that doesn't happen anymore in the Rust version. Rust doesn't automatically remove from a hash map when we drop a `u64`.
+
+This can lead to "orphaned" nodes. This memory is "leaked" until the parent `Vec` goes out of scope, similar to how Java can leak objects.
+
+
+The problem is more widespread than we think. Just like above, Rust programs *naturally tend to collectionize* because the borrow checker dislikes when multiple long-lived references point to the same object. [# More precisely, the borrow checker generally doesn't allow us to ever modify something if anything else has a reference to it.]
+
+We end up with architectures where a lot of collections' structs have IDs referring to other collections' structs *instead of owning things directly*. The result is often similar to an entity-component-system architecture or a relational database. [# At least relational databases have `ON DELETE CASCADE`, which is kind of like an owning reference if you think about it.]
+
+With this collectionization, the risk for this kind of "memory leak" increases.
+
+
+But higher RAII can help!
+
+
+Let's pretend Rust has a `linear` keyword, and see what happens.
+
+
+<<<<
+We'll make a linear `OwningIndex<T>` struct to contain an index, to represent an "owning index".
+
+We also made `RBNode<T>` because only a linear struct can contain a linear struct. In fact, that Option<OwningIndex> is also implicitly linear.
+
+Finally, we make it so only one place can destroy an OwningIndex<T>: the `remove_node` function.
+////
+```linear-rust
+linear struct OwningIndex<T> {
+  index: usize;
+}
+linear struct RBNode<T> {
+  data: T,
+  color: Color,
+  parent: Option<usize>,
+  left: Option<OwningIndex>,
+  right: Option<OwningIndex>,
+};
+```
+>>>>
+
+
+This solves the problem! Though it can be hard to see why, so I'll try to explain:
+
+ * When we destroy a `RBNode<T>` instance, we're forced to take ownership of each child `Option<OwningIndex>` instances.
+ * The only way to get rid of an `Option<OwningIndex>` is to `match` it into either a (non-linear) `None` or a (linear) `Some<OwningIndex>`.
+ * The only way to get rid of a `Some<OwningIndex>` is to destruct it, taking ownership of the contained `OwningIndex`.
+ * The only way to get rid of an `OwningIndex` is hand it to `remove_node` (or, we could stuff it into another `RBNode<T>`).
+
+
+In short, the language forces us to eventually deliver that `OwningIndex` to another node or to `remove_node`.
+
+
+<ignore>
+TODO: generalize
+</ignore>
+
+
+## Prevent Zombie Temporary States
+
+By day, my computer helps me write articles like this one.
+
+But by night, it crawls the internet, searching for sufficiently weird yearly events. One such weird event is the [Flora-Bama Mullet Toss](https://www.florabama.com/mullet-toss) where people in Florida throw fish into Alabama.
+
+
+Every time it finds a possible event, it adds it to the `Event` list.
+
+Then, we do some [retrieval-augmented generation](https://blogs.nvidia.com/blog/what-is-retrieval-augmented-generation/) by googling for information about the event, analyzing each result with an LLM, and coalescing the relevant pages into a summary, updating the `summary` field and making it visible on the map.
+
+Alas, this was in Python, so *I had a bug: I forgot to update the* `summary` *in some cases.*
+
+This struct was forevermore stuck in its temporary `summary`-less state, like some sort of zombie, stuck between one realm and the next. And since I only show `summary`'d events on the map, it took me a while to realize a lot of events were missing.
+
+
+I could have used higher RAII to prevent this bug. I would:
+
+ * Make a special `linear struct InProgressEvent`
+ * Make a `func finish(event InProgressEvent, db &DB)` which would consume the `InProgressEvent` and return an `Event` object containing that `summary`.
+
+Suddenly, we're guaranteed to eventually give our `InProgressEvent` to `finish` to properly make it into an `Event`. [#typestate]
+
+
+! You could almost think of `InProgressEvent` as a sort of `EventBuilder`.
+
+
+<slice>
+#typestate: Savvy metaprogrammers would recognize the above as a kind of [type-state pattern](https://cliffle.com/blog/rust-typestate/), which uses static typing to make it so we can only call certain functions at the right times.
+
+If you imagine a state machine, linear types force the developer to drive the state machine into its final state.
+</slice>
+
+
+
+<ignore>
+expand in another article:
+
+### Type-State Pattern
+
+
+
+
+Let's show another example of the type-state pattern, and then show how higher RAII unlocks its next step.
+
+
+Imagine a struct that has states and also has methods that make sense for certain states.
+
+For example, we have a `TaxReturn` struct with a `status` enum, which has:
+
+ * `submit` methods for when `status` is `IN_PROGRESS`.
+ * `track` and `approve` methods for when `status` is `SUBMITTED`.
+ * A `close` method for when `status` is `APPROVED`.
+
+
+Instead of having one struct with three methods, we would have three structs with one method each, shown in Rust below.
+
+<<<<
+We would divide the one struct...
+
+```rust
+enum Status {
+    InProgress,
+    Submitted,
+    Approved,
+}
+struct TaxReturn {
+  status: Status,
+  ...
+}
+impl TaxReturn {
+fn submit(&mut self) {
+  assert_eq!(
+    self.status, Status::Instatus);
+  ...
+  self.status = Status::Submitted;
+}
+fn track(&self) {
+  assert_eq!(
+    self.status, Status::Submitted);
+  ...
+}
+
+fn approve(&mut self) {
+  assert_eq!(
+    self.status, Status::Submitted);
+  ...
+  self.status = Status::Approved;
+}
+
+fn close(self) {
+  assert_eq!(
+    self.status, Status::Approved);
+  ... // Some very important code
+  // return nothing
+}
+}
+```
+////
+...into three structs:
+
+```rust
+struct InProgressTaxReturn { ... }
+fn submit(self: InProgressTaxReturn)
+-> SubmittedTaxReturn {
+  ...
+  return SubmittedTaxReturn { ... };
+}
+
+struct SubmittedTaxReturn { ... }
+fn track(self: SubmittedTaxReturn) {
+  ... // Print tracking information
+}
+fn approve(self: SubmittedTaxReturn)
+-> ApprovedTaxReturn {
+  // No assertion needed!
+  ...
+  return ApprovedTaxReturn { ... };
+}
+
+struct ApprovedTaxReturn { ... }
+fn close(self: ApprovedTaxReturn) {
+  ... // Some very important code
+  // return nothing
+}
+```
+>>>>
+
+And suddenly, it's *impossible to call the wrong method at the wrong time:*
+
+ * We can only call `submit` on an in-progress tax return.
+ * We can only call `track` or `approve` on a submitted tax return.
+ * We can only call `close` on an approved tax return.
+
+This is the power of the type-state pattern!
+
+
+In general, the type-state pattern is where we divide our one struct into multiple, have functions to transform from one to the other, and only make certain functions available for whatever structs make sense.
+
+
+However, *without linear types, there is a problem.* Let's diagram the above as a state machine.
+
+<<<<
+One would assume it's like this:
+
+<img src="/images/TypeStateProgrammingLie.png" width="100%"/>
+
+(this is incorrect)
+////
+However, this is more accurate:
+
+<img src="/images/TypeStateProgrammingTruth.png" width="100%"/>
+
+(this is more accurate)
+>>>>
+
+
+Note the red dashed lines. These are unfortunately possible, because these structs aren't linear; we can `drop()` them at any time.
+
+
+This can lead to pretty serious bugs, especially since we never got to call that `... // very important code` in `close()`.
+
+
+As you can see, today's languages don't do the type-state pattern that well, because *they always allow an implicit extra transformation*, specifically they allow us to transform the struct into nothing, by allowing the struct to go out of scope.
+
+
+*Higher RAII is the missing piece* for the type-state pattern; it eliminates that unwanted extra possibility.
+
+
+All we need to do is make these structs `linear` and the problem goes away.
+
+
+Adding higher RAII to the type-state pattern feels like adding null safety to a type system: by removing an unwanted extra possibility, we reduce the odds of bugs very nicely.
+
+
+(then another follow up article: safety and liveness)
+</ignore>
+
+
+## Remember to Handle Messages
+
+Let's say you have thread A and thread B.
+
+
+How does thread A ask thread B to run a certain function `foo`?
+
+
+You're probably thinking, we should have thread A send a `FooMessage` of some sort to thread B, and then thread B can handle it and call `foo`.
+
+
+However, we sometimes encounter a bug in thread B where we don't call `FooMessage`, we just drop it on the floor.
+
+
+Higher RAII can help with this: we would make `FooMessage` linear, and make it so only `foo` can destroy it.
+
+
+TODO: make this section more compelling
+
+
+## Remember to Make a Decision
+
+In the higher RAII explanation above, we showed how we could make a `Transaction` object that can only be destroyed via a `commit` or a `rollback` function.
+
+
+Let's include that in our Seven Lost Uses, and even generalize it a bit: *If there is a future decision to be made, higher RAII guarantees that we'll eventually make it.*
+
+
+I sometimes wish there was something like this for real life.
+
+
+"Evan, think you're going to cancel that membership?"
+
+"Don't know, still thinking about it."
+
+"How long do you plan on thinking about it?"
+
+"Probably until after it automatically renews."
+
+
+Alas, I didn't make the decision, and so the default action was taken: my membership was renewed.
+
+Truly, life would be better with higher RAII.
+
+
+## Solve lookup-after-remove
+
+In C++, if we don't own a `Spaceship` but we want to access it, we store a pointer, `Spaceship*`. If we destroy the `Spaceship`, the `Spaceship*` becomes "dangling" and dereferencing it causes a use-after-free bug.
+
+When we translate that code to Rust, the usual outcome is that we instead store a `u64` "Spaceship ID", which is the key into a central `HashMap<u64, Spaceship>`. We would "dereference" the ID by calling `the_hash_map.get(spaceship_id)`. [# TODO: mention collectionizing?]
+
+Unfortunately, the bug is still here, but in a different form: if we remove the `Spaceship` from the map, and _then_ call `get` with that "dangling" u64, we receive a `None` which likely represents a bug. In other words, Rust turned the use-after-free into a "lookup-after-remove" bug.
+
+
+Higher RAII can help with this.
+
+Let's make a special `LinearHashMap` with these three adjustments:
+
+ * `insert` takes a key (`u64`) and a value (`Spaceship`) and returns a `LinearKey` which is simply a linear struct containing the key.
+ * `get` takes a `&LinearKey` and returns a reference to the value (`&Spaceship`).
+ * `remove` takes ownership of the `LinearKey`, destroys it, and returns the value (`Spaceship`).
+
+
+`get` can return a `&Spaceship` instead of an `Option<&Spaceship>` because if the given `LinearKey` still exists, then we know that the `Spaceship` is still in the hash map.
+
+
+This isn't _completely_ immune to problems: we'd still have a bug if we give one map's LinearKey to another map. Solving that will require a little more effort. [# We can make the LinearKey bound to the map's lifetime, or we can use an assertion, or make a different type for every map, or there are a few other solutions out there.]
+
+
+! This is kind of similar to the cache invalidation example. In the cache invalidation example, we used Higher RAII to enforce consistency between two maps. In this example, we're using it to know an ID isn't dangling.
+
+
+This particular use case shows an ability with much larger implications, and allows a lot of *spooky knowledge at a distance.* [# A taste: Here, some code can see that the LinearKey exists, and know that the corresponding object still exists. This technique can be used to, for example, elide generation checks and eliminate many classes of errors.] If you follow this curséd path, you'll eventually arrive at the nebulous "linear reference counting" concept I hinted at in [the grimoire](/grimoire/grimoire). [# A hint: We can use the existence of a linear reference as proof that the pointee object still exists, because the object can't be destroyed until the linear references are returned to it.]
+
+
+By the way, also check out Niko Matsakis's [blog post](https://smallcultfollowing.com/babysteps/blog/2023/03/16/must-move-types/) on what it would look like if Rust had linear "must-move" types! [# See [this StackOverflow answer](https://stackoverflow.com/questions/71694803/rust-type-that-requires-manual-drop) for a clever hack to make some types linear!]
+
+
+<ignore>
+# Spooky knowledge at a distance
+
+Higher RAII is powerful, as we can see. However, I suspect there's something even more powerful hidden here somewhere. I'll try to explain.
+
+
+In Higher RAII, we know that *if we make a linear struct, we can guarantee some future action.*
+
+However, we also know something more: *if a linear struct exists, we know that that future action hasn't happened yet.*
+
+
+In that last example, `get` uses the `&LinearKey`'s existence to assume that it refers to a value that still exists in the map.
+
+In other words, it sees the `&LinearKey` and knows that `remove` hasn't happened yet, because `remove` destroys the `LinearKey`.
+
+
+We've already seen how we can use Higher RAII to guarantee some future action. Here, Higher RAII is _also_ informing us that some future action (`remove`) _hasn't happened yet_, and therefore that something (`get`) is safe to do.
+
+
+This seems like some sort of *spooky knowledge at a distance*. I can't quite wrap my head around it, but I suspect there could be some pretty big implications.
+
+
+This _might_ also include the "linear reference counting" idea mentioned in [the grimoire](/grimoire/grimoire). It feels similar. It makes me wonder if there's some more general power here, waiting to be found. Hopefully we'll uncover more ancient Mayan tomes that can illuminate this.
+</ignore>
+
+
+# Can other languages add higher RAII?
+
+Yes! A language can add higher RAII, if they follow certain steps.
+
+
+First, let's address *exceptions and panics*. The reason that regular RAII requires a zero-argument destructor is that an in-flight exception (or panic) will unwind the stack, destroying everything in its path. To do this, it calls a zero-argument destructor or `drop()` function. So what does an in-flight exception do for a linear type?
+
+The answer: add a separate `onException` function for the type, which can handle this case. We shouldn't conflate exception handling with destructors.
+
+
+Second, *when dealing with generics* (like the `T` in `List<T>`), they need to take out the assumption that `T` has a destructor or a zero-argument `drop()` function.
+
+This means functions like [std::vector<T>::pop_back](https://en.cppreference.com/w/cpp/container/vector/pop_back) are problematic; it just destroys that last element.
+
+In Vale, that function instead returned the popped element, so the caller could figure out what to do with it.
+
+
+Third, [email me](mailto:verdagon_epsa@verdagon.dev), because there's a lot of interesting design decisions to be made about whether a _type_ is linear, or *our _usage_ of a type is linear.*
+
+These design decisions go straight to the original definition of linear types and affect, for example, whether `linear struct` literally means "a linear struct", or whether it just means "a `drop()`-less struct", a subtle distinction that can have quite a few benefits and tradeoffs.
+
+I hope to write an article about this at some point, but [the grimoire](/grimoire/grimoire) compels me to complete it first!
+
+
+# Implications for Software Architecture
+
+It wouldn't be a Languages ∩ Architecture blog without considering the architectural implications of a feature!
+
+So how does higher RAII do?
+
+Aside from all the above powers, there are two more benefits, and one more downside.
+
+
+The first extra benefit is that *a function can influence the future, not just the past*.
+
+Today's languages already make it easy to control the past: `second(f)` can require that you first call `first()`, by taking in a parameter `f` that only `first` returns.
+
+However, this is one-sided. `first()` has no control over whether we ever call `second()`. We solve that with higher RAII, by making that intermediate type `linear`.
+
+In other words, *higher RAII makes it twice as easy to use your API correctly.*
+
+
+The second extra benefit is that it *helps understandability* in certain cases. In RAII, a `drop()` function will be called invisibly and automatically, which _looks_ nice but can make a system harder to understand and debug in some cases, especially stateful ones. By requiring destruction to be explicit, we make it easier to see what's going on with our data, which reduces artificial complexity.
+
+
+The downside, however, is that `linear`ity can be an *upwardly viral constraint*: if struct `A` contains `linear struct B`, then `A` will likely need to be linear as well, because `A`'s auto-generated `drop()` function doesn't know what to do with `B`.
+
+Upwardly viral constraints, like `async`/`await` [#async] and Rust's borrow references, [#borrowing] can be harmful in some cases as they cause the rest of the program to change much more than other static constraints.
+
+This drawback can be mitigated, however. The containing struct `A` can define its own custom `drop()` function which calls the proper functions to destroy `B`, if it has the right arguments handy. If it doesn't, we'll need to refactor to change `A` (and possibly others who indirectly contain `A`) to be `linear`.
+
+
+<slice>
+#async: See Bob Nystrom's [What Color is Your Function](https://journal.stuffwithstuff.com/2015/02/01/what-color-is-your-function/) article.
+
+Though sometimes, a normal function can still call an `async` function and instead put the resulting Future onto a list somewhere instead of `await`ing it.
+
+#borrowing: Rust's borrow references are often an upwardly viral constraint, because a borrow reference puts a restriction on the rest of the program. More and more constraints, especially interconnected ones, means changes require more widespread refactoring. This is the reason why we tend to refactor much more in Rust than other languages.
+
+Fortunately, we can mitigate the upwardly viral spread with `.clone()`s or reference counting, though both can have performance implications.
+</slice>
+
+
+<ignore>
+# Linear Types' Future
+
+There are a few languages with linear types, most notably [Haskell](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/linear_types.html), [Vale](https://vale.dev/), and [Austral](https://austral-lang.org/linear-types), and only Vale has gone further and added higher RAII.
+
+
+I personally hope that a lot more languages add linear types and higher RAII... but it's not as easy as it sounds.
+
+
+It's not hard to get basic linear types working:
+
+ * Never let a linear struct go out of scope.
+ * Only a linear struct, linear array, or a local variable may contain a linear struct.
+
+
+But in Vale, I wanted to *avoid viral data coloring*
+
+But there are some things  hard part is making linear types mesh well with the rest of the ecosystem.
+
+The hardest part is making it compose well with the rest of the ecosystem. For example, 
+</ignore>
+
+
+# That's all!
+
+There's so much more I could write here!
+
+I especially wanted to talk more about the benefit of "a function can influence the future, not just the past", because it has a lot more implications than what I explained here.
+
+I also wanted to talk about how higher RAII would have helped Floridians throw fish at Alabama, but it got so long that I had to move it into my other article, [Layer-wise inferencing + batching: Small VRAM doesn't limit LLM throughput anymore](/blog/llm-throughput-not-ram-limited). Alas!
+
+
+I hope you all enjoyed this post! It's the collection of many years of experimenting and thinking about this wildly obscure topic. I'm grateful I have all of you to share it with.
+
+
+Donations and sponsorships for Vale are currently paused, but if you like these articles, please [Donate to Kākāpō Recovery](https://www.doc.govt.nz/kakapo-donate) and let me know! I love those birds, let's save them!
+
+
+Cheers,
+
+- Evan Ovadia
+
+
+# Thank you!
+
+I want to give a huge thanks to [Arthur Weagel](https://github.com/aweagel), [Kiril Mihaylov](https://github.com/KirilMihaylov), [Radek Miček](https://github.com/radekm), [Geomitron](https://github.com/Geomitron), [Chiuzon](https://github.com/chiuzon), [Felix Scholz](https://github.com/soupertonic), [Joseph Jaoudi](https://github.com/linkmonitor), [Luke Puchner-Hardman](https://github.com/lupuchard), [Jonathan Zielinski](https://github.com/tootoobeepbeep), [Albin Kocheril Chacko](https://github.com/albinkc), [Enrico Zschemisch](https://github.com/ezschemi), [Svintooo](https://github.com/Svintooo), [Tim Stack](https://github.com/tstack), [Alon Zakai](https://github.com/kripken), [Alec Newman](https://github.com/rovaughn), [Sergey Davidoff](https://github.com/Shnatsel), [Ian (linuxy)](https://github.com/linuxy), [Ivo Balbaert](https://github.com/Ivo-Balbaert/), [Pierre Curto](https://github.com/pierrec), [Love Jesus](https://github.com/loveJesus), [J. Ryan Stinnett](https://github.com/jryans), [Cristian Dinu](https://github.com/cdinu), and [Florian Plattner](https://github.com/lasernoises) (plus a very generous anonymous donor!) for sponsoring Vale over all these years.
+
+Recent events have forced me to stop coding Vale for a while and led me to pause donations and sponsorships, but your support all this time is still giving me spirit and strength! Things are looking up, and I hope to be back soon.
+
+
+
+
+But alas, it's 1:30am, and I'm starting to 
+
+
+
+# Open Questions
+
+TODO finish this section
+
+Someone should give you a linear struct if they expect you to:
+
+ * Call a callback.
+ * Log something.
+ * Write something to a database.
+ * Send an HTTP request to some telemetry server.
+
+
+TODO finish this
+
+I hope you enjoyed this article!
+
+[Save the kakapos](https://www.doc.govt.nz/kakapo-donate)!
+
+
+
+
+
+   * what % of bugs could have been prevented with higher raii?
+     * probably depends on how many things can be represented by linear RC.
+
+
+
+
+<ignore>
+
+Some real-world examples of linear types:
+
+ * A cafeteria tray can be a linear type: you aren't allowed to leave it on the table, you must eventually return it to somewhere, or give it to someone else who will.
+ * A JIRA ticket that's assigned to you; you can't just ignore it, you must eventually resolve it somehow or assign it to someone else.
+ * A baton in a relay race: you can finish the race with it, or you can hand it off to someone else.
+
+
+
+
+
+For example, you have three very large numbers. For each large number, you want to fire up a thread that will call `biggestPrimeFactor(x)` for each one.
+
+
+<<<<
+You might do something like this:
+////
+```c++
+int biggestPrimeFactor(int n) {
+  ...
+}
+
+vector<int> foo(vector<int> numbers) {
+  // Result numbers will eventually be put
+  // into these futures.
+  vector<future<int>> futures;
+
+  for (int x : numbers) {
+    // Call biggestPrimeFactor on a thread
+    futures[i] =
+      async(
+        launch::async,
+        biggestPrimeFactor,
+        x);
+  }
+  // Now, many threads are calculating.
+
+  // Wait for and receive from each future
+  vector<int> results;
+  for (future<int> fut : futures) {
+    int result = fut.get(); // Waits
+    results.push_back(result);
+  }
+
+  return results;
+}
+```
+\\\\
+Here, `foo` takes in many large numbers, for example 185395729470, 383495729470, and 15935205.
+
+The biggest prime factor for each of those respectively is 32779, 16551391, and 23, so `foo` returns those.
+
+Note how we need to call `fut.get()` to wait for and receive the result of the future.
+>>>>
+
+
+We often receive futures and 
+
+
+When you receive a future, the result is probably not in there yet. It will be in the future, though!
+
+
+<<<<
+For example, let's say we have a very large number like `185395729470`, and we want to calculate the smallest numbers that can be multiplied together to get this number.
+
+In this case, `2 x 3 x 5 x 7 x 23 x 1171 x 32779` are the numbers that multiply together to become `185395729470`.
+////
+```c++
+vector<int> primeFactors(int n) {
+  vector<int> factors;
+  for (int i = 2; i <= n / i; i++) {
+    while (n % i == 0) {
+      factors.push_back(i);
+      n /= i;
+    }
+  }
+  if (n > 1)
+    factors.push_back(n);
+  return factors;
+}
+```
+>>>>
+
+
+
+
+ </ignore>
