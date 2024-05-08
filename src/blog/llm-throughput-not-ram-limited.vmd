@@ -1,0 +1,244 @@
+---
+title: Layer-wise inferencing + batching: Small VRAM doesn't limit LLM throughput anymore
+author: Evan Ovadia
+date: May 9th, 2024
+realm: blog
+path: blog/layer-wise-inferencing-batching
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+! Also posted today: [Higher RAII, and the Seven Lost Uses of Linear Types](/blog/higher-raii-uses-linear-types), about how linear types let us control the future!
+
+
+<ignore>
+
+ * make it clear that we're streaming _from disk_
+ * mention https://github.com/SJTU-IPADS/PowerInfer
+ * more cool events
+ * mention everything said in https://www.reddit.com/r/LocalLLaMA/comments/1ckxzi3/airllm_batching_ram_size_doesnt_limit_throughput/
+ * maybe mention https://github.com/FMInference/FlexGen
+ * this comment: https://github.com/oobabooga/text-generation-webui/issues/4754#issuecomment-1834653096 says llama.cpp --batch_size=1 might be equivalent?
+
+</ignore>
+
+
+Currently, the general consensus is that *you can't really run larger LLMs* on ordinary computers. [# You generally either get an out-of-memory error or it runs way too slowly.]
+
+
+But now, you can run an LLM much larger than your VRAM to *answer a yes/no question every 5 seconds* on average, for throughput use cases. [# This means cases where latency doesn't matter, where you're fine waiting a while to get a result.]
+
+
+This is possible with *layer-wise inferencing with batching*, where we stream an LLM's layers from the hard drive into VRAM, and run each layer against multiple in-progress prompts before moving on to the next layer.
+
+
+<ignore>
+For example, for a 68-gigabyte 34B LLM, instead of answering one question in 35.354 seconds using layer-wise inferencing alone, batching makes it answer 500 questions in 2426 seconds, averaging 4.85 seconds per question.
+</ignore>
+
+
+For fun, I spent an evening prototyping this into an [AirLLM fork](https://github.com/Verdagon/Anima/commit/d90e07756014bd174c172fa3bf57a3770e3842a0). [# Just Mac currently, sorry!]
+
+
+Of course, this isn't a new technique! [Moritz Thüning](https://github.com/moritztng) used this technique months ago in their [fltr](https://github.com/moritztng/fltr) tool, which is like grep but for natural language questions: ask it a human question and it will run that question against many documents at once. And even before that, [Sheng et al](https://arxiv.org/abs/2303.06865) wrote a paper about the technique and published their code as [FlexGen](https://github.com/FMInference/FlexGen), though unfortunately for me, it doesn't support Macs.
+
+
+Read on to hear the nonsense that led to this, or feel free to skip to the [technical stuff](#layer-wise-inferencing)!
+
+
+
+# Background: The Flora-bama Mullet Toss
+
+
+In 1985, an unknown man threw a fish from the beaches of Florida all the way into Alabama. To some, this became known as "the greatest fish-based artillery assault of the 80s." [# "Some" being me and a few of my buddies from the discord server.] To the Alabamans, it probably became known as the "fish heard 'round the world", [# A reference to the [shot heard round the world](https://en.wikipedia.org/wiki/Shot_heard_round_the_world)] and confirmation of Florida's ambitions of conquest.
+
+
+Now, every April, Floridians and Alabamans flock to the Perdido Key beaches to reenact that glorious toss, in a charity event where they compete to see who can throw a fish the furthest into Alabama.
+
+
+It is unknown whether anyone has beaten the record set back then, and it is unknown whether this will escalate into more advanced munitions in coming years like [rubber fish](https://www.peta.org/blog/flora-bama-mullet-toss/), which are more aerodynamic and pack a lot more kinetic energy.
+
+
+When I heard about the [Florabama Mullet Toss](https://www.florabama.com/mullet-toss), I knew I _had to_ find more weird events like this. Surely, there must be more!
+
+
+This is actually something *LLMs are good at*: crawling the web and interpreting webpages.
+
+
+## The "Weird Event Finder"
+
+So I made a little tool which basically *asks ChatGPT and doublechecks via Google*, basically a poor-man's [retrieval-augmented generation](https://blogs.nvidia.com/blog/what-is-retrieval-augmented-generation/) approach:
+
+ * I type in a question, like "What are the most weird, interesting, obscure yearly events that happen in North Carolina?" [# Or other fun ones like "What are the weirdest annual llama-related events in the United States?"]
+ * It feeds that to ChatGPT (which returns more hallucinations than actual events) which responds a CSV "possible event list" including name, city, state.
+ * *For each possible event,* it:
+    * Does a google search with the name, city, and state of the event, like: "Pirate Invasion Beaufort North Carolina".
+    * *For each google result,* such as [thebeaufortpirateinvasion.com](https://www.thebeaufortpirateinvasion.com/) it:
+       * Gives the page text to ChatGPT and asks it, "Is this page describing an event?". If no, skip.
+       * It *asks it questions* like:
+          * "Is this page describing one event, multiple events, or no events at all?"
+          * "What's the event's name?"
+          * "Does the event repeat every year?"
+
+It then takes the resulting list of event pages, and puts them on a webpage to ask me if they're weird enough and look legit.
+
+
+However, *this was very expensive.* Even with various optimizations, I was racking up $10 per night in OpenAI spending. And this was just a tiny weekend side-project, so it would be hard to justify spending *thousands of dollars* on GPUs to run models locally.
+
+
+It was unfortunate that my Macbook Pro only had 16gb of RAM, otherwise I could run an LLM locally. Alas, I would need _much_ more RAM to run a 70B LLM, [# A Q5-quantized 70B model would need 60gb of RAM, and Mac OS needs a lot of RAM for the OS, so we're talking a 64gb or 128gb Macbook Pro.] and the smaller LLMs just don't work as well.
+
+
+# Layer-wise Inferencing
+
+It's clear that I need more RAM so I can run an LLM locally.
+
+...or do I?
+
+
+Recently, tools like lyogavin's [AirLLM](https://github.com/lyogavin/Anima/tree/main/air_llm) (and others) have emerged, which allow us to *run an LLM piece-by-piece*.
+
+Why load the entire huge model into VRAM, when we're only using a piece of it at a time? Let's just load whatever piece we need right now!
+
+
+Basically, *an LLM is divided into layers*.
+
+For example, The 68-gigabyte model [UNA-SimpleSmaug-34b-v1beta](https://huggingface.co/fblgit/UNA-SimpleSmaug-34b-v1beta) is actually 59 layers of 1.12 gigabytes each. 
+
+AirLLM does *layer-wise inferencing*: it loads one layer into VRAM, runs it, unloads it, and repeats, feeding each layer's "in-progress thought" tensor [#tensor] into the next.
+
+You could almost think of it as *streaming layers into VRAM* on-demand, and then quickly unloading to make room for the next layer.
+
+! Well, not technically VRAM. More recent Macs' Ram is actually [unified memory](https://www.xda-developers.com/apple-silicon-unified-memory/) which is directly accessible to the CPU, GPU, and the neural engine. But that shouldn't matter much here, these techniques should apply to any GPU setup.
+
+
+A metaphor would be how your average steampunk chap-hop rapper scientist gets through his day:
+
+ * First, he puts on his time-traveling trousers and grabs tea leaves from his favorite victorian-era tea shop.
+ * Then, he puts on his tea trousers, which let him turn the leaves into the finest tea possible.
+ * Then, he puts on his [fighting trousers](https://www.youtube.com/watch?v=0iRTB-FTMdk) to turn the caffeine into a new diss track about Mr. B, a rival steampunk chap-hop rapper.
+
+[Professor Elemental](https://en.wikipedia.org/wiki/Professor_Elemental) doesn't wear all three trousers at once, _and neither should we._
+
+
+<slice>
+#tensor: You can think of a "tensor" as a block of numbers, or rather, an N-dimensional array of numbers. An N=1 tensor is a regular array, an N=5 tensor is a 5d array, and an N=0 tensor is just a single number.
+
+Here, each layer produces a block of numbers that is fed into the next layer. You can kind of think of it as an "in-progress thought".
+</slice>
+
+# ...is really slow
+
+Layer-wise inferencing makes it _possible_ to run large models, but not very _desirable_ to do so.
+
+If a "token" is a word, then the average human can speak 100-150 tokens per minute, and ChatGPT speaks about [6000](https://www.reddit.com/r/LocalLLaMA/comments/15nig1k/did_someone_calculate_how_fast_gpt35_is_in_terms/) tokens per minute.
+
+AirLLM gives us... 2 tokens per minute. Very slow indeed.
+
+
+...which makes sense, really. It needs to load 59 layers from RAM for every single token. [# You'd be slow too if you had to cycle through 59 trousers every time you wanted to say a word.]
+
+
+Even for my use case, that's a bit too slow. Even if I only used AirLLM for only the yes-or-no questions (like "Does this event happen every year?"), it would only be able to doublecheck one possible event every 42 minutes. [# 30 seconds x 7 search results x 12 questions per result = 42 minutes.]
+
+
+This is roughly the consensus today: *you can't really run large models on regular computers,* it's just too slow.
+
+
+# We can speed it up!
+
+"Batching" is a well-known strategy, for various other use cases.
+
+For example, one could load a 68-gigabyte model onto three RTX A5000s (each has 24gb memory), and do inferencing on multiple prompts at a time, using llama.cpp's --parallel flag or HuggingFace's Accelerate's `batch_size` parameter.
+
+It's also common practice to use batching when training a model, for example DeepSpeed's [train_batch_size](https://www.deepspeed.ai/docs/config-json/) parameter.
+
+
+However, those require that the entire model be loaded, into this machine's memory or distributed in other machines' memory. We only have one machine with relatively little VRAM.
+
+
+So, it seemed I had a few options:
+
+ * Add Mac support to [FlexGen](https://github.com/FMInference/FlexGen).
+ * Add layer-wise inferencing to llama.cpp.
+ * Add batching to [AirLLM](https://github.com/lyogavin/Anima/tree/main/air_llm).
+
+
+The last one definitely sounded the easiest.
+
+
+# Success!
+
+In the end, it only took [123 lines](https://github.com/Verdagon/Anima/commit/d90e07756014bd174c172fa3bf57a3770e3842a0) and one evening. It's weekend-hackathon quality, but it worked!
+
+And the results were pretty impressive.
+
+
+Previously, it took 35.354 seconds per token, running one prompt.
+
+By running 500 prompts at a time on each layer, we got down to 4.85 seconds, a 7x speedup.
+
+
+More detailed benchmarks:
+
+ * 35.354s for 1 prompt, 35.354 seconds per token
+ * 40.387s for 2-prompt batch, 20.1935 seconds per token
+ * 55.527s for 5-prompt batch, 11.1054 seconds per token
+ * 265.9s for 50-prompt batch, 5.318 seconds per token
+ * 2426.11s for 500-prompt batch, 4.85222 seconds per token
+
+
+# How can the rest of us do this?
+
+If you want to do something like this, I recommend looking into [FlexGen](https://github.com/FMInference/FlexGen), which likely does this _way_ better than my hacked AirLLM did. It even uses some slick linear programming techniques to determine the best batch sizes.
+
+
+! Linear programming is different from linear types, about which I [posted another article today](/blog/higher-raii-uses-linear-types)!
+
+
+On top of that, AirLLM leaves a lot of performance on the table:
+
+ * It doesn't load the next layer ahead of time, even if there's room for it. It waits until inferencing is done.
+ * AirLLM has a [block-wise quantization](https://github.com/lyogavin/Anima/tree/main/air_llm#model-compression---3x-inference-speed-up) option for 3x speedup, but it doesn't work on Mac and probably won't [until bitsandbytes better supports Mac](https://github.com/TimDettmers/bitsandbytes/issues/1020).
+
+
+# The takeaways
+
+Honestly, this doesn't really change anything, I just added an existing technique to an existing tool so I could do a thing on my Mac.
+
+
+However, what most people don't know, and the main reason I wrote a whole post about this journey, is to show people that *normal computers can run larger LLMs with reasonable throughput* for some use cases.
+
+
+This technique unblocks a lot of interesting uses, like:
+
+ * We could periodically run a little program that looks at all new posts on r/technology, filters out anything unrelated to technology, and adds it to an RSS feed.
+ * When an iOS device is plugged in at night, we could run a local AI to generate a short caption for all the pictures we took that day.
+ * We could make a "weird yearly event finder" running on a Raspberry Pi at home! [# I haven't tried putting any of this on a Raspberry PI yet, but it would be pretty awesome.]
+
+These are all latency-agnostic use cases that can use this approach, without needing hundreds or thousands of dollars of GPUs.
+
+Hopefully, it's only a matter of time before libraries better support this use case!
+
+
+# That's all!
+
+Thanks for reading! I hope you enjoyed this post. It was a wild ride, and I'm glad I get to share it with you all.
+
+
+Donations and sponsorships for Vale are currently paused, but if you like these articles, please [Donate to Kākāpō Recovery](https://www.doc.govt.nz/kakapo-donate) and let me know! I love those birds, let's save them!
+
+
+Cheers,
+
+- Evan Ovadia
+
+
+# Thank you!
+
+I want to give a huge thanks to [Arthur Weagel](https://github.com/aweagel), [Kiril Mihaylov](https://github.com/KirilMihaylov), [Radek Miček](https://github.com/radekm), [Geomitron](https://github.com/Geomitron), [Chiuzon](https://github.com/chiuzon), [Felix Scholz](https://github.com/soupertonic), [Joseph Jaoudi](https://github.com/linkmonitor), [Luke Puchner-Hardman](https://github.com/lupuchard), [Jonathan Zielinski](https://github.com/tootoobeepbeep), [Albin Kocheril Chacko](https://github.com/albinkc), [Enrico Zschemisch](https://github.com/ezschemi), [Svintooo](https://github.com/Svintooo), [Tim Stack](https://github.com/tstack), [Alon Zakai](https://github.com/kripken), [Alec Newman](https://github.com/rovaughn), [Sergey Davidoff](https://github.com/Shnatsel), [Ian (linuxy)](https://github.com/linuxy), [Ivo Balbaert](https://github.com/Ivo-Balbaert/), [Pierre Curto](https://github.com/pierrec), [Love Jesus](https://github.com/loveJesus), [J. Ryan Stinnett](https://github.com/jryans), [Cristian Dinu](https://github.com/cdinu), and [Florian Plattner](https://github.com/lasernoises) (plus a very generous anonymous donor!) for sponsoring Vale over all these years.
+
+Recent events have forced me to stop coding Vale for a while and led me to pause donations and sponsorships, but your support all this time is still giving me spirit and strength! Things are looking up, and I hope to be back soon.
+
+
+
