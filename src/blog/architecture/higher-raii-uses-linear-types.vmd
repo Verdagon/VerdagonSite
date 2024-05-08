@@ -768,13 +768,10 @@ How does thread A ask thread B to run a certain function `foo`?
 You're probably thinking, we should have thread A send a `FooMessage` of some sort to thread B, and then thread B can handle it and call `foo`.
 
 
-However, we sometimes encounter a bug in thread B where we don't call `FooMessage`, we just drop it on the floor.
+However, we sometimes encounter a bug in thread B where we don't call `foo`, we just drop the `FooMessage` on the floor.
 
 
 Higher RAII can help with this: we would make `FooMessage` linear, and make it so only `foo` can destroy it.
-
-
-TODO: make this section more compelling
 
 
 ## Remember to Make a Decision
@@ -806,7 +803,7 @@ Truly, life would be better with higher RAII.
 
 In C++, if we don't own a `Spaceship` but we want to access it, we store a pointer, `Spaceship*`. If we destroy the `Spaceship`, the `Spaceship*` becomes "dangling" and dereferencing it causes a use-after-free bug.
 
-When we translate that code to Rust, the usual outcome is that we instead store a `u64` "Spaceship ID", which is the key into a central `HashMap<u64, Spaceship>`. We would "dereference" the ID by calling `the_hash_map.get(spaceship_id)`. [# TODO: mention collectionizing?]
+When we translate that code to Rust, the usual outcome is that we instead store a `u64` "Spaceship ID", which is the key into a central `HashMap<u64, Spaceship>`. We would "dereference" the ID by calling `the_hash_map.get(spaceship_id)`.
 
 Unfortunately, the bug is still here, but in a different form: if we remove the `Spaceship` from the map, and _then_ call `get` with that "dangling" u64, we receive a `None` which likely represents a bug. In other words, Rust turned the use-after-free into a "lookup-after-remove" bug.
 
