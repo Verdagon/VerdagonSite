@@ -885,6 +885,11 @@ These design decisions go straight to the original definition of linear types an
 I hope to write an article about this at some point, but [the grimoire](/grimoire/grimoire) compels me to complete it first!
 
 
+Ironically, there's a chance that by adding higher RAII to Vale, I might also be *indirectly adding it for Rust*: I _may_ have found a way that Vale can automatically and seamlessly call directly into Rust libraries, without user-written bindings.
+
+If I'm right, then it'll be possible to use Vale's higher RAII with Rust libraries, just by reinterpreting Rust types as linear. I hope to prototype this over the next several months, so stay tuned!
+
+
 # Implications for Software Architecture
 
 It wouldn't be a Languages ∩ Architecture blog without considering the architectural implications of a feature!
@@ -967,6 +972,7 @@ Cheers,
 - Evan Ovadia
 
 
+<ignore>
 <slice new-color="afterword"/>
 
 # Thank you!
@@ -978,7 +984,6 @@ Recent events have forced me to stop coding Vale for a while and led me to pause
 
 
 
-<ignore>
 But alas, it's 1:30am, and I'm starting to 
 
 
