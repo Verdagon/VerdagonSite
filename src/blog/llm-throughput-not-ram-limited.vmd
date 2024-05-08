@@ -13,6 +13,12 @@ namespace: c-blog m-annotated
 
 <ignore>
 
+ * mention SIMD
+ * corgi races
+ * find events 
+ * take out "hacked" or say hackathon
+ * vale has no special sauce for AI--thats more Mojo, Rust, and perhaps Julia--but its linear types are invaluable fpr reflecting data into the database.
+ * (or maybe mention how higher raii would have helped)
  * add slices
  * actually called layer-wise inferencing?
  * make it clear that we're streaming _from disk_
