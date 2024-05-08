@@ -8,7 +8,7 @@ layout: annotated
 namespace: c-blog m-annotated
 ---
 
-! Also posted today: [Higher RAII, and the Seven Lost Uses of Linear Types](/blog/higher-raii-uses-linear-types), about how linear types let us control the future!
+! Also posted today: [Higher RAII, and the Seven Arcane Uses of Linear Types](/blog/higher-raii-uses-linear-types), about how linear types let us control the future!
 
 
 <ignore>
