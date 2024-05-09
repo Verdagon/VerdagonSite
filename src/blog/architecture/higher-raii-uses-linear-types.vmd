@@ -2,7 +2,7 @@
 title: Higher RAII, and the Seven Arcane Uses of Linear Types
 subtitle: Linear types + whitelisted destroyers = powers yet unimagined!
 author: Evan Ovadia
-date: DRAFT
+date: May 14, 2024
 realm: blog
 path: blog/higher-raii-uses-linear-types
 layout: annotated
@@ -52,10 +52,10 @@ I hesitate to spread the curse to you, my dear readers, but I am compelled by th
 # What's a linear type?
 
 
-If you look up linear types online, you'll find a lot of misleading definitions, like *a linear type is a type that can't be aliased, can't be cloned, and must be "used" exactly once.* [# [Wikipedia](https://en.wikipedia.org/wiki/Substructural_type_system#Linear_type_systems): "Linear types correspond to linear logic and ensure that objects are used exactly once."] [# [martriay](https://medium.com/@martriay/rust-and-linear-types-a-short-guide-4845e9f1bb8f): "the constraint that each variable can be used exactly once" (though they explain the motivations really well)] [# [Cornell](https://www.cs.cornell.edu/courses/cs4110/2018fa/lectures/lecture29.pdf): In linear logic, you have to “use” every premise exactly once to construct the conclusion.] [# [austral-lang.org](https://austral-lang.org/linear-types): a value of a linear type is a value that can only be used once.]
+If you look up linear types online, you'll find a lot of unhelpful definitions, like *a linear type is a type that can't be aliased, can't be cloned, and must be "used" exactly once.* [# [Wikipedia](https://en.wikipedia.org/wiki/Substructural_type_system#Linear_type_systems): "Linear types correspond to linear logic and ensure that objects are used exactly once."] [# [martriay](https://medium.com/@martriay/rust-and-linear-types-a-short-guide-4845e9f1bb8f): "the constraint that each variable can be used exactly once" (though they explain the motivations really well)] [# [Cornell](https://www.cs.cornell.edu/courses/cs4110/2018fa/lectures/lecture29.pdf): In linear logic, you have to “use” every premise exactly once to construct the conclusion.] [# [austral-lang.org](https://austral-lang.org/linear-types): a value of a linear type is a value that can only be used once.]
 
 
-I say it's "misleading" because as Vale shows us, you can have a linear struct without any of the above restrictions.
+I say that because, as Vale shows us, you can have a linear struct without any of the above restrictions.
 
  * You can read/modify it as much as you like.
  * You can copy it.
@@ -65,12 +65,13 @@ I say it's "misleading" because as Vale shows us, you can have a linear struct w
 So for now, let's use a less correct but more helpful definition: *A linear struct must eventually be _explicitly_ destroyed.* [#acrobatics]
 
 
+In other words, a linear struct can't just go out of scope. When the user lets a linear struct go out of scope, the compiler gives an error.
+
+
 <<<<
-In other words, a function can't just let a linear struct go out of scope. When the user lets a linear struct go out of scope, the compiler gives an error instead of automatically calling a destructor (or `drop`) on it.
+Here we have a function that makes a linear struct `x`, makes a reference to it, and even reads its contents.
 
-Here we have a function that makes a linear struct, makes a reference to it, and even reads its contents.
-
-However, when it goes out of scope, we get a compile error.
+When `x` goes out of scope, we get a compile error.
 ////
 ```vale
 linear struct MyStruct {
@@ -92,7 +93,10 @@ func foo() {
 }
 ```
 \\\\
-If we put in the line `destruct m;`, it would resolve the compiler error.
+Other languages might automatically clean it up, or call a destructor or `drop()` method, but here we've opted into the compiler error instead.
+
+
+If we put in the line `destruct x;`, it would resolve the compiler error.
 >>>>
 
 
@@ -135,7 +139,7 @@ At <a href="https://www.youtube.com/embed/UavYVf0UEoc?start=958&end=1000" target
 
 Cher Ami was awarded the Croix de Guerre, a French military honor, for her bravery.
 
-If you read this note, sneak the phrase "that badass pigeon, truly she was the best of us" into a comment somewhere and [try to sound sane](https://youtu.be/-UBgNREvlIo), to be awarded the highest honor I can bestow!
+If you read this note, sneak the word "pigeon" into a comment [try to sound sane](https://youtu.be/-UBgNREvlIo), to be awarded the highest honor I can bestow.
 
 (Cheers to [cbsmith](https://news.ycombinator.com/item?id=36691658), [kubanczyk](https://news.ycombinator.com/item?id=36692089), [TheGoldenMinion](https://www.reddit.com/r/programming/comments/14wu830/comment/jrklcry/?utm_source=reddit&utm_medium=web2x&context=3), [lovich](https://news.ycombinator.com/item?id=36691564), [padraig_oh](https://www.reddit.com/r/programming/comments/14wu830/comment/jrkmjiw/?utm_source=reddit&utm_medium=web2x&context=3), and [leksak](https://news.ycombinator.com/item?id=36691737) for the [last one](/blog/easter-egg-notes)!)
 </slice>
@@ -176,10 +180,10 @@ linear struct Transaction {
 This means the struct can never go out of scope; it can never be automatically destroyed. It must be _explicitly_ destroyed now, such as with Vale's `destruct` keyword, shown below.
 
 
+<<<<
 Second, *create the functions* that take the object and explicitly `destruct` it.
 
 
-<<<<
 Here's our `commit` and `rollback` functions.
 ////
 ```vale
@@ -202,7 +206,7 @@ func rollback(txn Transaction, db &DB) {
 Note the `Transaction` parameter isn't `&Transaction`; the functions take the instance itself, not a reference.
 
 
-They then `destruct` the `Transaction`. Only this file can do that, because that's where `Transaction` is defined.
+They then `destruct` the `Transaction`.
 >>>>
 
 
@@ -211,7 +215,7 @@ Third, make sure that *_only_ those functions can destroy the object*.
 In Vale, you don't actually have to do anything for this step: `destruct` can only be used from the file defining the struct.
 
 
-*Success!* We're guaranteed to `commit` or `destroy` every `Transaction` object.
+*Success!* We're now guaranteed to `commit` or `destroy` every `Transaction` object.
 
 
 More specifically, the user can't accidentally let the `Transaction` go out of scope, the compiler would notice and give a compile error. The only remaining option for the user is to move the object somewhere else, or destroy it via `commit` or `rollback`.
@@ -220,14 +224,14 @@ More specifically, the user can't accidentally let the `Transaction` go out of s
 Zooming out, you can see how *this struct can only be explicitly destroyed, by certain operations*, which means we've successfully enabled Higher RAII here.
 
 
-This sounds pretty simple, but has _huge_ benefits if used well.
+This mechanism has _huge_ benefits if used well, for example by keeping caches consistent or enforcing we update a database, as I'll list further below.
 
 
 <slice />
 
 # Why haven't we seen this before?
 
-(Or [skip to the Seven Uses](#the-seven-arcane-uses))
+(Or [skip to the Seven Arcane Uses](#the-seven-arcane-uses))
 
 
 Existing languages can't quite do this, and I'll show why below.
@@ -285,7 +289,9 @@ struct Transaction {
 
 Rust is unfortunately even less capable than C++ here.
 
-Rust can almost do C++'s workaround, but the borrow checker generally dislikes references inside structs, such as that `DB` reference. [# More specifically, Rust structs containing references generally work well as long as they stay within the same function. But at that point, we might as well be using `defer`.] Rust's workarounds include either using `unsafe`, using `Rc<RefCell<DB>>`, or if one considers those unidiomatic, giving up on RAII. I prefer the second, though I've seen all three happen in the wild.
+Rust can almost do C++'s workaround, but the borrow checker generally dislikes references inside structs, such as that `DB` reference. [# More specifically, Rust structs containing references generally work well as long as they stay within the same function. But at that point, we might as well be using `defer`.]
+
+Rust's workarounds include either using `unsafe`, using `Rc<RefCell<DB>>`, or if one considers those unidiomatic, giving up on RAII. I prefer the second, though I've seen all three happen in the wild.
 
 
 <slice />
@@ -294,7 +300,8 @@ Rust can almost do C++'s workaround, but the borrow checker generally dislikes r
 
 Summarizing the C++ section above, RAII is the practice of putting code in destructors that you want to guarantee will eventually run.
 
-From that context, we could say that _higher_ RAII is when we can have multiple named destructors, destructors with parameters, destructors with return values, and we can force the user to explicitly call them.
+From that context, we could say that _higher_ RAII is when we can have multiple named destructors, destructors with parameters, destructors with return values, and we can force the user to explicitly call one of them.
+
 
 Whereas RAII eventually makes us implicitly call a specific zero-arg non-returning function (the destructor), Higher RAII eventually makes us explicitly call _any_ approved function.
 
@@ -329,7 +336,9 @@ Golang, I want to love you, I really do, but every time I get used to your lates
 
 # The Seven Arcane Uses [# I call them "arcane" because they seem confusing at first, but once you know the technique, it unlocks some pretty incredible powers. Makes one feel rather... _sorcerous_.] [# Perceptive readers will notice that there's actually eight items here, but seven sounded cooler than eight, and some of them are similar to each other. Besides, everyone already knows I can't count after [the last article](https://verdagon.dev/grimoire/grimoire).]
 
-There are, of course, more than seven ways to use linear types and Higher RAII. But behold, here are the seven most useful ones that I've seen.
+There are, of course, more than seven ways to use linear types and Higher RAII.
+
+But behold! Here are the seven most useful ones that I've seen.
 
 
 <slice />
@@ -365,7 +374,7 @@ So I did two things:
 Now, removing from `levelGoblins` will give us not only the `Goblin`, but also the linear `GoblinInCacheToken`, and the only way to get rid of the `GoblinInCacheToken` is to hand it to `removeGoblinRefFromCache`.
 
 
-Suddenly, we've *statically guaranteed* that we'll remove from both the list and the cache!
+Suddenly, we've *statically guaranteed* that we'll always remove from both the list and the cache!
 
 
 <slice />
@@ -441,10 +450,10 @@ This is where Higher RAII could have helped: that `shoutPromise` should have bee
 >>>>
 
 
-I suspect a lot of--maybe even most--`Promise`s should be linear.
+I suspect a lot of&mdash;maybe even most&mdash;`Promise`s should be linear.
 
 
-! Some of you might have seen something like this! This is similar to C++'s `[[nodiscard]]`, C#'s `MustUseReturnValueAttribute`, or Rust's `#[must_use]`. However, those are easily confused: we could e.g. put the result into a struct's member, and then accidentally drop the struct. These measures only look at the current scope, they don't follow the struct throughout its entire lifetime through the program.
+! Some of you might have seen something like this! This is similar to C++'s `[[nodiscard]]`, C#'s `MustUseReturnValueAttribute`, or Rust's `#[must_use]`. However, those are easily foiled: we could e.g. put the result into a List, and then accidentally drop the List. These measures only look shallowly at the current scope, they don't follow the value throughout its entire lifetime through the program.
 
 
 <slice />
@@ -463,7 +472,7 @@ Or, we can use Higher RAII to make sure we remember. Here's how!
 <<<<
 First, we make a linear type that represents "our vow to put a string into that future".
 
-We'll call it `FutureVow`. [# I wanted to call it `Promise` but Javascript makes that confusing.]
+We'll call it `FutureVow`. [# I wanted to call it `Promise`, because this is literally a linear version of `std::promise`, but I don't want to confuse things with Javascript's `Promise` which is completely unrelated to this.]
 ////
 ```vale
 linear struct FutureVow<T> {
@@ -473,7 +482,7 @@ linear struct FutureVow<T> {
 >>>>
 
 
-Then, we make sure that whenever we make a `Future`, we also make a corresponding `FutureVow`.
+Then, we would make sure that whenever we make a `Future`, we also make a corresponding `FutureVow`.
 
 In Vale, that would mean changing `Future`'s constructor to also return the `FutureVow` at the same time, [# Not terribly difficult, just make the default constructor private and then make a new function called `Future` that returns a tuple.] but one can imagine many mechanisms to ensure one is never created without the other.
 
@@ -492,7 +501,7 @@ Now there's no way to get rid of a `FutureVow` except by calling this `set` func
 >>>>
 
 
-Success! Now it's guaranteed that we'll eventually set every `Future`'s value. [# "Guarantee" could be a strong word here. A determined programmer can get around this by, for example, panicking the program first.]
+Success! Now it's guaranteed that we'll eventually set every `Future`'s value. [# "Guarantee" could be a strong word here. A determined programmer can get around this if they tried hard enough.]
 
 
 <ignore>
@@ -543,15 +552,40 @@ Then, we do some [retrieval-augmented generation](https://blogs.nvidia.com/blog/
 
 Alas, this was in Python, so *I had a bug: I forgot to update the* `summary` *in some cases.*
 
-This struct was forevermore stuck in its temporary `summary`-less state, like some sort of zombie, stuck between one realm and the next. And since I only show `summary`'d events on the map, it took me a while to realize a lot of events were missing.
+This struct was forevermore stuck in its temporary `summary`-less state, like some sort of zombie stuck between one realm and the next. And since I only show `summary`'d events on the map, it took me a while to realize a lot of events were missing.
 
 
-I could have used Higher RAII to prevent this bug. I would:
+If Python had Higher RAII, I could have prevented this bug!
 
- * Make a special `linear struct InProgressEvent` [# You could almost think of `InProgressEvent` as a sort of `EventBuilder`.]
- * Make a `func finish(event InProgressEvent, db &DB)` which would consume the `InProgressEvent` and return an `Event` object containing that `summary`.
 
-Suddenly, we're guaranteed to eventually give our `InProgressEvent` to `finish` to properly make it into an `Event`.
+<<<<
+Here's how Vale would do it:
+
+
+First, we'd split our struct into two structs, `InProgressEvent` and `Event`.
+
+
+Then, we'd make a `finish` function to consume the `InProgressEvent` and return a new `Event` object with the new `summary`.
+
+
+Suddenly, we're guaranteed to eventually give our `InProgressEvent` to `finish` to properly make it into an `Event`!
+////
+```vale
+linear struct InProgressEvent {
+  name str;
+}
+struct Event {
+  name str;
+  summary str;
+}
+func finish(
+    event InProgressEvent,
+    summary str) {
+  [name] = destruct event; «destructure»
+  return Event(name, summary);
+}
+```
+>>>>
 
 
 ! Savvy metaprogrammers would recognize the above as a kind of [type-state pattern](https://cliffle.com/blog/rust-typestate/), which uses static typing to make it so we can only call certain functions at the right times. In a way, it's making one struct into multiple structs that more closely match the struct's state machine diagram. Higher RAII completes the type-state pattern, by forcing the developer to drive the state machine into its final state.
@@ -707,7 +741,9 @@ Adding Higher RAII to the type-state pattern feels like adding null safety to a 
 </ignore>
 
 
-<slice/>
+<slice>
+#destructure: `[name] = destruct event;` is just putting `event`'s old members into new local variables, in this case `name`.
+</slice>
 
 ## Remember to Handle Messages
 
@@ -720,10 +756,13 @@ How does thread A ask thread B to run a certain function `foo`?
 You're probably thinking, we should have thread A send a `FooMessage` of some sort to thread B, and then thread B can handle it and call `foo`.
 
 
-However, we sometimes encounter a bug in thread B where we don't call `foo`, we just drop the `FooMessage` on the floor.
+However, thread B might mis-handle `FooMessage` by letting it go out of scope and not calling `foo`.
 
 
 Higher RAII can help with this: we would make `FooMessage` linear, and make it so only `foo` can destroy it.
+
+
+I suspect a lot of&mdash;maybe even most&mdash;messages should be linear.
 
 
 <slice />
@@ -760,7 +799,7 @@ Truly, life would be better with Higher RAII.
 We all know that manually-managed-memory languages (like C) can leak memory, from forgetting to call `free`. We also know that reference-counted languages can leak memory, from reference cycles.
 
 
-Did you know that even garbage collected languages (like Java) [can have memory leaks too](https://stackoverflow.com/a/10619408/1424454)?
+Did you know that *even garbage collected languages* (like Java) [can have memory leaks too](https://stackoverflow.com/a/10619408/1424454)?
 
 Imagine the above cache invalidation example in Java: the forgotten `Goblin` reference in the `HashMap<Location, Goblin> locationToGoblinCache` will prevent the GC from reclaiming it, effectively "leaking" it.
 
@@ -770,7 +809,7 @@ So we can already see how Higher RAII could help with leaks, by preventing that 
 Of all the mainstream languages, I'd say modern C++ is the most resistant to memory leaks, and you'll see why.
 
 
-Surprisingly, even Rust is more vulnerable to memory leaks than C++! I'll show you what I mean by translating a C++ Red-Black tree to idiomatic Rust, and how it introduces the risk for memory leaks.
+Surprisingly, *Rust is more vulnerable to memory leaks* than C++! I'll show you what I mean by translating a C++ Red-Black tree to idiomatic Rust, and how it introduces the risk for memory leaks.
 
 
 <<<<
@@ -1003,11 +1042,11 @@ The second extra benefit is that it *helps understandability* in certain cases. 
 By requiring destruction to be explicit, we make it easier to see what's going on with our data, which reduces artificial complexity.
 
 
-The downside, however, is that `linear`ity can be an *upwardly viral constraint*: if struct `A` contains `linear struct B`, then `A` will likely need to be linear as well, because `A`'s auto-generated `drop()` function doesn't know what to do with `B`.
+The downside, however, is that `linear`ity can be an *upwardly viral constraint:* [# An upwardly viral constraint is one where a something's restrictions spread into those calling into or containing it.] if struct `Outer` contains `linear struct Inner`, then `Outer` will likely need to be linear as well, because `Outer`'s auto-generated `drop()` function doesn't know what to do with `Inner`.
 
 Upwardly viral constraints, like `async`/`await` [#async] and Rust's borrow references, [#borrowing] can be harmful in some cases as they cause the rest of the program to change much more than other static constraints.
 
-This drawback can be mitigated, however. The containing struct `A` can define its own custom `drop()` function which calls the proper functions to destroy `B`, if it has the right arguments handy. If it doesn't, we'll need to refactor to change `A` (and possibly others who indirectly contain `A`) to be `linear`.
+This drawback can be mitigated, however. `Outer` can define its own custom `drop()` function which calls the proper functions to destroy `Inner`, if it has the right arguments handy. If it doesn't, we'll need to refactor to change `Outer` (and possibly others who indirectly contain `Outer`) to be `linear`.
 
 
 The *major implication* of Higher RAII is that it can bring a language's programs much closer to the ever-elusive goal of *correctness*.
@@ -1068,14 +1107,16 @@ The hardest part is making it compose well with the rest of the ecosystem. For e
 
 # That's all!
 
-There's so much more I could write here!
-
-I especially wanted to talk more about the benefit of "a function can influence the future, not just the past", because it has a lot more implications than what I explained here.
-
-I also wanted to talk about how Higher RAII would have helped Floridians throw fish at Alabama, but it got so long that I had to move it into my other article, [Layer-wise inferencing + batching: Small VRAM doesn't limit LLM throughput anymore](/blog/llm-throughput-not-ram-limited). Alas!
+One reason I love making languages is that I get to play with and write about new techniques and share their implications with the world. I didn't realize it at the time, but I've been playing with Higher RAII since my [very first article](/blog/raii-next-steps#language-implications) four years ago.
 
 
-I hope you all enjoyed this post! It's the collection of many years of experimenting and thinking about this wildly obscure topic. I'm grateful I have all of you to share it with.
+After using it and seeing its potential, it's become a central feature of Vale, manifesting its benefits in user-space programs, the standard library, and even some aspects of Vale's memory safety approach.
+
+
+There's so much more I could write about them! But alas, this one is almost... oh wow, 19 pages. Congrats on getting to the end!
+
+
+I hope you all enjoyed this post! I'm grateful to have all of you to share this arcane nonsense with. If you have any questions, always feel free to reach out via [email](mailto:verdagon_epsa@verdagon.dev), [twitter](https://twitter.com/vale_pl), [discord](https://discord.gg/SNB8yGH), or the [subreddit](https://reddit.com/r/vale).
 
 
 Donations and sponsorships for Vale are currently paused, but if you like these articles, please [Donate to Kākāpō Recovery](https://www.doc.govt.nz/kakapo-donate) and let me know! I love those birds, let's save them!
