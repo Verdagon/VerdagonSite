@@ -49,8 +49,6 @@ I hesitate to spread the curse to you, my dear readers, but I am compelled by th
 </ignore>
 
 
-<slice />
-
 # What's a linear type?
 
 
@@ -145,19 +143,22 @@ If you read this note, sneak the phrase "that badass pigeon, truly she was the b
 # Higher RAII = Linear types + whitelisted destroyers
 
 
-Recall our definition of a linear struct:
+Recall that *a linear struct must eventually be explicitly destroyed.*
 
-> A linear struct must eventually be _explicitly_ destroyed.
-
-Higher RAII adds a bit at the end:
-
-> A linear struct must eventually be _explicitly_ destroyed *by a specific function* (or functions).
+Now, imagine a struct that must eventually be explicitly destroyed *by a specific function* (or functions).
 
 
-Imagine we have a `Transaction` struct in our program. We want to guarantee that we eventually call `commit` or `rollback` with it.
+We say that struct has *Higher RAII.*
+
+I'll explain that term in a bit, [# RAII stands for "Resource Acquisition is Initialization", which is a secret key phrase that we C++ programmers whisper at the door to get into our secret covert gatherings. Careful: if they suspect you're an impostor, you'll be SFINAEd.] but first, let's see an example!
 
 
-To set this up, we need to do three things.
+Imagine a `Transaction` struct that must eventually be `commit`ted or `rollback`ed.
+
+In today's mainstream languages, [# C++ and Rust's RAII can get halfway, but they can only implicitly call a single zero-arg void-returning function, the destructor. Some pretty amazing things happen when you can choose among multiple destructors with parameters and returns.] the user might forget to call `commit` or `rollback`, causing the transaction to hang or make a guess. [# The most common strategy is to default to `rollback`, thankfully.] This cost me a few hours the other day in my [weird event collector](/blog/llm-throughput-not-ram-limited#background-the-flora-bama-mullet-toss), when I didn't `commit` one of my transactions.
+
+
+To set up a `Transaction` struct with Higher RAII, we need to do three things.
 
 
 <<<<
@@ -172,39 +173,51 @@ linear struct Transaction {
 ```
 >>>>
 
-This means the struct can never go out of scope; it can never be automatically destroyed. It must be _explicitly_ destroyed now, such as with Vale's `destruct` keyword.
+This means the struct can never go out of scope; it can never be automatically destroyed. It must be _explicitly_ destroyed now, such as with Vale's `destruct` keyword, shown below.
+
+
+Second, *create the functions* that take the object and explicitly `destruct` it.
 
 
 <<<<
-Second, *create the functions* that take ownership of the object and explicitly destroy it.
+Here's our `commit` and `rollback` functions.
 ////
 ```vale
-func commit(trx Transaction, db &DB) {
+// (same file as struct Transaction)
+
+func commit(txn Transaction, db &DB) {
   ... // code to commit the transaction
 
-  destruct trx; // Explicitly destroy
+  destruct txn; // Explicitly destroy
 }
-func rollback(trx Transaction, db &DB) {
+
+func rollback(txn Transaction, db &DB) {
+
   ... // code to rollback the transaction
 
-  destruct trx; // Explicitly destroy
+  destruct txn; // Explicitly destroy
 }
 ```
 \\\\
-(Note the parameter `Transaction` isn't `&Transaction`; the functions take ownership of the instance, not a reference to it.)
+Note the `Transaction` parameter isn't `&Transaction`; the functions take the instance itself, not a reference.
+
+
+They then `destruct` the `Transaction`. Only this file can do that, because that's where `Transaction` is defined.
 >>>>
 
 
-Third, make sure that *_only_ those functions can destroy the object*. Luckily, this is already how Vale's `destruct` works: only the struct's own file can use `destruct`. One can imagine other language mechanisms to ensure this though.
+Third, make sure that *_only_ those functions can destroy the object*. 
+
+In Vale, you don't actually have to do anything for this step: `destruct` can only be used from the file defining the struct.
 
 
-Higher RAII is where *we use linear types that can only be destroyed in certain places,* and that's exactly what we just did.
+*Success!* We're guaranteed to `commit` or `destroy` every `Transaction` object.
 
 
-We've succeeded in our goal! If anyone owns a `Transaction` object, they can't let it go out of scope and they can't destroy it, they _must_ transfer it to someone else or call `commit` or `rollback` on it.
+More specifically, the user can't accidentally let the `Transaction` go out of scope, the compiler would notice and give a compile error. The only remaining option for the user is to move the object somewhere else, or destroy it via `commit` or `rollback`.
 
 
-In other words, the program cannot forget to call `commit` or `destroy` on a `Transaction` object.
+Zooming out, you can see how *this struct can only be explicitly destroyed, by certain operations*, which means we've successfully enabled Higher RAII here.
 
 
 This sounds pretty simple, but has _huge_ benefits if used well.
@@ -212,20 +225,17 @@ This sounds pretty simple, but has _huge_ benefits if used well.
 
 <slice />
 
-# Why "Higher RAII?"
+# Why haven't we seen this before?
 
-Linear types are rarely used like this. The world has generally only used linear types for:
-
- * Resources, like a `file`, so only one person in the program can access it at a time.
- * [Capabilities](https://borretti.me/article/how-capabilities-work-austral); one can make an un-cloneable linear type to represent, say, the user's permission to use the camera this one time.
- * Memory safety; if every object has only one reference pointing to it, then use-after-free is impossible.
+(Or [skip to the Seven Uses](#the-seven-arcane-uses))
 
 
-Here, we're using linear types to *guarantee that a future operation eventually happens.*
+Existing languages can't quite do this, and I'll show why below.
 
 
-Mainstream languages can _almost_ do this.
+<slice />
 
+## C++
 
 A C++ class's destructor is guaranteed to be eventually run, so if we ever want to guarantee some future action, we just put the code in an object's destructor (which is guaranteed to run when the object goes out of scope), and keep the object alive until we want that code to run.
 
@@ -234,23 +244,55 @@ Scott Meyers [once said](https://youtu.be/ltCgzYcpFUI?t=937) that "the single mo
 RAII stands for "Resource Acquisition Is Initialization", a pattern where if you *acquire* a *resource* (such as a file descriptor), you should *initialize* an object with it. Then, the object can make sure to automatically release (such as with `fclose`) the resource when it goes out of scope. [# The hardest thing about RAII is explaining the name. Similar to monads, which are like [stateful burritos](https://byorgey.wordpress.com/2009/01/12/abstraction-intuition-and-the-monad-tutorial-fallacy/).]
 
 
-Unfortunately, a C++ class can only have one destructor function, and we need two.
+Unfortunately, a C++ class can only have one destructor function, and our `Transaction` struct (from above) needs two.
 
+
+<<<<
 A [common half-solution](https://stackoverflow.com/a/10984171/1424454) is to:
 
- 1. Put the above `db` parameter in as a class member `DB* db;`, since C++ destructors have no parameters.
+ 1. Put the above `db` parameter in as a class member `DB* db;`, since C++ destructors have no parameters. Note this isn't always possible. [# This isn't always possible, for example if we don't know the parameter value yet at construction time. Imagine `commit` wanted a `priority` integer, only knowable from reading the database while inside the transaction.]
  1. Have a `commit` method, which also sets a `committed` boolean to true.
  1. In the destructor, run `rollback`'s logic if the `committed` boolean is false.
 
 Alas, this doesn't quite solve the problem because the user still might forget to call `commit` where they should have.
+////
+```c++
+struct Transaction {
+  DB* db;
+  bool committed = false;
 
+  ...
+
+  // Don't forget to call this!
+  void commit() {
+    ... // Commit to db
+    committed = true;
+  }
+
+  // Destructor
+  ~Transaction() {
+    if (!committed) {
+      ... // Rollback logic
+    }
+  }
+}
+```
+>>>>
+
+<slice />
+
+## Rust
 
 Rust is unfortunately even less capable than C++ here.
 
-Rust can almost do the above workaround, but the borrow checker generally dislikes references inside structs, such as that `DB` reference. [# More specifically, Rust structs containing references generally work well as long as they stay within the same function. But at that point, we might as well be using `defer`.] Rust's workarounds include either using `unsafe`, using `Rc<RefCell<DB>>`, or if one considers those unidiomatic, giving up on RAII. I prefer the second, though I've seen all three happen in the wild.
+Rust can almost do C++'s workaround, but the borrow checker generally dislikes references inside structs, such as that `DB` reference. [# More specifically, Rust structs containing references generally work well as long as they stay within the same function. But at that point, we might as well be using `defer`.] Rust's workarounds include either using `unsafe`, using `Rc<RefCell<DB>>`, or if one considers those unidiomatic, giving up on RAII. I prefer the second, though I've seen all three happen in the wild.
 
 
-In summary, RAII is the practice of putting code in destructors that you want to guarantee will eventually run.
+<slice />
+
+## RAII vs Higher RAII
+
+Summarizing the C++ section above, RAII is the practice of putting code in destructors that you want to guarantee will eventually run.
 
 From that context, we could say that _higher_ RAII is when we can have multiple named destructors, destructors with parameters, destructors with return values, and we can force the user to explicitly call them.
 
@@ -262,9 +304,9 @@ Whereas RAII eventually makes us implicitly call a specific zero-arg non-returni
 
 <slice />
 
-# What's the difference between RAII and defer?
+## What's the difference between RAII and defer?
 
-Go, Zig, and a few other languages have a `defer` statement which will run a statement at the end of the current scope (or function). [# Zig runs a `defer`'d statement at the end of the scope, as god intended. Golang is different, it runs it at the end of the function. This can sometimes lead to surprising out-of-memory crashes.]
+Go, Zig, and a few other languages have a `defer` statement which will run a statement at the end of the current scope (or function). [#deferzg]
 
 In RAII, we would put that code into an object's destructor, and the code will be run when the object goes out of scope.
 
@@ -274,9 +316,18 @@ They sound like two equivalent approaches, but RAII is more flexible: we can ret
 In short: `defer` can make sure something happens at the end of your function, but RAII can make sure that something happens _even past_ the end of your function.
 
 
-<slice />
+Now that we see the differences between Higher RAII and RAII and defer, let's see some more examples!
 
-# The Seven Arcane Uses [# Those who have read [the grimoire](https://verdagon.dev/grimoire/grimoire) will know why I call these "arcane".]
+
+<slice>
+#deferzg: Zig runs a `defer`'d statement at the end of the scope, as god intended.
+
+Golang is different. For some reason, even if we `defer` from an inner scope, the `defer`'d statement will run it at [the end of the function](https://stackoverflow.com/a/49457047/1424454). This can sometimes lead to surprising out-of-memory crashes.
+
+Golang, I want to love you, I really do, but every time I get used to your latest nonsense you do something like this.
+</slice>
+
+# The Seven Arcane Uses [# I call them "arcane" because they seem confusing at first, but once you know the technique, it unlocks some pretty incredible powers. Makes one feel rather... _sorcerous_.] [# Perceptive readers will notice that there's actually eight items here, but seven sounded cooler than eight, and some of them are similar to each other. Besides, everyone already knows I can't count after [the last article](https://verdagon.dev/grimoire/grimoire).]
 
 There are, of course, more than seven ways to use linear types and Higher RAII. But behold, here are the seven most useful ones that I've seen.
 
@@ -480,16 +531,15 @@ By day, my computer helps me write articles like this one.
 
 But by night, it [uses an LLM to crawl the internet searching for sufficiently weird yearly events](/blog/llm-throughput-not-ram-limited), such as:
 
- * The [Flora-Bama Mullet Toss](https://www.florabama.com/mullet-toss) where people in Florida throw fish into Alabama.
- * The Corgi Races
- *
-
-
+ * [Corgi Races](https://tickets.canterburypark.com/events/2023/corgi-dog-races) in Minnesota. [Go Logan Handsomepants!](https://youtu.be/tPuKyeVsfZY?t=93)
+ * [Flora-Bama Mullet Toss](https://www.florabama.com/mullet-toss) where people in Florida throw fish into Alabama!
+ * [Outhouse Races](https://visitvirginiacitynv.com/events/world-championship-outhouse-races-virginia-city/), which is... hard to explain.
 
 
 Every time it finds a possible event, it adds it to the `Event` list.
 
 Then, we do some [retrieval-augmented generation](https://blogs.nvidia.com/blog/what-is-retrieval-augmented-generation/) by googling for information about the event, analyzing each result with an LLM, and coalescing the relevant pages into a summary, updating the `summary` field and making it visible on the map.
+
 
 Alas, this was in Python, so *I had a bug: I forgot to update the* `summary` *in some cases.*
 
@@ -504,7 +554,7 @@ I could have used Higher RAII to prevent this bug. I would:
 Suddenly, we're guaranteed to eventually give our `InProgressEvent` to `finish` to properly make it into an `Event`.
 
 
-! Savvy metaprogrammers would recognize the above as a kind of [type-state pattern](https://cliffle.com/blog/rust-typestate/), which uses static typing to make it so we can only call certain functions at the right times. In a way, it's making one struct into multiple structs that more closely match the struct's state machine diagram. You could say that linear types force the developer to drive the state machine into its final state.
+! Savvy metaprogrammers would recognize the above as a kind of [type-state pattern](https://cliffle.com/blog/rust-typestate/), which uses static typing to make it so we can only call certain functions at the right times. In a way, it's making one struct into multiple structs that more closely match the struct's state machine diagram. Higher RAII completes the type-state pattern, by forcing the developer to drive the state machine into its final state.
 
 
 I also could have used Higher RAII to make sure the tool always reflected its findings into the database. As it is now, the database contains six zombie in-progress events... I let them remain, to remind me why I need to translate the tool to Vale.
@@ -930,7 +980,7 @@ If I'm right, then it'll be possible to use Vale's Higher RAII with Rust librari
 But even without these measures, we've still reduced the problem drastically and enabled higher RAII, which is an improvement.
 </slice>
 
-# Implications for Software Architecture
+# Software Architecture Implications
 
 It wouldn't be a Languages ∩ Architecture blog without considering the architectural implications of a feature!
 
@@ -948,7 +998,9 @@ However, this is one-sided. `first()` has no control over whether we ever call `
 In other words, *Higher RAII makes it twice as easy to use your API correctly.*
 
 
-The second extra benefit is that it *helps understandability* in certain cases. In RAII, a `drop()` function will be called invisibly and automatically, which _looks_ nice but can make a system harder to understand and debug in some cases, especially stateful ones. By requiring destruction to be explicit, we make it easier to see what's going on with our data, which reduces artificial complexity.
+The second extra benefit is that it *helps understandability* in certain cases. In RAII, a `drop()` function will be called invisibly and automatically, which _looks_ nice but can make stateful systems less understandable and debuggable.
+
+By requiring destruction to be explicit, we make it easier to see what's going on with our data, which reduces artificial complexity.
 
 
 The downside, however, is that `linear`ity can be an *upwardly viral constraint*: if struct `A` contains `linear struct B`, then `A` will likely need to be linear as well, because `A`'s auto-generated `drop()` function doesn't know what to do with `B`.
@@ -958,13 +1010,18 @@ Upwardly viral constraints, like `async`/`await` [#async] and Rust's borrow refe
 This drawback can be mitigated, however. The containing struct `A` can define its own custom `drop()` function which calls the proper functions to destroy `B`, if it has the right arguments handy. If it doesn't, we'll need to refactor to change `A` (and possibly others who indirectly contain `A`) to be `linear`.
 
 
-The *major implication* of Higher RAII is that it can bring a language much closer to the ever-elusive goal of *correctness*.
+The *major implication* of Higher RAII is that it can bring a language's programs much closer to the ever-elusive goal of *correctness*.
 
-A lot of languages nail the *first half* of correctness: *safety*. Safety is the assurance that "bad things don't happen", for example, a panic, a crash, or a use-after-free.
+Correctness is [two things put together](https://www.hillelwayne.com/post/safety-and-liveness/):
 
-But no languages nail the *second half* of correctness: *liveness*. As [Hillel Wayne once said](https://www.hillelwayne.com/post/safety-and-liveness/), liveness is the assurance that "good things _do_ happen". By adding linear types and Higher RAII, a language can get much closer to this.
+ * Safety: the assurance that "bad things don't happen", for example, a panic, a crash, or a use-after-free.
+ * Liveness: the assurance that "good things _do_ happen", for example a plane lowering its landing gear.
 
-There's one language in particular that could really shine here one day: *Austral*, which combines linear types and borrow checking. [# Vale can also shine here when one uses [move-only programming and regions](/blog/linear-types-borrowing) to eliminate generation checks.]
+Safety helps liveness: a panic'd subsystem can't lower the landing gear. And liveness helps safety too, as we saw in our lookup-after-remove example. Like [classical and techno](https://www.youtube.com/watch?v=wZPOUR3A24k), the two blend and build upon each other in surprising and delightful ways.
+
+But alas, no languages have nailed liveness yet. [#valecorrect] With linear types and Higher RAII, we can get much closer.
+
+There's one language in particular that could really shine here: *[Austral](https://austral-lang.org/)*, which combines linear types and borrow checking.
 
 If Austral enables Higher RAII on its linear types, it could be _the_ language to bring correctness to the mainstream in a way that's simple enough to not require users to learn advanced category theory. And that's a _huge deal_.
 
@@ -977,6 +1034,10 @@ Though sometimes, a normal function can still call an `async` function and inste
 #borrowing: Rust's borrow references are often an upwardly viral constraint, because a borrow reference puts a restriction on the rest of the program. More and more constraints, especially interconnected ones, means changes require more widespread refactoring. This is the reason why we tend to refactor much more in Rust than other languages.
 
 Fortunately, we can mitigate the upwardly viral spread with `.clone()`s or reference counting, though both can have performance implications.
+
+#valecorrect: I think Vale is _close_, but not quite there yet. One can accomplish this in Vale with [move-only programming and regions](/blog/linear-types-borrowing), but that technique is even harder to use than borrow checking.
+
+A lot of my nights are spent chasing a certain holy grail: blending borrow checking with Vale's existing hybrid strategy. This quest has singlehandedly led to half of the grimoire!
 </slice>
 
 
