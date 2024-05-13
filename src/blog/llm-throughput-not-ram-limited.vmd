@@ -16,8 +16,7 @@ namespace: c-blog m-annotated
  * fix event finder
  * mention SIMD
  * corgi races
- * find events 
- * take out "hacked" or say hackathon
+ * find events
  * vale has no special sauce for AI--thats more Mojo, Rust, and perhaps Julia--but its linear types are invaluable fpr reflecting data into the database.
  * (or maybe mention how higher raii would have helped)
  * add slices
@@ -41,6 +40,9 @@ But now, you can run an LLM much larger than your VRAM to *answer a yes/no quest
 This is possible with *batching and layer-wise inferencing* from disk, where we stream an LLM's layers from the hard drive into VRAM, and run each layer against multiple in-progress prompts before moving on to the next layer.
 
 
+This post is a bit AI-heavy, but as always, my trusty side notes will be explaining the more arcane concepts.
+
+
 <ignore>
 For example, for a 68-gigabyte 34B LLM, instead of answering one question in 35.354 seconds using layer-wise inferencing alone, batching makes it answer 500 questions in 2426 seconds, averaging 4.85 seconds per question.
 </ignore>
@@ -49,10 +51,10 @@ For example, for a 68-gigabyte 34B LLM, instead of answering one question in 35.
 For fun, I spent an evening prototyping this into an [AirLLM fork](https://github.com/Verdagon/Anima/commit/d90e07756014bd174c172fa3bf57a3770e3842a0). [# Just Mac currently, sorry!]
 
 
-Of course, this isn't a new technique! [Moritz Thüning](https://github.com/moritztng) used this technique months ago in their [fltr](https://github.com/moritztng/fltr) tool, which is like grep but for natural language questions: ask it a human question and it will run that question against many documents at once. And even before that, [Sheng et al](https://arxiv.org/abs/2303.06865) wrote a paper about the technique and published their code as [FlexGen](https://github.com/FMInference/FlexGen), though unfortunately for me, it doesn't support Macs.
+And it turns out, this isn't a new technique! [Moritz Thüning](https://github.com/moritztng) used this technique months ago in their [fltr](https://github.com/moritztng/fltr) tool, which is like grep but for natural language questions: ask it a human question and it will run that question against many documents at once. And even before that, [Sheng et al](https://arxiv.org/abs/2303.06865) wrote a paper about the technique and published their code as [FlexGen](https://github.com/FMInference/FlexGen), though unfortunately for me, it doesn't support my Mac.
 
 
-Read on to hear the nonsense that led to this, or feel free to skip to the [technical stuff](#layer-wise-inferencing)!
+Read on to hear the nonsense that led to this, or feel free to skip to the [technical stuff](#an-llm-is-made-of-layers)!
 
 
 
@@ -71,20 +73,20 @@ It is unknown whether anyone has beaten the record set back then, and it is unkn
 When I heard about the [Florabama Mullet Toss](https://www.florabama.com/mullet-toss), I knew I _had to_ find more weird events like this. Surely, there must be more!
 
 
-This is actually something *LLMs are good at*: crawling the web and interpreting webpages.
+This is actually something *LLMs are really good at*: crawling the web and interpreting webpages.
 
 
 ## The "Weird Event Finder"
 
-So I made a little tool which basically *asks ChatGPT and doublechecks via Google*, basically a poor-man's [retrieval-augmented generation](https://blogs.nvidia.com/blog/what-is-retrieval-augmented-generation/) approach:
+So a couple months ago, I made a little tool which basically *asks ChatGPT and doublechecks via Google*, basically a poor-man's [retrieval-augmented generation](https://blogs.nvidia.com/blog/what-is-retrieval-augmented-generation/) approach:
 
  * I type in a question, like "What are the most weird, interesting, obscure yearly events that happen in North Carolina?" [# Or other fun ones like "What are the weirdest annual llama-related events in the United States?"]
  * It feeds that to ChatGPT (which returns more hallucinations than actual events) which responds a CSV "possible event list" including name, city, state.
  * *For each possible event,* it:
     * Does a google search with the name, city, and state of the event, like: "Pirate Invasion Beaufort North Carolina".
     * *For each google result,* such as [thebeaufortpirateinvasion.com](https://www.thebeaufortpirateinvasion.com/) it:
-       * Gives the page text to ChatGPT and asks it, "Is this page describing an event?". If no, skip.
-       * It *asks it questions* like:
+       * Grabs the page text [# This part was fun to figure out: I had to print it to a PDF first then run a text extractor on it.] and give it to ChatGPT, asking, "Is this page describing an event?". If no, skip.
+       * *It asks more questions* like:
           * "Is this page describing one event, multiple events, or no events at all?"
           * "What's the event's name?"
           * "Does the event repeat every year?"
@@ -92,42 +94,34 @@ So I made a little tool which basically *asks ChatGPT and doublechecks via Googl
 It then takes the resulting list of event pages, and puts them on a webpage to ask me if they're weird enough and look legit.
 
 
-However, *this was very expensive.* Even with various optimizations, I was racking up $10 per night in OpenAI spending. And this was just a tiny weekend side-project, so it would be hard to justify spending *thousands of dollars* on GPUs to run models locally.
+However, *this was a bit expensive.* Even with various optimizations, I was racking up $10 per night in OpenAI spending. And this was just a tiny side-project, so it would be hard to justify spending *thousands of dollars* on GPUs to run models locally.
 
 
 It was unfortunate that my Macbook Pro only had 16gb of RAM, otherwise I could run an LLM locally. Alas, I would need _much_ more RAM to run a 70B LLM, [# A Q5-quantized 70B model would need 60gb of RAM, and Mac OS needs a lot of RAM for the OS, so we're talking a 64gb or 128gb Macbook Pro.] and the smaller LLMs just don't work as well.
 
-
-# Layer-wise Inferencing
 
 It's clear that I need more RAM so I can run an LLM locally.
 
 ...or do I?
 
 
-Recently, tools like lyogavin's [AirLLM](https://github.com/lyogavin/Anima/tree/main/air_llm) (and others) have emerged, which allow us to *run an LLM piece-by-piece*.
-
-Why load the entire huge model into VRAM, when we're only using a piece of it at a time? Let's just load whatever piece we need right now!
+First, some background on how LLMs work!
 
 
-Basically, *an LLM is divided into layers*.
+# An LLM is made of layers
 
-For example, The 68-gigabyte model [UNA-SimpleSmaug-34b-v1beta](https://huggingface.co/fblgit/UNA-SimpleSmaug-34b-v1beta) is actually 59 layers of 1.12 gigabytes each. 
-
-AirLLM does *layer-wise inferencing*: it loads one layer into VRAM, runs it, unloads it, and repeats, feeding each layer's "in-progress thought" tensor [#tensor] into the next.
-
-You could almost think of it as *streaming layers into VRAM* on-demand, and then quickly unloading to make room for the next layer.
-
-! Well, not technically VRAM. More recent Macs' Ram is actually [unified memory](https://www.xda-developers.com/apple-silicon-unified-memory/) which is directly accessible to the CPU, GPU, and the neural engine. But that shouldn't matter much here, these techniques should apply to any GPU setup.
+Basically, *an LLM is divided into layers*, like a cake. [# Or an onion, or an ogre.]
 
 
-A metaphor would be how your average steampunk chap-hop rapper scientist gets through his day:
+For example, The 68-gigabyte model [UNA-SimpleSmaug-34b-v1beta](https://huggingface.co/fblgit/UNA-SimpleSmaug-34b-v1beta) is actually 59 layers of 1.12 gigabytes each.
 
- * First, he puts on his time-traveling trousers and grabs tea leaves from his favorite victorian-era tea shop.
- * Then, he puts on his tea trousers, which let him turn the leaves into the finest tea possible.
- * Then, he puts on his [fighting trousers](https://www.youtube.com/watch?v=0iRTB-FTMdk) to turn the caffeine into a new diss track about Mr. B, a rival steampunk chap-hop rapper.
 
-[Professor Elemental](https://en.wikipedia.org/wiki/Professor_Elemental) doesn't wear all three trousers at once, _and neither should we._
+When an LLM does inferencing, [# "Inferencing" is predicting the next token in the LLM's response.] heres whats actually going on under the hood:
+
+ * It first turns the user input into an "in-progress thought" tensor. [#tensor]
+ * Then it feeds that in-progress thought into Layer 1 to get a slightly-more-developed in-progress thought.
+ * It then feeds that into Layer 2, and so on, 57 more times.
+ * After Layer 59, the LLM declares the in-progress thought to be complete, and decodes it as human-readable text.
 
 
 <slice>
@@ -135,6 +129,34 @@ A metaphor would be how your average steampunk chap-hop rapper scientist gets th
 
 Here, each layer produces a block of numbers that is fed into the next layer. You can kind of think of it as an "in-progress thought".
 </slice>
+
+# Layer-wise Inferencing from Disk
+
+Recently, tools like lyogavin's [AirLLM](https://github.com/lyogavin/Anima/tree/main/air_llm) (and others) have emerged, which allow us to *lazily load layers from disk into VRAM*. [# VRAM is your GPU's memory. An LLM can only read data that's in your VRAM.]
+
+After all, why load the entire huge model into VRAM, when we're only using a piece of it at a time? Let's just load whatever piece we need, right as we need it!
+
+
+You could almost think of it as *streaming layers into VRAM* on-demand, and then quickly unloading to make room for the next layer.
+
+! Well, not technically VRAM. More recent Macs' Ram is actually [unified memory](https://www.xda-developers.com/apple-silicon-unified-memory/) which is directly accessible to the CPU, GPU, and the neural engine. But that shouldn't matter much here, these techniques should apply to any GPU setup.
+
+
+This technique lets us run LLMs on much smaller VRAM. We only need about 2 gigabytes of VRAM now, not 68. [# The layer needs 1.12gb, and we also need a little space for the "in-progress thought" tensor.]
+
+
+<ignore>
+A metaphor would be how your average steampunk chap-hop rapper scientist gets through his day:
+
+ * First, he puts on his time-traveling trousers and grabs tea leaves from his favorite victorian-era tea shop.
+ * Then, he puts on his tea trousers, which let him turn the leaves into the finest tea possible.
+ * Then, he puts on his [fighting trousers](https://www.youtube.com/watch?v=0iRTB-FTMdk) to turn the caffeine into a new diss track about Mr. B, a rival steampunk chap-hop rapper.
+
+[Professor Elemental](https://en.wikipedia.org/wiki/Professor_Elemental) doesn't wear all three trousers at once, _and neither should we._
+</ignore>
+
+
+<slice/>
 
 # ...is really slow
 
@@ -145,7 +167,7 @@ If a "token" is a word, then the average human can speak 100-150 tokens per minu
 AirLLM gives us... 2 tokens per minute. Very slow indeed.
 
 
-...which makes sense, really. It needs to load 59 layers from RAM for every single token. [# You'd be slow too if you had to cycle through 59 trousers every time you wanted to say a word.]
+...which makes sense, really. It needs to load 59 layers from disk for every single token. [# You'd be slow too if you had to cycle through 59 layers every time you wanted to say a word.]
 
 
 Even for my use case, that's a bit too slow. Even if I only used AirLLM for only the yes-or-no questions (like "Does this event happen every year?"), it would only be able to doublecheck one possible event every 42 minutes. [# 30 seconds x 7 search results x 12 questions per result = 42 minutes.]
@@ -154,16 +176,51 @@ Even for my use case, that's a bit too slow. Even if I only used AirLLM for only
 This is roughly the consensus today: *you can't really run large models on regular computers,* it's just too slow.
 
 
-# We can speed it up!
+# Adding Batching
 
-"Batching" is a well-known strategy, for various other use cases.
+The final approach would later involve adding batching to this "layer-wise inferencing from disk" approach.
 
-For example, one could load a 68-gigabyte model onto three RTX A5000s (each has 24gb memory), and do inferencing on multiple prompts at a time, using llama.cpp's --parallel flag or HuggingFace's Accelerate's `batch_size` parameter.
+So what's batching?
+
+
+"Batching" is a strategy where we do inferencing on *multiple prompts at the same time.*
+
+
+For example, we can ask our LLM these 5 questions at the same time:
+
+ * Is the sky blue?
+ * Do cats have nine legs?
+ * Is 2 + 5 = 7?
+ * If x = 4, is x/2 = 2?
+ * Is Minnesota the capital of Maine?
+
+
+And it turns each of those into an in-progress thought. We now have 5 in-progress thoughts at the same time.
+
+
+Then, it runs all of those through Layer 1. Now we have 5 slightly-more-developed in-progress thoughts.
+
+
+Then, we repeat 58 more times.
+
+
+Then, we decode all 5 in-progress thoughts into our answers:
+
+ * Yes
+ * No
+ * Yes
+ * Yes
+ * No
+
+
+Batching already exists, of course! This is what llama.cpp's `--parallel` flag does, and what HuggingFace's Accelerate's `batch_size` parameter does.
 
 It's also common practice to use batching when training a model, for example DeepSpeed's [train_batch_size](https://www.deepspeed.ai/docs/config-json/) parameter.
 
+However, those require that the entire model be loaded, into this machine's memory or distributed in other machines' memory.
 
-However, those require that the entire model be loaded, into this machine's memory or distributed in other machines' memory. We only have one machine with relatively little VRAM.
+
+And alas, I have only one machine, with relatively little VRAM.
 
 
 So, it seemed I had a few options:
@@ -197,15 +254,18 @@ More detailed benchmarks:
  * 2426.11s for 500-prompt batch, 4.85222 seconds per token
 
 
+And the best part is that this works on my little 16gb Mac, I don't have to go out and buy a graphics card or something with a lot more memory.
+
+
 # How can the rest of us do this?
 
-If you want to do something like this, I recommend looking into [FlexGen](https://github.com/FMInference/FlexGen), which likely does this _way_ better than my hacked AirLLM did. It even uses some slick linear programming techniques to determine the best batch sizes.
+If you want to do something like this, I recommend looking into [FlexGen](https://github.com/FMInference/FlexGen), which likely does this _way_ better than my modified AirLLM did. It even uses some slick linear programming techniques to determine the best batch sizes.
 
 
 ! Linear programming is different from linear types, about which I [posted another article today](/blog/higher-raii-uses-linear-types)!
 
 
-On top of that, AirLLM leaves a lot of performance on the table: [#blockwise] It doesn't load the next layer ahead of time, even if there's room for it. It waits until inferencing is done. If it loaded the next layer while we did inferencing on this one, we could get those faster times (like 4.85s) on much smaller batch sizes than 500.
+On top of that, AirLLM leaves some performance on the table: it doesn't load the next layer ahead of time, even if there's room for it. It waits until inferencing is done. If it loaded the next layer while we did inferencing on this one, we could get those faster times (like 4.85s) on much smaller batch sizes than 500. [#blockwise]
 
 
 <slice>
@@ -236,7 +296,7 @@ Hopefully, it's only a matter of time before libraries better support this use c
 Thanks for reading! I hope you enjoyed this post. It was a wild ride, and I'm glad I get to share it with you all.
 
 
-Donations and sponsorships for Vale are currently paused, but if you like these articles, please [Donate to Kākāpō Recovery](https://www.doc.govt.nz/kakapo-donate) and let me know! I love those birds, let's save them!
+Donations and sponsorships are currently paused, but if you like these articles, please [Donate to Kākāpō Recovery](https://www.doc.govt.nz/kakapo-donate) and let me know! I love those birds, let's save them!
 
 
 Cheers,
