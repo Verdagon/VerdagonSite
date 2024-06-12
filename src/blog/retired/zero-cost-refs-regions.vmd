@@ -273,7 +273,8 @@ With our `Mutexes` and region markers, the compiler can give us free, zero-cost 
 ////
 ```vale
 func templar(
-    inAstMutex &Mutex<InAst>) {
+    inAstMutex &Mutex<InAst>)
+Mutex<OutAst> {
   inAstLock = inAstMutex.openro();
   inAst = inAstLock.contents;
 
@@ -402,7 +403,7 @@ i' {
 
 # Next Steps
 
-Vale's regions give the programmer incredible flexibility on where and how to optimize their code. Because Vale makes it so much easier to do this kind of optimization, Vale programs could be have performance rivaling even C++.
+Vale's regions give the programmer incredible flexibility on where and how to optimize their code. Because Vale makes it so much easier to do this kind of optimization, Vale programs could have performance rivaling even C++.
 
 Over the next year or two, we'll be trying these out, as well as some other ideas on cutting down the reference-counting overhead. Regions and single ownership have never been combined in this way, so we're discovering new potential every day.
 
