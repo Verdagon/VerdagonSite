@@ -155,7 +155,7 @@ If you're curious for more, check out this [Developer Voices episode](https://ww
 
 *4: Arena-only programming* is where we never use malloc or free, and [always use arenas instead](https://www.rfleury.com/p/untangling-lifetimes-the-arena-allocator), even for function returns. This is a familiar paradigm to users of C, Ada, Zig, and especially Odin which has a way to [automatically decouple code from allocator strategy](https://odin-lang.org/docs/overview/#implicit-context-system).
 
-As described, this is more of a memory _management_ approach than a memory _safety_ approach. However, [Cyclone](https://en.wikipedia.org/wiki/Cyclone_(programming_language) and [Ada/SPARK](https://en.wikipedia.org/wiki/SPARK_(programming_language) show us that we can track which pointers are pointing into which arenas, to prevent any use-after-frees. [Verona](https://github.com/microsoft/verona) shows us that by combining arenas with regions (described below), we can take things even further. [# We could also combine arena-only programming with generational references, regions, constraint references, or MMM++.] 
+As described, this is more of a memory _management_ approach than a memory _safety_ approach. However, [Cyclone](https://en.wikipedia.org/wiki/Cyclone_(programming_language%29) and [Ada/SPARK](https://en.wikipedia.org/wiki/SPARK_(programming_language%29) show us that we can track which pointers are pointing into which arenas, to prevent any use-after-frees. [Verona](https://github.com/microsoft/verona) shows us that by combining arenas with regions (described below), we can take things even further. [# We could also combine arena-only programming with generational references, regions, constraint references, or MMM++.] 
 
 
 <slice />
