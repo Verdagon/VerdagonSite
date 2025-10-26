@@ -12,6 +12,14 @@ namespace: c-blog m-annotated
 ! Also posted today: [Layer-wise inferencing + batching: Small VRAM doesn't limit LLM throughput anymore](/blog/llm-throughput-not-ram-limited), on how even a normal small computer can now run huge LLMs, much more quickly!
 
 
+<ignore>
+More uses:
+
+ * Remember to shut off a motor
+ * If you call update() on CoreData but it wont happen until you flush(), update() should return a RememberToFlush linear type that can only be consumed by flush() or forgetOnPurpose().
+</ignore>
+
+
 Can you spot the problem in each of these comments?
 
 `// Remember to update the database row with the new status.`
@@ -28,6 +36,9 @@ We'd love a way to guarantee that we remember to do something. Unfortunately, to
 
 
 But hark! We can change that, with *Higher RAII*, a technique where we use linear types that can only be destroyed in certain places.
+
+
+<div style="text-align: center"><img src="/images/asciigoblins.png" width="100%"/></div><div style="opacity: .8; text-align: center"><a href="https://youtu.be/UavYVf0UEoc?t=2246">Goblins like linear types and gardening.</a></div>
 
 
 # What's a linear type?
@@ -352,20 +363,10 @@ So I did two things:
 Now, removing from `levelGoblins` will give us not only the `Goblin`, but also the linear `GoblinInCacheToken`, and the only way to get rid of the `GoblinInCacheToken` is to hand it to `removeGoblinRefFromCache`.
 
 
-Suddenly, we've *statically guaranteed* that we'll always remove from both the list and the cache! [#easter]
+Suddenly, we've *statically guaranteed* that we'll always remove from both the list and the cache!
 
 
-<slice>
-#easter: Easter egg note!
-
-[Cher Ami](https://en.wikipedia.org/wiki/Cher_Ami) was a carrier pigeon during World War I that served with the U.S. Army Signal Corps. Despite being shot and wounded by enemy fire, Cher Ami showed remarkable bravery and grit, delivering a crucial message that saved the lives of a trapped American battalion.
-
-Cher Ami was awarded the Croix de Guerre, a French military honor, for her bravery.
-
-If you read this note, sneak the word "pigeon" into a comment [try to sound sane](https://youtu.be/-UBgNREvlIo), to be awarded the highest honor I can bestow.
-
-(Cheers to [cbsmith](https://news.ycombinator.com/item?id=36691658), [kubanczyk](https://news.ycombinator.com/item?id=36692089), [TheGoldenMinion](https://www.reddit.com/r/programming/comments/14wu830/comment/jrklcry/?utm_source=reddit&utm_medium=web2x&context=3), [lovich](https://news.ycombinator.com/item?id=36691564), [padraig_oh](https://www.reddit.com/r/programming/comments/14wu830/comment/jrkmjiw/?utm_source=reddit&utm_medium=web2x&context=3), and [leksak](https://news.ycombinator.com/item?id=36691737) for the [last one](/blog/easter-egg-notes)!)
-</slice>
+<slice/>
 
 ## Get the Result of a Thread or Future
 
@@ -398,11 +399,12 @@ async function determineAction(
   const shoutPromise: Promise<string> =
     callGPU("taunt", goblin.personality);
 
-  // Expensive!
+  // Some expensive pathfinding
   const path: Location[] =
     findPathAStar(
       level, goblin.loc, player.loc);
 
+  // Bug here!
   return new FollowPathAction(path);
 }
 ```
@@ -413,12 +415,12 @@ While that's going, we're doing some expensive pathfinding, to figure out if the
 
 
 Then at the end, we return what the goblin should do this turn.
->>>>
 
 
 *But wait! There's a bug here!*
 
 We sent the request to the GPU, but forgot to actually _use_ the result.
+>>>>
 
 
 <<<<
@@ -646,10 +648,20 @@ I sometimes wish there was something like this for real life.
 
 Alas, I didn't make the decision, and so the default action was taken: my membership was renewed.
 
-Truly, life would be better with Higher RAII.
+Truly, life would be better with Higher RAII. [#halp]
 
 
-<slice />
+<slice>
+#halp: No! The grimoire is compelling me to write this article and spread *the curse.*
+
+Heed my words, _never use Higher RAII,_ lest you be cursed to see all the places in other languages' code where it could have been used to prevent a bug.
+
+Every time you see the words "remember to", "forget", or "responsible for" in comments or design discussions, you'll see another place that Higher RAII could have helped.
+
+Even among friends you will be alone, the only one able to see the spirits of bugs prowling, knowing their inevitability yet being powerless to prevent them, [limited by the technology of your time](https://www.youtube.com/watch?v=6AcbHiJtbcM). Such is the curse. Such is our fate.
+
+I hesitate to spread it to you, my dear readers, but I am compelled by the grimoire and am powerless to stop. I takes all my strength to merely put this side note in, hoping that someone sees it and spreads my warning.
+</slice>
 
 ## Prevent Leaks
 
@@ -794,7 +806,7 @@ Let's make a special `LinearHashMap` with these three adjustments:
 `get` can return a `&Spaceship` instead of an `Option<&Spaceship>` because if the given `LinearKey` still exists, then we know that the `Spaceship` is still in the hash map.
 
 
-This isn't _completely_ immune to problems: we'd still have a bug if we give one map's LinearKey to another map. Solving that will require a little more effort. [# We can make the LinearKey bound to the map's lifetime, or we can use an assertion, or make a different type for every map, or there are a few other solutions out there.]
+This isn't _completely_ immune to problems: we'd still have a bug if we give one map's LinearKey to another map, and a language that can recover from panics will have weakened guarantees here. [# Specifically, some panic unwinding might destroy either the hash map or the key, causing a mismatch.] Solving these will require a little more effort. [#keysolns]
 
 
 ! This is kind of similar to the cache invalidation example. In the cache invalidation example, we used Higher RAII to enforce consistency between two maps. In this example, we're using it to know an ID isn't dangling.
@@ -832,14 +844,18 @@ This _might_ also include the "linear reference counting" idea mentioned in [the
 </ignore>
 
 
-<slice />
+<slice>
+#keysolns: For the first problem, we can make the LinearKey bound to the map's lifetime, or we can use an assertion, or make a different type for every map, or there are a few other solutions out there.
+
+The second problem isn't so bad, but `get` might want to panic if the key isn't found. I _suspect_ there's other solutions here that could prevent this problem.
+</slice>
 
 # Can other languages add Higher RAII?
 
 Yes! It generally fits most cleanly into single-ownership-based languages (C++, Rust, Austral, Mojo, Carbon, CppFront, etc.), and Haskell shows us that GC'd languages could have luck too.
 
 
-To walk this path, there are a few steps a language has to follow.
+To walk this path, there are some steps a language has to follow.
 
 
 First, let's address *exceptions, panics, and async cancellation*. The reason that regular RAII requires a zero-argument destructor is that an in-flight exception (or panic, or `async` task cancellation) will unwind the stack, destroying everything in its path. [# Exceptions are rather rude, aren't they? You're just having a nice time talking with your fellow local variables and then an exception bursts into the room and starts destroying everything.] To do this, it calls a zero-argument destructor or `drop()` function. So what does an in-flight exception do for a linear type?
@@ -864,32 +880,31 @@ This can require some standard library changes: a function like [std::vector<T>:
 
 In Vale, that function instead returns the popped element, so the caller can decide what to do with it.
 
-As [Aria Beingessner wrote](https://faultlore.com/blah/linear-rust/), this is the main reason that Rust would have difficulty adding linear types: the entire existing ecosystem already assumes that it can drop given types. [# The rest of their post is really good too. Though my experience with Vale shows me that linear-type-enabled generics are more ergonomic than they suggest, once you have the right patterns in place.]
+As [Aria Beingessner wrote](https://faultlore.com/blah/linear-rust/), this is the main reason that Rust would have difficulty adding linear types: the entire existing ecosystem already assumes that it can drop given types. [# The rest of their post is really good too. Though my experience with Vale shows me that linear-type-enabled generics are more ergonomic than they suggest, once you have the right patterns in place.] [#valerust] The same would likely apply to C++.
 
 
 Third, *reconcile it with the aliasing* introduced by reference counting or garbage collection. One would assume that a reference-counted type can't have Higher RAII, but that's not true: we just need a single reference to be designated as the linear reference. This is similar to how `unique_ptr`, constraint references (from [the grimoire](/grimoire/grimoire#the-list)), and generational references work: one reference is a special "owning reference".
 
 
-Fourth, [send me an email](mailto:verdagon_epsa@verdagon.dev), because there's a lot of interesting hidden design decisions to be made about whether a _type_ is linear, or *our _usage_ of a type is linear.*
+Fourth, *figure out globals*. There's a lot of potential solutions to this one, [# I'm curious about potentially requiring `main` to initialize and destroy globals explicitly, and call the "global constructors" for all dependencies (which would presumably then call _their_ dependencies' global constructors and so on). Lot's of interesting benefits and drawbacks to explore on that one.] for example just requiring all globals be non-linear, or requiring a destroyer function for any linear globals. [# Last resort, one can just make the global an `Option`, empty it from inside `main`, and have the global's destroyer function just assert it's empty.]
+
+
+Fifth, *[send me an email](mailto:verdagon_epsa@verdagon.dev)*, because there's a lot of interesting hidden design decisions to be made about whether a _type_ is linear, or our _usage_ of a type is linear.
 
 These design decisions go straight to the original definition of linear types and affect, for example, whether `linear struct` literally means "a linear struct", or whether it just means "a `drop()`-less struct", a subtle distinction that can have quite a few benefits and tradeoffs.
 
 I hope to write an article about this at some point, but I am compelled by unholy sorcery to complete [the grimoire](/grimoire/grimoire) first.
 
 
-Ironically, there's a chance that by adding Higher RAII to Vale, I might also be indirectly adding it for Rust: I _may_ have found a way that Vale can automatically and seamlessly call directly into Rust libraries, without user-written bindings, even though Rust doesn't have a stable ABI.
-
-If I'm right, then it'll be possible to use Vale's existing Higher RAII with Rust libraries, just by reinterpreting external Rust types as linear, or by wrapping the external Rust types in linear Vale structs. I hope to prototype this over the next several months, so stay tuned! [#crust] [#lvr]
-
-
 <slice>
-#crust: I hope to get this working for C too, though it wouldn't be quite as seamless or automatic: we'd have to do some special pattern rules in a Makefile or something for it to work nicely.
+#valerust: Though, ironically, there's a chance that by adding Vale's Rust FFI, I might be indirectly adding Higher RAII to Rust: I _may_ have found a way that Vale can automatically and seamlessly call directly into Rust libraries, without user-written bindings, even though Rust doesn't have a stable ABI.
 
-
-#lvr: There might be some interesting constraints here.
+It would have some interesting constraints:
 
  * We'd only be allowed to put non-`linear` Vale structs inside Rust structs.
  * If we reinterpret a Rust struct as linear, we wouldn't be able to move it into a Rust function (which might `drop` it).
+
+but if it works, then Vale could just reinterpret external Rust types as linear, or wrap the external Rust types in linear Vale structs. I hope to prototype this over the next several months, so stay tuned!
 </slice>
 
 
@@ -942,7 +957,7 @@ This is so important that one of Zig's core principles is that [there should be 
 
 <slice />
 
-## Benefit: Makes your API twice as easy to use
+## Benefit: Makes your API twice as easy to use correctly
 
 The second extra benefit is that a function can help your future self, not just your past self.
 
@@ -1048,6 +1063,16 @@ Cheers,
 - Evan Ovadia
 
 
+<slice new-color="afterword"/>
+
+# Thank you!
+
+I want to give a huge thanks to [Arthur Weagel](https://github.com/aweagel), [Kiril Mihaylov](https://github.com/KirilMihaylov), [Radek Miček](https://github.com/radekm), [Geomitron](https://github.com/Geomitron), [Chiuzon](https://github.com/chiuzon), [Felix Scholz](https://github.com/soupertonic), [Joseph Jaoudi](https://github.com/linkmonitor), [Luke Puchner-Hardman](https://github.com/lupuchard), [Jonathan Zielinski](https://github.com/tootoobeepbeep), [Albin Kocheril Chacko](https://github.com/albinkc), [Enrico Zschemisch](https://github.com/ezschemi), [Svintooo](https://github.com/Svintooo), [Tim Stack](https://github.com/tstack), [Alon Zakai](https://github.com/kripken), [Alec Newman](https://github.com/rovaughn), [Sergey Davidoff](https://github.com/Shnatsel), [Ian (linuxy)](https://github.com/linuxy), [Ivo Balbaert](https://github.com/Ivo-Balbaert/), [Pierre Curto](https://github.com/pierrec), [Love Jesus](https://github.com/loveJesus), [J. Ryan Stinnett](https://github.com/jryans), [Cristian Dinu](https://github.com/cdinu), and [Florian Plattner](https://github.com/lasernoises) (plus a very generous anonymous donor!) for sponsoring Vale over all these years.
+
+Your support has always given me the strength and resolve to explore these arcane corners of the world. And even though I'm not doing sponsorships for a while, it's awesome to know you're with me in spirit. [Axes high!](http://www.gamesurge.com/pc/strategy/pc_wt/Adom.shtml)
+
+
+
 <ignore>
 # The Curse of Knowing Higher RAII
 
@@ -1057,25 +1082,10 @@ Never read the [essays of rationality](https://www.lesswrong.com/posts/WusBwpQL5
 
 Never learn how to [build a programming language](https://craftinginterpreters.com/), or you'll be lost wandering the forgotten realms of programming possibilities for a decade or more. [# Definitely not speaking from experience here.]
 
-And never use linear types, lest you discover Higher RAII, and see all the places where it could have been used to prevent a bug.
-
-
-I've used Higher RAII in Vale, and I have been cursed. Now, every time see the words "remember to", "forget", or "responsible for" in comments or design discussions, I see another place that linear types and Higher RAII could help.
-
-
-I hesitate to spread the curse to you, my dear readers, but I am compelled by the [grimoire](/grimoire/grimoire) and am powerless to stop.
 </ignore>
 
 
 <ignore>
-<slice new-color="afterword"/>
-
-# Thank you!
-
-I want to give a huge thanks to [Arthur Weagel](https://github.com/aweagel), [Kiril Mihaylov](https://github.com/KirilMihaylov), [Radek Miček](https://github.com/radekm), [Geomitron](https://github.com/Geomitron), [Chiuzon](https://github.com/chiuzon), [Felix Scholz](https://github.com/soupertonic), [Joseph Jaoudi](https://github.com/linkmonitor), [Luke Puchner-Hardman](https://github.com/lupuchard), [Jonathan Zielinski](https://github.com/tootoobeepbeep), [Albin Kocheril Chacko](https://github.com/albinkc), [Enrico Zschemisch](https://github.com/ezschemi), [Svintooo](https://github.com/Svintooo), [Tim Stack](https://github.com/tstack), [Alon Zakai](https://github.com/kripken), [Alec Newman](https://github.com/rovaughn), [Sergey Davidoff](https://github.com/Shnatsel), [Ian (linuxy)](https://github.com/linuxy), [Ivo Balbaert](https://github.com/Ivo-Balbaert/), [Pierre Curto](https://github.com/pierrec), [Love Jesus](https://github.com/loveJesus), [J. Ryan Stinnett](https://github.com/jryans), [Cristian Dinu](https://github.com/cdinu), and [Florian Plattner](https://github.com/lasernoises) (plus a very generous anonymous donor!) for sponsoring Vale over all these years.
-
-Recent events have forced me to stop coding Vale for a while and led me to pause donations and sponsorships, but your support all this time is still giving me spirit and strength! Things are looking up, and I hope to be back soon.
-
 
 
 
@@ -1202,9 +1212,6 @@ vector<int> primeFactors(int n) {
 expand in another article:
 
 ### Type-State Pattern
-
-
-
 
 Let's show another example of the type-state pattern, and then show how Higher RAII unlocks its next step.
 

@@ -1,14 +1,208 @@
+---
+title: How To Master Your Project's First 150,000 Lines
+author: Evan Ovadia
+date: May 2, 2023
+realm: blog
+path: blog/first-100k-lines
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+<ignore>
+TODO:
+ * mention somewhere that if you do accrue tech debt, do it in a branch. but also, if the branch gets too big and there's some structural tech debt, it might still be a good idea to resolve it at a nice stopping point.
+</ignore>
 
 
 
-The last one, 100,000 lines, was about some technical tips and tricks for surviving. This one is going to be about how to survive mentally.
+
+After many years of development, the Vale compiler just passed its 150,000th line of code! [# Specifically, including test cases, standard library, and the bigger test programs like [ValeRLPrototype](https://verdagon.itch.io/vale-prototype) and the site generator and their supporting libraries.]
+
+
+This is an article about how we kept it from *collapsing under its own weight and exploding*, as many projects do.
+
+
+This is a followup to the [first 100,000 lines](/blog/first-100k-lines) article from a year ago, which mostly emphasized testing and documentation and other tactical tips and tricks.
+
+This one is more strategic, talking about 
+
+The last one, 100,000 lines, was about some tactical tips and tricks for surviving. This one is going to be about broader strategies.
 
 
 
+ * "Evan, you're solving the wrong problem."
+ * "Evan, your idea probably doesn't work."
+ * "Evan, your idea works but there's a better one out there."
+
+
+# Stuff
+
+
+
+You can notice these in teammates too, but be careful not to mind-read: human minds are surprisingly non-predictable.
+
+
+
+maybe talk about exploratory safety, via tests and static typing? maybe also acknowledge that its easy to go overboard and make your codebase too taut? or dont, thats kind of an arcane detail.
+
+
+
+maybe also mention that if you leave enough breadcrumbs talking about the unintuitive stuff, then youll feel a sense of its-possible when in some new area of the codebase. you know you can just keep reading these notes until you *understand* the complexities of whats involved.
+
+
+
+maybe also emphasize the psychological importance of intermediate milestones?
+
+
+
+# Always consider other options
+
+In [Crossing the Impossible FFI Boundary, and My Gradual Descent Into Madness](https://verdagon.dev/blog/exploring-seamless-rust-interop-part-2), I knew I was going down a rather insane path.
+
+> "Before I even started with this overload resolution, I _knew in my bones_ that I was standing on the edge of sanity, and the only path forward was through that forest of madness and that fiery chasm of sheer and utter folly and so on.
+
+> So before I started implementing it, I also [lit the beacons](https://www.reddit.com/r/AskHistorians/comments/rzi7go/were_fire_signals_actually_used_like_in_lord_of/) and *called for aid.* In other words, I [posted on the Rust internals forum](https://internals.rust-lang.org/t/different-way-to-call-into-rust-from-other-languages/20912), sent a couple emails, etc."
+
+
+And someone replied with a suggestion that _massively_ reduced the compiler's complexity in that area.
+
+
+In that post, I said that the moral of the story was to always be searching for a simpler approach than the one you're currently implementing.
+
+
+# ...even when your idea is amazing.
+
+*However,* too often, we only look for other options when our current approach gives us that "spidey sense" that our approach might not be perfect.
+
+
+*Don't rely on that feeling.*
+
+
+For big enough decisions, _always_ look for better approaches. Even if you think your solution is perfect.
+
+
+I've found that my software architecture effectiveness has been directly correlated with how hard and how often I search for simpler approaches.
+
+
+# First Idea Syndrome
+
+"Sure, always be searching for better approaches," I hear you say, "that's obvious!"
+
+
+But it's a lot harder than it sounds, because of something I call *First Idea Syndrome.*
+
+
+Often, I had to think for _days_ to find a solution to a problem, especially if the problem is in the Vale compiler's generics and overload resolution logic.
+
+Then, when I finally found the solution, I would get _so excited_ that I immediately dive in and implement it.
+
+
+Nowadays, I don't immediately dive in. I write it down, flesh it out, and then I administer *the cure* for First Idea Syndrome.
+
+What's the cure?
+
+
+It's to pretend the idea was actually not that great, and *convince myself that there's a better solution out there.* [# I also mentioned this trick in the context of coming up with new memory safety models, in the [Memory Safety Grimoire](/grimoire/grimoire).]
+
+
+That's usually enough to shake me out of it, and I hope it works for you too! [# Fun fact, this is also a great tactic in interviews.]
+
+
+! Also, check out [The Proper use of Humility](https://www.lesswrong.com/posts/GrDqnMjhqoxiqpQPw/the-proper-use-of-humility) by Eliezer Yudkowsky, where he talks about the difference between humility and social modesty.
+
+
+<ignore>
+Your skill lies in the ability to find other options.
+
+Unfortunately, we too often get blinded by our first option.
+
+it's similar to "NIH" syndrome where we too highly value our own ideas. ironically, it can blind us to our next--possibly even better--idea.
+
+personally, this happened a lot to me a long time ago. I was so enamored with borrow checking that I couldn't figure out anything else to do. I was "Rust-blind". That's what happens when an idea is so good: you can't see its imperfections. Luckily I had another good practice.
+</ignore>
+
+
+
+# Always make sure you're solving the right problem.
+
+This is arguably even more important than the last one.
+
+
+The real skill is in knowing _when_ to do this. When you learn this, it's not just to be able to look back and categorize your mistakes and have a name for them. It's about _preventing_ them in the first place.
+
+When you're over 15 minutes into a refactor, back up.
+
+This is really hard when you have momentum. Sometimes you just keep charging ahead.
+
+
+
+# Document your impactful or difficult decisions
+
+Write your logic out, step by step, as if you were talking to a newbie. This is _incredibly important_ because it forces you to revisit every logical step that led to this tricky decision.
+
+Bonus: This ends up as great documentation that you can link to from everywhere that this decision touches.
+
+
+# Be open on more levels to criticism
+
+It's easy to have a bias, we all have them.
+
+It's really hard to admit you have a bias.
+
+It's _almost impossible_ to actually counteract that bias. Even mindfulness meditation isn't enough, one has to train a certain "inner compassion". There are certain cognitive science and psychology techniques (such as IFS) that emphasize this, and it's incredibly powerful outside of those settings as well.
+
+
+
+
+# Know Your Own Biases
+
+
+
+
+# You Are Not Alone
+
+Blog. Seriously, blog. It's incredibly isolating working on something 
+
+
+
+# Give Banana
+
+
+
+
+Oddly enough, 
+
+
+
+Every couple weeks, you get a paycheck, and it probably gets directly deposited into your bank account. An abstract number becomes a bigger abstract number. And we know that that's a good thing.
+
+
+Humans and Chimpanzees have [98.8% identical DNA](https://www.amnh.org/exhibitions/permanent/human-origins/understanding-our-past/dna-comparing-humans-and-chimps).
+
+You can train a chimp with bananas. But if you try to train them with abstract numbers, they'll screech at you as if to say "Fuck you, give banana!"
+
+Underneath our abstract-thinking brains, we are still monkeys deep down.
+
+
+For millions of years, we evolved to appreciate certain things: praise, bananas, sharp sticks, etc.
+
+
+
+
+And if you increase an abstract number for a chimp, they'll
+
+
+
+
+However, try giving 
+
+
+We share 98.8% of our DNA with chimps.
 
 
 Like I said in part 1, use *intermediate, useful, cohesive goals*.
 
+We all have an inner monkey that shouts, "Fuck you, give banana." It doesn't want money, it wants something our mammal-brain can understand: something tangible, or acceptance from a group, or a hug.
 
 - forgive yourself for being exhausted and adding some tech debt, but remember, pay it down before the next feature. know your own track record and be honest with yourself.
 - do all the tips in the 100k article
@@ -17,14 +211,74 @@ Like I said in part 1, use *intermediate, useful, cohesive goals*.
 
 
 
+
+# Fundamentally flawed idea? Keep it around!
+
+The most promising ideas are the ones that seem fundamentally flawed in only one or two ways.
+
+
+in the grimoire, one would discount some of the ideas:
+
+ * linear RC doesn't quite work in the presence of panics
+ * stack arenas does too much copying
+ * regions never *quite* solved things.
+
+it's really easy to discard ideas as _fundamentally worthless_ because they don't work. their flaws seem utterly disqualifying.
+
+train yourself to recognize that particular impulse. it's extremely common in us engineers, a lot of us are very black-and-white thinkers.
+
+to me, these are "almost jackpots". they are _clues._ each one is a *holy grail whose key is still lost* to the sands of time. If we can find it, we can achieve glory yet unimagined.
+
+the solution will be out there. scribbled in the margins of an ancient scroll, hidden in the whispers of an overheard conversation, or perhaps drifting in a memory of something said long ago in your past. [# Regions' solution was found while staring at the wall of a georgian AirBnB called Ole Mexico]
+
+
+
+ * if we have a fallback for when panics could happen, then linear RC could excel. for example, fall back to RC or gen refs.
+ * stack arenas could be paired with a ton of other strategies in the grimoire to make something really cool i think.
+ * with the later parts of the regions design, and with the unification, it could actually really shine.
+
+and someone out there has the solution.
+
+
+I leave you with some abridged [writings by Eliezer Yudkowsky](https://hpmor.com/chapter/81) that always inspire me to keep looking: [# "The Lords and Ladies of the Wizengamot are departing their wooden benches, leaving as they came, looking rather nervous."] [# "The vast majority are thinking 'The Dementor was frightened of the Boy-Who-Lived!'"] [# "Some of the shrewder ones are already wondering how this will affect the delicate power balance of the Wizengamot - if a new piece has appeared upon the gameboard."] [# "Almost none are thinking anything along the lines of 'I wonder how he did that.'"]
+
+> This is the truth of the Wizengamot: Many are nobles, many are wealthy magnates of business, a few came by their status in other ways. [# "Some of them are stupid."] Most are shrewd in the realms of business and politics, but their shrewdness is circumscribed. Almost none have walked the path of a powerful wizard. They have not read through ancient books, scrutinized old scrolls, searching for truths too powerful to walk openly and disguised in conundrums, hunting for true magic among a hundred fantastic fairy tales. When they are not looking at a contract of debt, they abandon what shrewdness they possess and relax with some comfortable nonsense. [# "They believe in the Deathly Hallows, but they also believe that Merlin fought the dread Totoro and imprisoned the Ree."] They know (because that too is part of the standard legend) that a powerful wizard must learn to distinguish the truth among a hundred plausible lies. But it has not occurred to them that they might do the same. [# "(Why not? Why, indeed, would wizards with enough status and wealth to turn their hands to almost any endeavor, choose to spend their lives fighting over lucrative monopolies on ink importation? The Headmaster of Hogwarts would hardly see the question; of course most people should not be powerful wizards, just as most people should not be heroes. The Defense Professor could explain at great and cynical length why their ambitions are so trivial; to him, too, there is no puzzle. Only Harry Potter, for all the books he has read, is unable to understand; to the Boy-Who-Lived the life choices of the Lords and Ladies seem incomprehensible - not what a good person would do, nor yet an evil person either. Now which of the three is most wise?)"]
+
+> For whatever reason, then, most of the Wizengamot has never walked the path that leads to powerful wizardry; they do not seek out what is hidden. For them, there is no why. There is no explanation. There is no causality. [# "The Boy-Who-Lived, who was already halfway into the magisterium of legend, has now been promoted all the way there; and it is a brute fact, simple and unexplained, that the Boy-Who-Lived frightens Dementors."] Ten years earlier they were told that a one-year-old boy defeated the most terrible Dark Lord of their generation, perhaps the most evil Dark Lord ever to live; and they just accepted that too. [# "You are not meant to question that sort of thing (they know in some unspoken way). If the most terrible Dark Lord in history, confronts an innocent baby - why, how could he not be vanquished? The rhythm of the play demands it. You are supposed to applaud, not stand up from your seat in the audience and say 'Why?' It is just the story's conceit, that in the end the Dark Lord is brought down by a little child; and if you are going to question that, you might as well not attend the play in the first place."] [# "It does not occur to them to second-guess the application of such reasoning to the events they have seen with their own eyes in the Most Ancient Hall. Indeed, they are not consciously aware that they are using story-reasoning on real life. As for scrutinizing the Boy-Who-Lived with the same careful logic they would use on a political alliance or a business arrangement - what brain would associate to that, when a part of the legendary magisterium is at hand?"]
+
+> But there are a very few, seated on those wooden benches, who do not think like this.
+
+> There are a certain few of the Wizengamot who have read through half-disintegrated scrolls and listened to tales of things that happened to someone's brother's cousin, not for entertainment, but as part of a quest for power and truth. They have already marked the Night of Godric's Hollow, as reported by Albus Dumbledore, as an anomalous and potentially important event. They have wondered why it happened, if it did happen; or if not, why Dumbledore is lying.
+
+> And when an eleven-year-old boy rises up and says "Lucius Malfoy" in that cold adult voice, and goes on to speak words one simply would not expect to hear from a first-year in Hogwarts, they do not allow the fact to slip into the lawless blurs of legends and the premises of plays.
+
+> They mark it as a clue.
+
+> They add it to the list. [# I'm secretly convinced Eliezer Yudkowsky is a wizard himself, just giving us hidden clues to the true nature of the universe and human consciousness.]
+
+
+The answer is out there, my friends.
+
+We just have to believe it, and keep our eyes open!
+
+
+
+
+
+
+
+
+
+<ignore>
+
+
 # Don't Blindly Follow Best Practices
 
 When I was at Google, we had some accepted best practices:
 
- * A/B test everything.
- * Have everything reviewed by someone else. 
  * Add a _lot_ of unit tests.
- * Focus on scalability and reliability before doing _anything_.
+ * A/B test everything.
+ * Have everything reviewed by someone else. [# TODO: find a better example than this, its a little too religious.]
 
 
 All of these best practices are, of course, complete nonsense when you're working on a solo team. These techniques will slow you down, in the early stages when productivity is one of the most important things.
@@ -33,7 +287,22 @@ All of these best practices are, of course, complete nonsense when you're workin
 Every approach has situations where it shouldn't be applied. The mark of a good architect is knowing _when_ to use which best practices.
 
 
+Most of the above practices only apply to a megacorp or a well-established large codebase. When writing a smaller product:
+
+ * In a rapidly changing codebase, end-to-end tests are more appropriate, as they don't slow down refactoring and improvements as much as unit tests do.
+ * You don't have to strictly A/B test everything. Some things you can just implement it for an alpha version, and then revert it if people don't like it.
+ * It's nice to have everything reviewed, but for rapidly-changing codebases, recognize that it's more important for central code than the code on the leaves.
+
+ You don't have to have _everything_ reviewed by someone else.
+
+
 When someone tells you about some new best practice, ask them when it's the wrong decision. If they can't come up with one, or give you a non-answer, [# I once asked someone to name one drawback of their favorite language. They answered, "that's it not used in more places." That's a non-answer.] they haven't thought hard enough.
+
+
+Convince yourself that there is _definitely_ a time when this advice is counterproductive. If nobody answers, then you're probably listening to idealists, not engineers.
+
+You can try this today! Ask the average American to point out one flaw in their own political philosophy, or ask the average language enthusiast what the drawbacks of borrow checking are, or ask the average Apple fan what the drawbacks of Macbook Pros are. (This is mostly a joke, but I have been all three of these and have had all these idealisms!)
+
 
 
 # Manage Your Burnout
@@ -66,7 +335,6 @@ Luckily, I had some techniques to get to the end:
 
 
 Forgive yourself for adding that technical debt.
-
 
 
 
@@ -208,3 +476,5 @@ Of course, some bug reports are rather hostile, and can be seen as the former. I
 - dont open things up to volunteers too early. there is a _huge_ coordination and ramp-up cost, and it's _rarely_ worth it for volunteers.
 
 - that said, look for slices of the project where you can write something up and hand it to volunteers. it means you dont have to spend time explaining a potential project to someone. the vast majority of volunteers will fade away, which is understandable, most projects sound fun until reality reveals itself.
+
+</ignore>

@@ -16,11 +16,18 @@ I use this site to blog about my endeavors. Enjoy!
 
 # Recent posts:
 
- * [Borrow checking, RC, GC, and the Eleven (!) Other Memory Safety Approaches](https://verdagon.dev/grimoire/grimoire)
+
+ * [Group Borrowing: Zero-Cost Memory Safety with Fewer Restrictions](/blog/group-borrowing)
+ * [On Joining the Mojo Compiler Team](/blog/on-joining-mojo-compiler-team)
+ * [Crossing the Impossible FFI Boundary, and My Gradual Descent Into Madness](/blog/exploring-seamless-rust-interop-part-2)
+ * [Exploring Seamless Rust Interop for Newer Languages, Part 1](/blog/exploring-seamless-rust-interop-part-1)
+ * [Higher RAII, and the Seven Arcane Uses of Linear Types](/blog/higher-raii-uses-linear-types)
+ * [Layer-wise inferencing + batching: Small VRAM doesn't limit LLM throughput anymore](/blog/llm-throughput-not-ram-limited)
+ * [Borrow checking, RC, GC, and the Eleven (!) Other Memory Safety Approaches](/grimoire/grimoire)
  * [Vale's First Prototype for Immutable Region Borrowing](/blog/first-regions-prototype)
  * [Generational References (Updated)](/blog/generational-references)
  * [Making C++ Memory-Safe Without Borrow Checking, RC, or Tracing GC](/blog/vale-memory-safe-cpp)
- * [Chasing the Myth of Zero-Overhead Memory Safety](https://verdagon.dev/blog/myth-zero-overhead-memory-safety)
+ * [Chasing the Myth of Zero-Overhead Memory Safety](/blog/myth-zero-overhead-memory-safety)
  * [Single Ownership and Memory Safety without Borrow Checking, RC, or GC](/blog/single-ownership-without-borrow-checking-rc-gc)
  * [The Link Between Generics, Compile Times, Type-Erasure, Cloud Building, and Hot-Code Reloading](/blog/generics-compile-times)
  * [What Vale Taught Me About Linear Types, Borrowing, and Memory Safety](/blog/linear-types-borrowing)
@@ -118,7 +125,14 @@ Hello Mars!
 
 # Software Engineering
 
-I've worked on [Google Earth](https://earth.google.com/web), [Google Chat](https://chat.google.com/), and [Google MyMaps](https://mymaps.google.com).
+I currently work on the [Mojo](https://www.modular.com/mojo) programming language at [Modular](https://www.modular.com/), and in the past I've worked on [Google Earth](https://earth.google.com/web), [Google Chat](https://chat.google.com/), and [Google MyMaps](https://mymaps.google.com).
+
+
+#### Mojo
+
+Since mid-2024, I've been working on the [Mojo](https://www.modular.com/mojo) programming language, adding things like linear types, associated aliases, and various frontend features.
+
+<img src="https://cdn.prod.website-files.com/63f9f100025c058594957cca/65df28c4d9ed2ae5929c129c_mojo-man_5.jpg" width="100%"/>
 
 
 #### Google Earth

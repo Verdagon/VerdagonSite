@@ -13,19 +13,14 @@ namespace: c-blog m-annotated
 
 <ignore>
 
- * fix event finder
  * mention SIMD
  * corgi races
  * find events
  * vale has no special sauce for AI--thats more Mojo, Rust, and perhaps Julia--but its linear types are invaluable fpr reflecting data into the database.
  * (or maybe mention how higher raii would have helped)
- * add slices
- * actually called layer-wise inferencing?
- * make it clear that we're streaming _from disk_
  * mention https://github.com/SJTU-IPADS/PowerInfer
  * more cool events
  * mention everything said in https://www.reddit.com/r/LocalLLaMA/comments/1ckxzi3/airllm_batching_ram_size_doesnt_limit_throughput/
- * maybe mention https://github.com/FMInference/FlexGen
  * this comment: https://github.com/oobabooga/text-generation-webui/issues/4754#issuecomment-1834653096 says llama.cpp --batch_size=1 might be equivalent?
 
 </ignore>
@@ -76,6 +71,8 @@ When I heard about the [Florabama Mullet Toss](https://www.florabama.com/mullet-
 This is actually something *LLMs are really good at*: crawling the web and interpreting webpages.
 
 
+<slice />
+
 ## The "Weird Event Finder"
 
 So a couple months ago, I made a little tool which basically *asks ChatGPT and doublechecks via Google*, basically a poor-man's [retrieval-augmented generation](https://blogs.nvidia.com/blog/what-is-retrieval-augmented-generation/) approach:
@@ -107,6 +104,8 @@ It's clear that I need more RAM so I can run an LLM locally.
 
 First, some background on how LLMs work!
 
+
+<slice />
 
 # An LLM is made of layers
 
@@ -176,6 +175,8 @@ Even for my use case, that's a bit too slow. Even if I only used AirLLM for only
 This is roughly the consensus today: *you can't really run large models on regular computers,* it's just too slow.
 
 
+<slice />
+
 # Adding Batching
 
 The final approach would later involve adding batching to this "layer-wise inferencing from disk" approach.
@@ -233,6 +234,8 @@ So, it seemed I had a few options:
 The last one definitely sounded the easiest.
 
 
+<slice />
+
 # Success!
 
 In the end, it only took [123 lines](https://github.com/Verdagon/Anima/commit/d90e07756014bd174c172fa3bf57a3770e3842a0) and one evening. It's weekend-hackathon quality, but it worked!
@@ -256,6 +259,8 @@ More detailed benchmarks:
 
 And the best part is that this works on my little 16gb Mac, I don't have to go out and buy a graphics card or something with a lot more memory.
 
+
+<slice />
 
 # How can the rest of us do this?
 
@@ -291,6 +296,8 @@ These are all latency-agnostic use cases that can use this approach, without nee
 Hopefully, it's only a matter of time before libraries better support this use case!
 
 
+<slice />
+
 # That's all!
 
 Thanks for reading! I hope you enjoyed this post. It was a wild ride, and I'm glad I get to share it with you all.
@@ -302,12 +309,3 @@ Donations and sponsorships are currently paused, but if you like these articles,
 Cheers,
 
 - Evan Ovadia
-
-
-<ignore>
-# Thank you!
-
-I want to give a huge thanks to [Arthur Weagel](https://github.com/aweagel), [Kiril Mihaylov](https://github.com/KirilMihaylov), [Radek Miček](https://github.com/radekm), [Geomitron](https://github.com/Geomitron), [Chiuzon](https://github.com/chiuzon), [Felix Scholz](https://github.com/soupertonic), [Joseph Jaoudi](https://github.com/linkmonitor), [Luke Puchner-Hardman](https://github.com/lupuchard), [Jonathan Zielinski](https://github.com/tootoobeepbeep), [Albin Kocheril Chacko](https://github.com/albinkc), [Enrico Zschemisch](https://github.com/ezschemi), [Svintooo](https://github.com/Svintooo), [Tim Stack](https://github.com/tstack), [Alon Zakai](https://github.com/kripken), [Alec Newman](https://github.com/rovaughn), [Sergey Davidoff](https://github.com/Shnatsel), [Ian (linuxy)](https://github.com/linuxy), [Ivo Balbaert](https://github.com/Ivo-Balbaert/), [Pierre Curto](https://github.com/pierrec), [Love Jesus](https://github.com/loveJesus), [J. Ryan Stinnett](https://github.com/jryans), [Cristian Dinu](https://github.com/cdinu), and [Florian Plattner](https://github.com/lasernoises) (plus a very generous anonymous donor!) for sponsoring Vale over all these years.
-
-Recent events have forced me to stop coding Vale for a while and led me to pause donations and sponsorships, but your support all this time is still giving me spirit and strength! Things are looking up, and I hope to be back soon.
-</ignore>

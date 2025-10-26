@@ -1,7 +1,7 @@
 ---
 title: Easter Eggs
 author: Evan Ovadia
-date: July 11, 2023
+date: Living Document
 realm: blog
 path: blog/easter-egg-notes
 layout: annotated
@@ -17,10 +17,16 @@ Future notes:
  * King Neptune
  * Staff Sergeant Reckless
  * Hessian the Duck
+ * https://www.oldforester.com/ktd/
+ * ferret legging: https://en.wikipedia.org/wiki/Ferret-legging
  * Nemo the Dog
  * Sinbad the Chief Dog
+ * goat chariot racing: https://www.youtube.com/watch?v=-JljxRdSvdA
+ * cricket spitting
  * Master Sergeant Big Deuce VI
  * Sergeant Stubby
+ * https://en.wikipedia.org/wiki/Elephant_polo
+ * https://en.wikipedia.org/wiki/Cricket_fighting
  * Simon the Cat: Simon was a ship's cat on the British Royal Navy's HMS Amethyst during the Yangtze Incident in 1949. Despite being injured by shrapnel during an attack, Simon continued to perform his duties by protecting the ship's food stores from rats. He was awarded the Dickin Medal for his actions, becoming the only cat to receive the prestigious honor.
  * https://en.wikipedia.org/wiki/Cockroach_racing
 
@@ -31,14 +37,50 @@ Future notes:
 I often like to hide a little "easter egg" note in the side notes, and see if anyone finds them before I remove them.
 
 
-There are *two* outstanding easter egg notes that nobody has found.
-
-
 Below is a list of past easter egg notes, enjoy!
 
 
 Also, if you have any ideas for future easter egg notes, let me know! You can reach me via [email](mailto:verdagon_epsa@verdagon.dev), [twitter](https://twitter.com/vale_pl), or [discord](https://discord.gg/SNB8yGH). Cheers!
 
+
+
+# King Neptune
+
+Was in [Crossing the Impossible FFI Boundary, and My Gradual Descent Into Madness](https://web.archive.org/web/20240618014743/https://verdagon.dev/blog/exploring-seamless-rust-interop-part-2):
+
+> [King Neptune](https://en.wikipedia.org/wiki/King_Neptune_%28pig%29) is a pig that singlehandedly raised $19 million for the construction of the U.S. Navy's [Iowa-class battleship](https://en.wikipedia.org/wiki/Iowa-class_battleship) [Illinois](https://en.wikipedia.org/wiki/USS_Illinois_%28BB-65%29) during World War 2.
+
+> Originally intended to be served as a pig roast, the Navy recruiter, had a better idea: auction the pig! But each time he tried to auction it off, the winner returned King Neptune alive and well.
+
+> After an extensive fundraising career, King Neptune retired to a farm in Anna, Illinois, and died a hero. He was buried with military honors.
+
+> If you read this note, mention "battleship" or "Neptune" anywhere on HN or reddit! [Nobody will believe you](https://youtu.be/-UBgNREvlIo).
+
+Cheers to u/sebamestre [for catching this one](https://www.reddit.com/r/ProgrammingLanguages/comments/1di0cgw/comment/l973vlv/):
+
+> This is so cursed. I love it. Your writeups are always great btw, they dig deep into dense technical and low level subjects but I can always sail right through them end to end (like a battleship) without breaking a sweat.
+
+Thank you my friend!
+
+
+# Cher Ami
+
+Was in [Higher RAII, and the Seven Arcane Uses of Linear Types](https://web.archive.org/web/20240514134452/https://verdagon.dev/blog/higher-raii-uses-linear-types#cache-invalidation):
+
+> [Cher Ami](https://en.wikipedia.org/wiki/Cher_Ami) was a carrier pigeon during World War I that served with the U.S. Army Signal Corps. Despite being shot and wounded by enemy fire, Cher Ami showed remarkable bravery and grit, delivering a crucial message that saved the lives of a trapped American battalion.
+
+> Cher Ami was awarded the Croix de Guerre, a French military honor, for her bravery.
+
+> If you read this note, sneak the word "pigeon" into an [HN](https://news.ycombinator.com/item?id=40359886)/[reddit](https://www.reddit.com/r/programming/comments/1crqi4e/higher_raii_and_the_seven_arcane_uses_of_linear/) comment and [try to sound sane](https://youtu.be/-UBgNREvlIo), to be awarded the highest honor I can bestow.
+
+
+Cheers to [robert-wallis](https://news.ycombinator.com/item?id=40363660) and [Geroman Joe](https://x.com/Joebobo2000/status/1791490879569453420) for catching this one!
+
+> How about COO - Close Object Obligation? And you could sound like a pigeon saying "coo" during talks explaining it.
+
+> Nice post. You could call them something like "life cycle objects", or "leased objects," since you have to finish them via a life cycle function, or terminate the lease so to speak. Sorry if sound like a drunk pigeon...
+
+To thee I bestow the honor of being the High Linear Chancellors of the Noble Avian Expanse. Huzzah!
 
 
 <ignore>
@@ -56,31 +98,29 @@ If you read this note, mention "that one lance corporal goat" anywhere on HN or 
 
 # Brigadier Sir Nils Olav III
 
-(Was on [Vale's First Prototype for Immutable Region Borrowing](https://web.archive.org/web/20230712155756/https://verdagon.dev/blog/first-regions-prototype#where-does-vale-go-from-here))
+Was on [Vale's First Prototype for Immutable Region Borrowing](https://web.archive.org/web/20230712155756/https://verdagon.dev/blog/first-regions-prototype#where-does-vale-go-from-here):
 
+> [Brigadier Sir Nils Olav III](https://en.wikipedia.org/wiki/Nils_Olav), colonel-in-chief of the Norwegian King's Guard, is a widely celebrated national hero. A statue was erected in his honor in 2005, and he was even awarded a knighthood by [King Harald V](https://en.wikipedia.org/wiki/Harald_V_of_Norway) himself.
 
-[Brigadier Sir Nils Olav III](https://en.wikipedia.org/wiki/Nils_Olav), colonel-in-chief of the Norwegian King's Guard, is a widely celebrated national hero. A statue was erected in his honor in 2005, and he was even awarded a knighthood by [King Harald V](https://en.wikipedia.org/wiki/Harald_V_of_Norway) himself.
+> Oh also, Nils Olav is a [king penguin](https://en.wikipedia.org/wiki/King_penguin).
 
-Oh also, Nils Olav is a [king penguin](https://en.wikipedia.org/wiki/King_penguin).
+> During his knighting ceremony, the King declared that Nils was, as a penguin, "in every way qualified to receive the honour and dignity of knighthood".
 
-During his knighting ceremony, the King declared that Nils was, as a penguin, "in every way qualified to receive the honour and dignity of knighthood".
+> If you read this note, mention Nils Olav on [HN](https://news.ycombinator.com/item?id=36690556) or [r/programming](https://www.reddit.com/r/programming/comments/14wu830/vales_first_prototype_for_immutable_region/)! [Nobody will believe you](https://youtu.be/-UBgNREvlIo).
 
-If you read this note, mention Nils Olav on [HN](https://news.ycombinator.com/item?id=36690556) or [r/programming](https://www.reddit.com/r/programming/comments/14wu830/vales_first_prototype_for_immutable_region/)! [Nobody will believe you](https://youtu.be/-UBgNREvlIo).
-
-(Congrats to [cbsmith](https://news.ycombinator.com/item?id=36691658), [kubanczyk](https://news.ycombinator.com/item?id=36692089), [TheGoldenMinion](https://www.reddit.com/r/programming/comments/14wu830/comment/jrklcry/?utm_source=reddit&utm_medium=web2x&context=3), [lovich](https://news.ycombinator.com/item?id=36691564), [padraig_oh](https://www.reddit.com/r/programming/comments/14wu830/comment/jrkmjiw/?utm_source=reddit&utm_medium=web2x&context=3), and [leksak](https://news.ycombinator.com/item?id=36691737)!)
+Congrats to [cbsmith](https://news.ycombinator.com/item?id=36691658), [kubanczyk](https://news.ycombinator.com/item?id=36692089), [TheGoldenMinion](https://www.reddit.com/r/programming/comments/14wu830/comment/jrklcry/?utm_source=reddit&utm_medium=web2x&context=3), [lovich](https://news.ycombinator.com/item?id=36691564), [padraig_oh](https://www.reddit.com/r/programming/comments/14wu830/comment/jrkmjiw/?utm_source=reddit&utm_medium=web2x&context=3), and [leksak](https://news.ycombinator.com/item?id=36691737) for catching this one!
 
 
 # G. I. Joe
 
-(Was on [Making C++ Memory-Safe Without Borrow Checking, RC, or GC](https://web.archive.org/web/20230629052606/https://verdagon.dev/blog/vale-memory-safe-cpp#borrowless-affine-style))
+Was on [Making C++ Memory-Safe Without Borrow Checking, RC, or GC](https://web.archive.org/web/20230629052606/https://verdagon.dev/blog/vale-memory-safe-cpp#borrowless-affine-style):
+
+> A pigeon named [G. I. Joe](https://en.wikipedia.org/wiki/G.I._Joe_%28pigeon%29) was awarded the [Dickin Medal for gallantry](https://www.pdsa.org.uk/what-we-do/animal-awards-programme/pdsa-dickin-medal) for saving the British 56th infantry division and the inhabitants of Calvi Vecchia, Italy.
+
+> G. I. Joe successfully flew a last-resort message to the nearby allied artillery to cancel bombarding the city, which the infantry had just successfully taken over. [o7](https://www.urbandictionary.com/define.php?term=o7), you brave bird!
+
+> If you read this note, leave a comment ([HN](https://news.ycombinator.com/item?id=36448759) / [r/cpp](https://www.reddit.com/r/cpp/comments/14h0ixr/making_c_memorysafe_without_borrow_checking_rc_or/)), [nobody will believe you](https://youtu.be/-UBgNREvlIo).
 
 
-A pigeon named [G. I. Joe](https://en.wikipedia.org/wiki/G.I._Joe_%28pigeon%29) was awarded the [Dickin Medal for gallantry](https://www.pdsa.org.uk/what-we-do/animal-awards-programme/pdsa-dickin-medal) for saving the British 56th infantry division and the inhabitants of Calvi Vecchia, Italy.
-
-G. I. Joe successfully flew a last-resort message to the nearby allied artillery to cancel bombarding the city, which the infantry had just successfully taken over. [o7](https://www.urbandictionary.com/define.php?term=o7), you brave bird!
-
-If you read this note, leave a comment ([HN](https://news.ycombinator.com/item?id=36448759) / [r/cpp](https://www.reddit.com/r/cpp/comments/14h0ixr/making_c_memorysafe_without_borrow_checking_rc_or/)), [nobody will believe you](https://youtu.be/-UBgNREvlIo).
-
-
-(Congrats to [dwr90](https://www.reddit.com/r/cpp/comments/14h0ixr/comment/jpbx3l4/?utm_source=reddit&utm_medium=web2x&context=3), [nico mac](https://news.ycombinator.com/item?id=36464990), [LLyaudet](https://news.ycombinator.com/item?id=36527312), [chris_wot](https://news.ycombinator.com/item?id=36453695), and [saagarjha](https://news.ycombinator.com/item?id=36462488)!)
+Congrats to [dwr90](https://www.reddit.com/r/cpp/comments/14h0ixr/comment/jpbx3l4/?utm_source=reddit&utm_medium=web2x&context=3), [nico mac](https://news.ycombinator.com/item?id=36464990), [LLyaudet](https://news.ycombinator.com/item?id=36527312), [chris_wot](https://news.ycombinator.com/item?id=36453695), and [saagarjha](https://news.ycombinator.com/item?id=36462488) for catching this one!
 

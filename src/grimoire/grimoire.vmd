@@ -48,6 +48,9 @@ However, those of weak wills should be careful not to read grimoires... they mig
 
 # A Curséd Tome, and Ancient Memory Safety
 
+(Or [skip to the list](#the-list)!)
+
+
 Mid-2023, a team of archaeologists discovered [an ancient Mayan city in Campeche](https://www.reuters.com/world/americas/ancient-maya-city-discovered-mexican-jungle-2023-06-21/). I was on the ground as the team's consulting software engineer, as the Mayans were known as some of the earliest and most powerful practitioners of the software arts.
 
 
@@ -138,6 +141,9 @@ Various languages build on this with different mechanisms: Rust adds [borrow che
 *2: Reference counting* is fairly mainstream. Some will be surprised to learn that it can coexist with tracing GC ([like in Python](https://devguide.python.org/internals/garbage-collector/index.html) and [Nim](https://nim-lang.org/blog/2020/10/15/introduction-to-arc-orc-in-nim.html)), and we also learned that there's a [whole spectrum](https://courses.cs.washington.edu/courses/cse590p/05au/p50-bacon.pdf) between the two.
 
 And as it turns out, reference counting can be [blended with immutable region borrowing](https://github.com/Verdagon/RegionsRCCellularAutomataBenchmark/blob/main/README.md) to greatly reduce its cache misses and make it data-race safe, something no language has done yet. [# I couldn't resist prototyping this, so the Vale compiler actually has a flag that switches Vale from generational references to RC so we can see this in action. See [this experimental repo](https://github.com/Verdagon/RegionsRCCellularAutomataBenchmark/blob/main/README.md) for more.] [# [Nim](https://nim-lang.org/) could theoretically do this, but alas, I was unable to convince Araq that it was possible. I also thought for a while that Rust could do this, but it's unfortunately foiled by the `RefCell` escape hatch.]
+
+For those who are into the more functional-programming side of things, I'm really interested in what Koka's doing with Perceus.
+Also check out Koka's Perceus
 
 
 <slice />
@@ -246,12 +252,12 @@ However, this checking is at run-time. Halting in release mode is often undesira
 <slice />
 
 
-*14: Linear reference counting* is an elusive concept, where we can completely eliminate the counter integer, and do all of the reference counting at compile time. No language can do this today, but there might be a way to get close with linear types. [# Matthieu's [static-rc](https://github.com/matthieu-m/static-rc) crate gets pretty close to this, but without linear types in Rust, it has to leak under certain conditions.] Basically, we have two types of linear reference:
+*14: Linear reference counting* is an elusive concept, where we can completely eliminate the counter integer, and do all of the reference counting at compile time. No language can do this today, but there might be a way to get close with linear types. [# Matthieu's [static-rc](https://github.com/matthieu-m/static-rc) crate gets pretty close to this, but without linear types in Rust, it has to leak under certain conditions. It's quite possible that his work on static-rc inspired this idea!] Basically, we have two types of linear reference:
 
  * A "tine" reference remembers (in its type, at compile-time) L, the number of forks to get from the original value to here.
- * A "fork" reference holds the original value (or a tine reference [# This is another difference between this idea and static-rc crate, I believe this will allow us to "borrow the borrow references" in objects, without lifetimes, rather than just on the stack.]), and remembers L and also N, the number of L+1 tine references created at the same time as this fork reference. Reclaiming the contents requires destroying this and all (N) of the L+1 tine references.
+ * A "fork" reference holds the original value (or a tine reference [# This is another difference between this idea and static-rc crate, I believe this will allow us to "borrow the borrow references" in objects, without lifetimes, rather than just on the stack. (Update: This might not be the case, see [this thread](https://www.reddit.com/r/rust/comments/1d06gjo/comment/l5x11po/) for a more accurate comparison)]), and remembers L and also N, the number of L+1 tine references created at the same time as this fork reference. Reclaiming the contents requires destroying this and all (N) of the L+1 tine references.
 
-I don't expect anyone to understand that rushed explanation, but I hope to write an article soon on this! [# I also talked about it a bit [here](https://discord.com/channels/398263331808346123/734119020613075052/1135196844360736798) and [here](https://discord.com/channels/398263331808346123/734119020613075052/1137411293310099546) and [here](https://discord.com/channels/398263331808346123/734819934760075264/1141854334171222098). If someone knows how to make better publicly-accessible discord logs, let me know!]
+I don't expect anyone to understand that rushed explanation, but I hope to write an article soon on this! [# I also talked about it a bit on discord [here](https://discord.com/channels/398263331808346123/734119020613075052/1135196844360736798) and [here](https://discord.com/channels/398263331808346123/734119020613075052/1137411293310099546) and [here](https://discord.com/channels/398263331808346123/734819934760075264/1141854334171222098) and on Reddit [here](https://www.reddit.com/r/rust/comments/1d06gjo/comment/l5x11po/). (If someone knows how to make better publicly-accessible discord logs, let me know!)]
 
 ! I'm not actually sure what kind of architectural restrictions it might impose, how situational it is, or if it even works at all. It's just something I came up with--I mean uh, _the grimoire_ mentions--as a hypothetical avenue to explore.
 
@@ -259,14 +265,22 @@ I don't expect anyone to understand that rushed explanation, but I hope to write
 <slice />
 
 
-*15: Mutable value semantics* is a very interesting approach. Imagine a Java or Swift where every object has exactly one reference pointing to it at any given time (similar to move-only programming) but that reference can be lent out to a function call. It's like a Rust with no shared references (`&`), only unique references (`&mut`) which can't be stored in structs. It's simple, fast, and powerful, though we may have to `.clone()` more often than even Rust programs.
+*15: Not-MVS* is a very interesting approach. Imagine a Java or Swift where every object has exactly one reference pointing to it at any given time (similar to move-only programming) but that reference can be lent out to a function call. It's like a Rust with no shared references (`&`), only unique references (`&mut`) which can't be stored in structs. It's simple, fast, and powerful, though we may have to `.clone()` more often than even Rust programs.
 
-[Hylo](https://www.hylo-lang.org/) uses mutable value semantics, with extra ergonomics like `subscript` on top to make it easier to work with. It's a very promising sweet spot on the performance vs. simplicity spectrum.
+Edit: I originally thought this is how Mutable Value Semantics worked, and I was totally wrong ([thanks to dist1ll for the correction](https://lobste.rs/s/mutdyp/borrow_checking_rc_gc_eleven_other_memory#c_tczfin)!). I'll leave it here as "Not-MVS" because I think what I described would _probably_ still work as a memory safety approach.
+
+For those curious about Mutable Value Semantics, dist1ll writes:
+
+> MVS as implemented by Hylo has multiple parameter passing modes. The immutable mode (which is equivalent to Rust’s &) is the default, but you can declare a mutable mode (i.e. &mut) with the inout keyword. The other two parameter passing modes are for transferring ownership (sink) and callee initialization (set).
 
 
 <slice/>
 
-*16: [CHERI](https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/)* is a project that's attempting to make hardware and a compiler that can run languages like C in a memory-safe way. In CHERI, every 64-bit pointer also comes with a 64-bit "capability" which expresses what can be done with that pointer, to achieve spatial memory safety. [Cornucopia](https://ieeexplore.ieee.org/document/9152640) adds temporal memory safety to that with special allocators that don't reuse memory in a page until it's empty and all of the existing capabilities have been revoked [# This is an important memory safety concept: Memory unsafety comes not from use-after-free, but _use-after-reuse_. In fact, even that's too loose; memory unsafety comes from "use after shape change", which I'll explain later in the grimoire.] via an application-wide memory sweep done concurrently in the background.
+*16: [CHERI](https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/)* is a hardware-software blend that can run languages like C in a memory-safe way. In CHERI, a pointer is represented as a 128-bit [# Or 64-bit on 32-bit systems.] type that contains an address range and permissions describing the operations that may be done with the pointer (and some other things), to achieve spatial memory safety. The hardware keeps track of whether something is a pointer or not via a 1-bit tag.
+
+! Check out [David Chisnall's comment](https://lobste.rs/s/mutdyp/borrow_checking_rc_gc_eleven_other_memory#c_x67f1n) for some good explanation and clarifications!
+
+[Cornucopia](https://ieeexplore.ieee.org/document/9152640) adds temporal memory safety to that with special allocators that don't reuse memory in a page until it's empty and all of the existing capabilities have been revoked [# This is an important memory safety concept: Memory unsafety comes not from use-after-free, but _use-after-reuse_. In fact, even that's too loose; memory unsafety comes from "use after shape change", which I'll explain later in the grimoire.] via an application-wide memory sweep done concurrently in the background. [Cornucopia Reloaded](https://www.ietfng.org/nwf/publications-and-talks/2024-cornucopia-reloaded.html) and [CHERIoT](https://cheriot.org/papers/2023-micro-cheriot-uarch.pdf) are also mechanisms that bring use-after-free protections to CHERI.
 
 If a new language used a system like this plus some techniques to prevent use-after-free on the stack, it could have a brand new memory safety model nobody's seen before.
 

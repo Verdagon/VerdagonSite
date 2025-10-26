@@ -1,0 +1,437 @@
+---
+title: Thoughts on the Mojo Programming Language
+author: Evan Ovadia
+date: July 16, 2025
+realm: blog
+path: blog/thoughts-on-mojo
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+# Thoughts on Mojo
+
+Here, for your entertainment, are my thoughts on the Mojo programming language, uncensored, first-hand, from the inside.
+
+
+I'll mainly talk about three things:
+
+ * What is Mojo? Okay but actually, what is it really?
+ * What's its memory safety like?
+ * When will it be open source?
+
+
+## What is Mojo trying to do?
+
+I'll start by answering the question: what will Mojo have that C++ or Rust doesn't?
+
+The answer:
+
+ * First-class heterogeneous compute support, and users can more easily use GPUs.
+ * Type system: Zig-caliber metaprogramming, linear types, and more flexible borrow checking.
+ * Built on MLIR, so new chips can easily use Mojo's software stack.
+
+I'll explain all those, and then I'll tie them together to explain how these all combine in a systems programming language.
+
+
+### Type System
+
+talk about SIMD
+
+talk about kernel fusion
+
+talk about MaybeComptime
+
+summarize the above with metaprogramming.
+
+talk about ASAP destruction?
+
+
+### Built on MLIR
+
+Mojo compiles to [MLIR](https://mlir.llvm.org/), and MLIR is better at optimizing code than LLVM in a lot of situations.
+
+When using LLVM, optimizers can only run on LLVM IR, which is even lower-level than C, and has therefore lost most of its higher meaning. I'll show you what I mean.
+
+How would you optimize this C code?
+
+```
+#define N 100
+#define M 100
+void zorkify(int A[N][M]) {
+  int B[M][N];
+  for(int i = 0; i < N; ++i) {
+    for(int j = 0; j < M; ++j) {
+       B[j][i] = A[i][j];
+    }
+  }
+  for(int i = 0; i < N; ++i) {
+    for(int j = 0; j < M; ++j) {
+       A[i][j] = B[j][i];
+    }
+  }
+}
+```
+
+If you didn't get an answer, don't worry, neither did I. And neither does LLVM. *It's hard to see the meaning behind this code.*
+
+Now, how would you optimize this equivalent C program?
+
+```
+#define N 100
+#define M 100
+void transpose(int X[N][M], int D[M][N]) {
+  for(int i = 0; i < N; ++i) {
+    for(int j = 0; j < M; ++j) {
+       D[j][i] = X[i][j];
+    }
+  }
+}
+void zorkify(int A[N][M]) {
+  int B[M][N];
+  transpose(A, B);
+  transpose(B, A);
+}
+```
+
+If you know a bit of linear algebra, you'll see this and say "Hey! That's `transpose(transpose(A))`! That's just `A`!"
+
+Yep. `zorkify` is a no-op. Always has been.
+
+
+As you can see, when we have access to the high level semantics of a program, _massive_ optimization opportunities are suddenly available to us.
+
+In other words, [premature lowering is the root of all evil.](https://rcs.uwaterloo.ca/~ali/cs842-s23/papers/mlir.pdf).
+
+
+MLIR helps with this: operations and patterns are first-class citizens to MLIR, so MLIR-based compilers can detect those redundant operations and eliminate them.
+
+In [MLIR Toy Tutorial](https://mlir.llvm.org/docs/Tutorials/Toy/Ch-3/), it talks about how we can teach MLIR what "transpose" means, and the fact that two transposes next to each other can be eliminated.
+
+
+This might be a pretty big deal, depending on the use case.
+
+
+To give you a sense of how much impact this can have, take a look at [Polygeist: Raising C to Polyhedral MLIR](https://c.wsmoses.com/papers/Polygeist_PACT.pdf), where they talk about how much this can speed things up.
+
+They compare:
+
+ * Polygeist, which uses MLIR.
+ * Polly, a collection of LLVM passes.
+ * Pluto, an optimizer that takes C code and produces optimized C code.
+
+In sequential mode, Polygeist gave a 2.53x speedup, vs Polly's 1.41x and Pluto's 2.34x. In other words, code from Polygeist was 79% faster than Polly's LLVM passes, and 8% faster than Pluto's C-to-C optimization.
+
+In parallel mode, Polygeist gave a 9.47x speedup, vs Polly's 3.26x and Pluto's 7.54x. In other words, code from Polygeist was 190% faster than Polly's LLVM passes, and 26% faster than Pluto's C-to-C optimization.
+
+These are considerable speedups, and that's all because MLIR enabled Polygeist to better express high-level operations, their semantics, and optimizations.
+
+Note that their numbers are geometric means across 30 benchmarks. These are just one use case (polyhedral benchmarks), so I definitely wouldn't generalize it to say that _all_ Mojo code is 8-190% faster than _all_ LLVM code. It does hint at the potential though.
+
+Mojo in particular uses it to speed up AI inference, and with quite a bit of success too. I won't go into that too much (this is a blog for us language nerds after all), but if you're into that sort of thing then take a look at [Max](LINK HERE), and then also [donate to the Kākāpō Recovery](https://www.doc.govt.nz/kakapo-donate) because why not? They're cute.
+
+
+<ignore>
+! Note: these numbers are geometric means across 30 polyhedral benchmarks (mathematical/scientific computing kernels), which particularly favor MLIR's approach, so results may vary for other types of workloads. This is also why I'm so excited for Mathieu Fehr's [library optimizations for Mojo](https://www.youtube.com/watch?v=Lpr_GcX5uKE) feature, so that users can add optimizations for their own use cases.
+</ignore>
+
+
+So, MLIR's high-level optimizations help for polyhedral benchmarks and AI inferencing. Theoretically, it can be applied to _any_ high-level operation that can be optimized. The only bottleneck is how much time our team has to add these optimizations for various use cases. At least, until we build out the [user-defined library optimizations](https://www.youtube.com/watch?v=Lpr_GcX5uKE) feature that Mathieu Fehr proved possible.
+
+
+
+
+<ignore>
+ask kernel devs what speedups theyve gotten from specifically this feature
+
+could use a real world example of a performance gain.
+
+talk about how this makes it so new chips can just add their MLIR intrinsics and they're good to go.
+
+modular spun up support for the A100 in N days, the MI300X in M days, etc.
+
+I didn't understand this until many months in. It's the kind of thing you can only know if you talk to a kernel ninja directly.
+
+We can even compile to ASICs. For those of you who don't know what those are, they're ...
+
+That's _insane_ to me.
+</ignore>
+
+
+
+
+
+### Heterogeneous Compute
+
+To understand why Mojo is good for heterogeneous compute, there are some surprising truths that you should know.
+
+* The most popular way to program GPUs is JAX, which has a 10-20% performance cost.
+* AMD cards actually 
+* For the highest performance on NVidia cards, people use CUDA, which only works on NVidia.
+* People still write some kernels in assembly.
+
+
+
+Heterogeneous compute as a field is facing the same conundrum. They can either spend their time fighting CUDA, or take the 10-20% hit and use something that gets the job done.
+
+I was surprised to hear this. Can't you just use C on the GPU? 
+
+People actually use assembly on GPUs.
+
+**What?! How? It's 2025!** Why aren't they using something like C++ or Rust or something?
+
+
+Or maybe they've figured out how to use Rust on the GPU.
+
+
+"Heterogeneous compute" means using all sorts of processing chips besides CPUs, like GPUs, NPUs, TPUs, XPUs, etc. These are all _ridiculously_ powerful.
+
+However, using them so difficult, that people regularly take a 10-20% performance hit just to make it vaguely usable.
+
+That might sound silly, but that's the difference between CUDA and JAX (DOUBLECHECK might not have been jax).
+
+
+
+(talk about the thousand papercuts).
+
+talk about how its so much easier to write GPU kernels
+
+talk about the pain points, read the comic book, include its points here
+
+"unlocks your hardware's performance."
+
+
+<ignore>
+We've all heard the classic tradeoff that a cloud startup faces. Do you use something easy like Java or Go, or something high-performance like Rust or C++?
+
+When people ask me for that kind of advice, I take off my language nerd hat and I put on my software engineer hat and I tell them **use Java or Go.**
+
+Complexity is the enemy, and flexibility is your friend. If you spend your time fighting the language, you're not spending time on your actual problems. Be an engineer. Get the job done.
+</ignore>
+
+
+### So what is Mojo trying to do?
+
+In short, it's a language that looks about 15 years into the future at what a "systems programming language" would need to have.
+
+In 15 years, we'll have an explosion of varied hardware. I'm not sure if that's enabling Mojo, or Mojo's enabling that, or some mix of both.
+
+
+It's hard to know all of this from the outside, because it's hard to talk about where things could be, years in the future.
+
+
+
+## Will it get there?
+
+It's really hard to say.
+
+Only we can use these MLIR things, we're not making it general purpose enough for others to code their own optimizations.
+
+### Is it a systems programming language?
+
+I'm not sure. Mojo is in a bit of an existential crisis right now, about whether it's an AI programming language or a true systems programming language.
+
+
+This tension is pretty pervasive. For example, I was recently asked to implement a feature to make this easier:
+
+```
+fn launch_multiply_kernel(
+    device: DeviceContext,
+    in_buf_1: DeviceBuffer[Float32],
+    in_buf_2: DeviceBuffer[Float32],
+    out_buf: DeviceBuffer[Float32],
+):
+  var in_buf_1_ptr: UnsafePointer[Float32] = in_buf_1.to_device_ptr()
+  var in_buf_2_ptr: UnsafePointer[Float32] = in_buf_2.to_device_ptr()
+  var out_buf_ptr: UnsafePointer[Float32] = out_buf.to_device_ptr()
+
+  @capture(in_buf_1_ptr, in_buf_2_ptr, out_buf_ptr)
+  fn multiply_kernel(index: Int):
+    out_buf[index] = in_buf_1_ptr[index] * in_buf_2_ptr[index]
+
+  device.enqueue_function[multiply_kernel]()
+```
+
+We would do "automatic closure transforms" so we could write it like this instead:
+
+```
+fn launch_multiply_kernel(
+    device: DeviceContext,
+    in_buf_1: DeviceBuffer[Float32],
+    in_buf_2: DeviceBuffer[Float32],
+    out_buf: DeviceBuffer[Float32],
+):
+  @capture(in_buf_1, in_buf_2, out_buf)
+  kernel multiply_kernel(index: Int):
+    # These are all `UnsafePointer`s
+    out_buf[index] = in_buf_1[index] * in_buf_2[index]
+
+  device.enqueue_function[multiply_kernel]()
+```
+
+However, that's us special-casing things for the AI use case, giving the compiler special knowledge of `DevicePassable::to_device_ptr()` and therefore special knowledge of our AI types.
+
+If you're an AI programmer, you'd think "[doing this] may be a special case, but it's also the most important case."
+
+But if you're designing a systems programming language, you don't want to hack in any special treatment for the AI use case.
+
+That tension exists at Modular.
+
+
+Ironically, it's not hard to craft these things in a general way. It just takes time, and it takes design. The big question is whether we'll get the time to do that design work.
+
+
+
+
+
+
+## What's its memory safety like?
+
+It's like a more flexible form of borrow checking. We're still eagerly awaiting Chris's Part 2, but I'll do my best to describe it.
+
+When you have these two references, Rust rejects it. Mojo does not.
+
+Mojo enables intra-function mutable aliasing.
+
+Is this a stepping stone towards the holy grail? I think so. Nick Smith's system proves it too. But it's uncertain what the final form will be.
+
+Stay tuned for another post on this topic.
+
+
+
+
+If this is an AI programming language, we probably do want that.
+
+
+
+`in_buf_1`, `in_buf_2`, 
+
+There are two ways to do this, and it depends what kind of language you want.
+
+If you want an AI programming language, you would probably introduce a 
+
+
+
+
+will it take off? depends.
+
+will it take off for ML cases? yeah, i think so. MLIR helps us code high-level optimizations much faster and more easily than anyone else. the tech is just _better_.
+
+will it take off as a mainstream language? no. not the way we're currently heading. at its core, mojo is basically rust with some of the more painful details removed. and anyone who thinks that the python world is going to want to use something like rust is insane.
+i see a path through it, but it requires us to take seriously the problem of gradual migration from python to rust. and I don't see anyone taking that problem seriously.
+
+we're targeting a super, super narrow niche. the people that are reaping the benefits are in the company, and there arent really relatable testimonials about it in the wild. and its not clear to me they understand what really organically grows a language.
+its hard because mojo addresses a thousand papercuts that everyone else just doesnt have. we cant relate.
+with java, you can say "do you think c++ is complex? use java!"
+with rust, you can say "don't like segmentation faults and nasal demons for your high-speed low-latency use case? use rust!"
+with vale i said "want the benefits of rust without its artificial complexity? use vale!"
+with mojo it's very, very difficult to make that simple case. not because it doesn't exist, but because nobody knows. they know for the niche stuff, but it's so niche that their answers are downright gibberish to a normal programmer, even a wide generalist like me.
+
+also, we're locking ourselves into a niche. our graph compiler is very suited towards ML. Mathieu Fehr's work last summer seemed to be a stepping stone towards bringing MLIR's power to the rest of the domains, but it was just a first step.
+
+chris has said "the performance of assembly, safety of rust, and usability of python" but that just doesnt resonate with me because they're too... vague and subjective. and its not really true. we're just a bunch of surface-level improvements over rust.
+
+i like how Billy put it once: mojo unlocks your hardware's performance." vale has linear types, swift has asap destruction, and zig has the comptime stuff, and rust has borrow checking. its all nice improvements. but the true major superpower mojo has is the other two points, it unlocks your hardware's performance. we have to capture that, and have it resonate with the very underlying foundations of the community and its hard to do that.
+
+need a couple ways we unlock hardware's performance, and how hard/impossible it would be without mojo/MLIR.
+
+
+
+## Open Sourcing
+
+I'm an open source denizen, and I would not be working here if I thought we wouldn't open source.
+
+I know you have no reason to believe someone who's technically on Modular's payroll, but there it is.
+
+I saw [this thread in r/programminglanguages](https://www.reddit.com/r/ProgrammingLanguages/comments/1lfz9jc) and, not gonna lie, it hit home. This is what people think of Mojo, and that _bugs me_. I want Mojo to be loved.
+
+I brought it up in the internal slack and said, "STUFF HERE" and Chris weighed in and left that reply.
+
+If you all want, I can write more on Mojo's path to open sourcing, and what it will take.
+
+
+### That's All!
+
+Hope you enjoyed it!
+
+Maybe someday soon I'll write about what it's like working in a startup's compiler.
+
+
+I was not ready to jump into someone else's compiler, especially a startup's. Startups move fast and break things, and I'm the kind of programmer that believes in thorough designs and [lots of documentation](https://verdagon.dev/blog/first-100k-lines).
+
+
+Also, nobody tell them that I posted this. I know you all can keep a secret.
+
+
+Also keep an eye on the comments. My posts are uncensored and no modular eyes have seen it, so Chris will probably be in the comments making corrections.
+
+
+
+
+
+
+
+
+
+
+
+
+LLVM-based compilers are backwards: they lower their code, and then the optimizer has to re-assemble meaning to be able to optimize it.
+
+LLVM also can't do cross-dialect optimizations.
+
+
+
+
+"while people want power, often they don't want all the complexity and fragmentation and all the details thrust in their face when they don't want to deal with it"
+6:38 of amd talk
+
+look at claude report on mlir
+
+mojo needs help to work for python devs
+
+want LLMs on tiny devices
+
+llvm is backwards and the code it produces is slow. you can express the semantics to MLIR so it can optimize it at the proper level
+
+graph compiler is for constant propagation
+
+feed the simd articles into deep research and ask it what rust cant do
+
+
+
+
+they (modulers) are in a different world, built entirely on different axioms and limitations and fundamentals. from the outside, it sometimes feels like cult-speak without the cult.
+
+also, people who use MLIR suck at explaining all of this.
+
+what are some optimizations we do? how hard would they be without mojo and MLIR?
+
+ask research:
+- how does a new hardware actually enable user software? actually asm? c++? what frameworks (jax?) can they be used in?
+- is there a maybe-comptime in any other language?
+- what does the graph compiler actually do?
+
+how do we take advantage of that linalg kind of stuff in mojo? does mojo let us actually do that?
+
+"pre-MLIR era" ... might be a bit strong.
+
+* is the community aware of all this?
+* are these messages really landing somehow?
+* what is chris actually saying?
+
+
+- destruction: linear, asap. gave a talk about these.
+- type system
+- MLIR for speed
+  - high level optimizations
+  - mid level optimizations, interleave lowering & optimization
+  - you can plug in your own code, because there's interfaces
+new hardware. if someone is bringing up a new chip, they can give complex assembly and c++, or they can just call into MLIR with mojo and offer an extensible, flexible, generic version that works with an entire ecosystem.
+this is more of a long term benefit, but we're already seeing it: we brought up A100 etc. in 3 days, that kind of result tells you that your building blocks are finally right.
+
+
+
+there doesnt seem to be a strong culture here of *design* yet. i see too many people who want to incrementally interleave building and designing. that works well in most cases, but it often leads one into local maxima. This is happening right now with our memory safety strategy, which I think will fail.
+
+

@@ -1,0 +1,207 @@
+---
+title: On joining the Mojo Compiler Team
+author: Evan Ovadia
+date: August 28, 2025
+realm: blog
+path: blog/on-joining-mojo-compiler-team
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+! Also posted today: [Group Borrowing: Zero-Cost Memory Safety with Fewer Restrictions](/blog/group-borrowing)
+
+
+The rumors are true, I am part of the Mojo compiler team!
+
+
+I've been there for an entire year now, and somehow I haven't been fired yet for scattering [my classic Spaceship examples](https://vale.dev/guide/structs) across their entire codebase.
+
+
+This all probably comes as a surprise! Why would I join with another language, instead of continuing Vale or going back to work for Google? The answer was surprising to me, too.
+
+
+The short answer is that *there's a holy grail I want to chase,* and Mojo might be the language to find it.
+
+The long answer involves linear types, a completely new memory safety approach, and [someone who gave an LLVM talk in a unicorn onesie](https://www.youtube.com/watch?v=VJORFvHJKWE).
+
+
+I'll tell that story, and then I'll get to my thoughts on the Mojo programming language itself (or feel free to [skip to that part!](#thoughts-on-mojo))
+
+
+# Linear Types
+
+I love telling this story.
+
+
+Two weeks after my [linear types chat](https://www.youtube.com/watch?v=UavYVf0UEoc) on Developer Voices went live, I got a message from Kris Jenkins:
+
+> Do you know (of) Chris Latner? The guy behind LLVM, clang and Swift? He's currently working on a new language called Mojo. (In fact, that's today's podcast.) Anyway, he just told me by email that he watched your Vale episode, and directly because of that, Mojo is going to get linear types. 🙂
+
+
+I was shocked. First, most people don't see the potential of linear types, so it's always a surprise when someone _gets it_. Second, if Mojo in particular added linear types, that meant it would have borrowing _and_ linear types, which would make it tied with [Austral](https://austral-lang.org/) for having the most powerful type system of all the upcoming languages.
+
+
+So I messaged Chris on discord to ask him about it, and he told me how linear types could specifically solve a certain problem with coroutines they were facing. In Rust terms, it would help remind the user to poll a Future to completion before destroying it.
+
+He also introduced me to [Nick Smith](https://github.com/nmsmith), who I regard as a world-class memory safety designer. Apparently, he and Nick have been working on a more flexible form of borrowing!
+
+This caught my attention.
+
+
+But before I talk more about that, let me give some context on the Holy Grail that I've been looking for.
+
+
+# The Holy Grail
+
+As most of you know, I [dabble in memory safety](https://verdagon.dev/grimoire/grimoire), to say the least.
+
+Heck, Vale's original purpose was to find "the next way to do memory safety", because I was unsatisfied with garbage collection, reference counting, and borrow checking.
+
+That quest led to one of my favorite achievements, Vale's [region borrowing and generational references blend](https://verdagon.dev/blog/generational-references).
+
+It's a really nice sweet-spot of usability, memory safety, and performance. But it always kind of irked me that a generational reference would still sometimes halt your program. One could eliminate this risk with [linear style](https://verdagon.dev/blog/linear-types-borrowing) [# A way of programming with no references, and instead moving everything around. It's like how we interact with the real world.] and maybe someday transactional regions [# Don't know if I've written about this anywhere, but theoretically there's a way to keep a log of "reversed changes" to memory in a region, that can be applied as part of a "rollback" if there's a panic. Pretty neat, though it can get rather memory intensive.], but those are both opt-in practices.
+
+
+While I was implementing that, I had a "debug mode" which helped me doublecheck that generational references were implemented correctly. It used reference counting under the hood.
+
+And it occurred to me, "wait a minute, could region borrowing eliminate reference count increments and decrements?" and just like that, I discovered a [region borrowing and reference counting blend](https://github.com/verdagon/RegionsRCCellularAutomataBenchmark) which eliminated most reference counting overhead.
+
+It made me wonder. What would happen if we used [the grimoire](https://verdagon.dev/grimoire/grimoire) to design a new memory safety model centered around reference counting and borrowing?
+
+That's what was going on in my mind when I read Nick Smith's new memory safety approach.
+
+
+# Nick Smith's Approach
+
+Nick Smith designed [an alternative model for lifetimes in Mojo](https://gist.github.com/nmsmith/cdaa94aa74e8e0611221e65db8e41f7b).
+
+It's a very complex read, but worth it.
+
+
+Basically, Nick found a way to completely eliminate the aliasability-xor-mutability rule from borrowing. He uses "regions" to do that (not to be confused with Vale regions, they're unrelated).
+
+I won't go into too much detail as I have [an entire separate post on it](/blog/group-borrowing), but my takeaway at the time that *Vale wasn't the only language exploring the eldritch outer reaches of memory safety.*
+
+
+It doesn't quite solve the holy grail, but it's a major step closer to it: Nick found a way for the compiler to reason about mutable aliasing without overhead and without Rust's aliasability-xor-mutability restrictions.
+
+And it looks like Mojo is already using part of it (the intra-function analysis) as the foundations for its new memory safety model.
+
+
+I've been waiting a long time for this! People who are reaching into the undiscovered depths of memory safety, at long last!
+
+
+So, my first day at Modular was July 16th, 2024.
+
+
+# Vale
+
+Luckily, joining Mojo doesn't change much with Vale.
+
+
+Vale development had already slowed down long before this happened, largely because I felt Vale's design was more or less complete, especially after [Part 5](https://verdagon.dev/blog/zero-cost-borrowing-regions-part-5-region-scoped-data) of the region borrowing design.
+
+
+Besides, Vale largely accomplished its original goal of showing the world that there are other memory safety models out there. The Vale compiler contained implementations for constraint references, generational references, regions, and linear types.
+
+
+# A year at Modular
+
+## The best parts [# The actual best part about working at Modular is knowing Walter Erquinigo. May the ancients bless your empire, and may the cosmos resonate with your power!]
+
+
+Getting to work with the people here at Modular is pretty amazing.  It's awesome talking to people in real life that are as nerdy about compilers as I am. I got to give [a talk at the LLVM conference](https://www.youtube.com/watch?v=IpuvQUVB8Cg) and talk to everyone there about linear types, and several times a week I get to talk to Chris and the rest of the team about intricate compiler challenges.
+
+
+Work with all the crazy kernel engineers is pretty great too. These are the guys that take the weird inventions from ML researchers, and make it run in milliseconds on any device imaginable.
+
+
+I liked to think I was pretty good at optimization and performance. These guys _run circles around me_. They don't just profile and optimize, they literally _calculate the theoretical peak throughput of a chip_ and then work backwards to see what they're doing wrong.
+
+
+They do things with matrix multiplications that you wouldn't even believe. They take this:
+
+```
+for i in range(m):
+  for j in range(p):
+    for k in range(n):
+      C[i][j] += A[i][k] * B[k][j]
+```
+
+and then they apply techniques like memory coalescing, tiling hierarchies, vectorizing, and then they use specialized cores with specialized instructions [# Specifically, tensor cores.] to make this 60x faster. They literally take your L2 cache size into account, _just because they can._
+
+
+## The not-so-great parts
+
+The worst part about working at a new company, especially a startup, is the different mindset you have to have.
+
+
+My major endeavors at Google were [MyMaps](https://www.google.com/maps/d/), [Earth](https://earth.google.com/), and [Chat](https://chat.google.com). None of these had "profit" as a goal. Their goal was largely to make users happy and bring more users in. Heck, Earth's explicit goal was to make people like Google. [# ...which is also why it was so frustrating to see Google throw all of that goodwill away so spectacularly in the mid 2010s.] It was _relaxed_.
+
+
+Vale was the same way: the goal was to do something interesting that people didn't know was possible. It was pretty relaxed too.
+
+
+The people at Modular are amazing. But it _is_ a startup, and you can feel that in the air. You can feel it in the priorities, and in the way people speak. It's subtle, but it's there.
+
+
+I think the most tangible manifestation is the lack of a "codebase north star" so to speak. Whenever I'm in a codebase, I like to understand not just the current architecture, but also what the architecture will look like 3-5 years from now. Unfortunately, it's hard to really discuss that when we're focusing so hard on the immediate goals. It's a balance we're trying to fix, but it's largely a cultural problem and it will take time.
+
+
+Still, bringing some perspective for a second, if these are the biggest problems we have, we're pretty lucky for a startup.
+
+
+
+## The weirdest parts
+
+The weirdest part is the mindset shift, from working on Vale to working on Mojo.
+
+
+Vale has always been designed to be a "high-level high-performance" language, aimed at things like web servers and game dev.
+
+Mojo is definitely not that. It's like a systems programming language from the future, with a penchant for heterogeneous compute.
+
+
+Vale's strength was in offering the right abstractions to uphold the right guarantees to enable the right features. For example, Vale's design was to largely disallow undefined behavior, so that things could be so predictable as to enable [perfect replayability](https://verdagon.dev/blog/perfect-replayability-prototyped).
+
+Mojo is different, since it's a systems programming language. I like the way Andrew Kelley once said it (paraphrased): systems programming is about being able to see through and peel back the abstractions so you can have absolute control over the hardware so you can go fast in ways your language can't foresee. For example, Mojo's `@parameter if` and its MLIR foundations let it do a lot of things for performance that other languages simply _can't_.
+
+
+Also, it's super weird talking to people about compilers in real life. That's _never been a thing._ I've always been a software engineer by day and a mad scientist compiler person by night, but now those two worlds have crossed. Occasionally, I hear people expressing strong opinions on the way LLVM is architected, or the way origins should be integrated into the compiler, or how our KGEN MLIR dialects should be organized, and I just kind of sit back and I'm like, "wait, where am I?"
+
+
+It's these little oddities that make my days interesting.
+
+
+
+# My thoughts on Mojo
+
+I sometimes say I'm "behind enemy lines" because in my heart, I'm still Vale's author.
+
+
+I bet you would all love to know my thoughts on Mojo, from an outsider-turned-insider perspective.
+
+
+But alas, it's such a big topic, that I'm saving it for the next post!
+
+
+# That's all
+
+Thanks for reading!
+
+Stay tuned for my next couple articles, where I'll talk about my thoughts on Mojo, and a few more memory safety approaches I've encountered in the past few months. Subscribe to the [RSS feed](https://verdagon.dev/rss.xml)!
+
+
+Also, **donate to [Mercy Chefs](https://mercychefs.com/),** because they helped my hometown out during Hurricane Helene. Excuses are for the weak! [# Donate to them and then [let me know](idonated@verdagon.dev) so I can give you a shout-out in my next post!]
+
+
+Cheers,
+
+- Evan Ovadia
+
+
+
+
+
+

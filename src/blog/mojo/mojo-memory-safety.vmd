@@ -1,0 +1,516 @@
+---
+title: The Secrets of Mojo's Memory Safety Approach
+author: Evan Ovadia
+date: October 27, 2025
+realm: blog
+path: blog/impossible-optimization
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+<ignore>
+Todos:
+ * link to Niko's blog post sooner, drive home that this is also a direction Rust should go
+ * link to vale regions design wherever relevant
+ * sprinkle in enough mentions of nick's group borrowing post, mention nick by name
+ * make it clear that i like it because it's another step towards the benefits of your proposal
+ * mention carbon is onboard with argument ref origin paths
+ * confirm that it doesnt just work because the checking isnt implemented
+ * deferred borrows is how it does work, because it's closer to the true mental model: dereference-xor-deletion. deep research on that, reference Chris Fallin's paper
+ * more emphasize that we really want mojo to have easy memory safety, because that kind of makes or breaks our strategy of building on python's popularity
+ * should we mention ref counting? progressive disclosure?
+ * get more interesting cases from the mojo code
+</ignore>
+
+
+My favorite line in the Mojo standard library is in this snippet:
+
+```rs
+    @always_inline
+    fn __next_ref__(
+        mut self,
+    ) -> ref [self.src[]._entries[0].value()] Self.Element:
+        ...
+```
+
+
+This comes from the [_DictEntryIter](https://github.com/modular/modular/blob/7a1e73b40ca99f150f27e0837f8565ed1f40922f/mojo/stdlib/stdlib/collections/dict.mojo#L100) struct.
+
+
+It basically says, "We're returning a reference to an `Element` (a `DictEntry[K, V, H]`) that points at some entry's value".
+
+
+This one line contains hints about Mojo's memory safety model, and where it might go one day.
+
+
+# Mojo's Memory Safety
+
+
+A casual reading of [Mojo's Ownership](https://docs.modular.com/mojo/manual/values/ownership/) docs might lead one to think that Mojo is using normal borrow checking, with some surface-level improvements.
+
+> Mojo enforces argument exclusivity for mutable references. This means that if a function receives a mutable reference to a value (such as an mut argument), it can't receive any other references to the same value—mutable or immutable. That is, a mutable reference can't have any other references that alias it.
+
+
+...with a few surface-level improvements:
+
+> The major difference between Rust and Mojo is that Mojo does not require a sigil on the caller side to pass by immutable reference.
+
+
+But there is a lot more to the approach, hidden between the lines here.
+
+
+Hark, dear reader, as I explain the secrets behind Mojo's memory safety approach!
+
+
+[# TODO: mention somewhere that Mojo's memory safety isn't actually fully implemented yet]
+
+
+# Origins
+
+The first thing to note is that Mojo's memory safety has no run-time overhead. [# Well, it's complicated; every memory-safe language has some run-time overhead, see [Chasing the Myth of Zero-Overhead Memory Safety](https://verdagon.dev/blog/myth-zero-overhead-memory-safety).]
+
+
+The easiest way to understand Mojo's borrowing system is actually to use Rust's system as a starting point. If you're not familiar with how Rust works, I recommend looking at the [Group Borrowing](https://verdagon.dev/blog/group-borrowing#foundation-builds-on-cs-single-ownership) article, specifically the sections "Foundation: Builds on C++'s "Single Ownership" and "Recap of Rust Borrowing".
+
+
+They have similar errors when we give away two mutable references to the same object.
+
+
+Here's a simple Rust program with a borrow checking error:
+
+(TODO: show rust example)
+
+
+And here's the equivalent Mojo program:
+
+```rs
+@fieldwise_init
+struct Wing(Copyable, Movable):
+    var span: Int
+
+@fieldwise_init
+struct Bird:
+    var left: Wing
+    var right: Wing
+
+
+fn transfer_some_span(mut wing_a, mut wing_b):
+    wing_a.span += 1
+    wing_b.span -= 1
+
+fn main():
+    var bird = Bird(Wing(10), Wing(20))
+
+    ref left_ref = bird.left
+    ref other_left_ref = bird.left
+
+    transfer_some_span(left_ref, other_left_ref) # Error!
+```
+
+
+However, there are two major differences between Mojo and Rust:
+
+ * Mojo uses "origin paths" to allow mutable aliasing inside the current function.
+ * In some cases, Mojo communicates origin paths between functions.
+
+I'll explain them below. Read on!
+
+
+## Origin Paths
+
+In normal borrow checking, one cannot have a shared (read-only) reference and a unique (mutable) reference at the same time. For example:
+
+(TODO: show rust equivalent of below, and its errors)
+
+
+However, Mojo's origin system actually allows this:
+
+```rs
+@fieldwise_init
+struct Wing(Copyable, Movable):
+    var span: Int
+
+@fieldwise_init
+struct Bird:
+    var left: Wing
+    var right: Wing
+
+
+fn add_to_wingspan(mut bird: Bird):
+    bird.left.span += 1
+    bird.right.span += 1
+
+fn main():
+    var bird = Bird(Wing(10), Wing(20))
+
+    ref left_ref = bird.left
+    ref other_left_ref = bird.left
+    ref right_ref = bird.right
+    ref other_right_ref = bird.right
+
+    transfer_some_span(left_ref, right_ref) 
+
+    var sum = read_both_spans(other_left_ref, other_right_ref)
+
+    print(sum)  # Prints 32
+```
+
+
+This is because in Mojo, *no local reference knows whether it's mutable or immutable*.
+
+
+Instead, Mojo *checks origins at callsites*.
+
+What do I mean by that?
+
+
+Let's look at original `main`'s call to `transfer_some_span`:
+
+```rs
+transfer_some_span(left_ref, other_left_ref)
+```
+
+
+Here's what the compiler does here:
+
+ 1. Looks up `left_ref`'s "origin", which is `bird.left`.
+ 1. Checks that nobody is borrowing `bird.left` or anything inside it.
+ 1. Marks `bird.left` as "temporarily mutably borrowed".
+ 1. Looks up `other_left_ref`'s "origin", which is `bird.left`.
+ 1. Halts! Because someone is borrowing `bird.left` or anything inside it.
+
+
+Now let's look at the new `main`'s call to `add_to_wingspan`:
+
+```rs
+transfer_some_span(left_ref, right_ref)
+```
+
+
+Here's what the compiler does here:
+
+ 1. Looks up `left_ref`'s "origin", which is `bird.left`.
+ 1. Checks that nobody is borrowing `bird.left` or anything inside it.
+ 1. Marks `bird.left` as temporarily mutably borrowed.
+ 1. Looks up `right_ref`'s "origin", which is `bird.right`.
+ 1. Halts! Because someone is borrowing `bird.right` or anything inside it.
+ 1. Marks `bird.right` as temporarily mutably borrowed.
+
+
+No conflicts, so no errors!
+
+
+The main difference with Rust is that Mojo *waits until the callsite* to:
+
+ * Determine if a part of an object is being borrowed mutably or immutably.
+ * Check if there's any overlap with any other arguments.
+
+
+This allows Mojo to have overlapping borrows where Rust does not.
+
+
+This is, in my opinion, a big step in the right direction, because it relaxes the restrictions that normal borrow checking had. As far as the Mojo compiler is concerned, these are perfectly safe operations, so why not allow them?
+
+
+Let's take another step in the right direction! Let's talk about how Mojo can communicate paths across function calls.
+
+
+[# mention that this is also known as Deferred Borrows]
+
+
+## Returning References from Functions
+
+
+Let's call a function that returns a reference:
+
+```rs
+@fieldwise_init
+struct Wing(Copyable, Movable):
+    var span: Int
+
+@fieldwise_init
+struct Bird:
+    var left: Wing
+    var right: Wing
+
+fn add_to_wingspan(mut bird: Bird):
+    bird.left.span += 1
+    bird.right.span += 1
+
+fn get_left_ref(ref bird: Bird) -> ref [bird.left] Wing:
+    return bird.left
+
+fn main():
+    var bird = Bird(Wing(10), Wing(20))
+
+    ref left_ref = bird.left
+    ref other_left_ref = get_left_ref(bird)
+    ref right_ref = bird.right
+    ref other_right_ref = bird.right
+
+    transfer_some_span(left_ref, right_ref) 
+
+    var sum = read_both_spans(other_left_ref, other_right_ref)
+
+    print(sum)  # Prints 32
+```
+
+
+Note how we changed:
+
+`ref other_left_ref = bird.left`
+
+to:
+
+`ref other_left_ref = get_left_ref(bird)`
+
+and we added this function:
+
+```rs
+fn get_left_ref(ref b: Bird) -> ref [b.left] Wing:
+    return b.left
+```
+
+
+That ` -> ref [b.left] Wing` means "We're returning the `Wing` at `b.left`".
+
+
+The callsite, `ref other_left_ref = get_left_ref(bird)`, knows that its bird is `get_left_ref`'s `b`, so it knows that the returned reference is pointing at `bird.left`.
+
+
+In other words, the callsite (`get_left_ref(bird)`) uses the function signature:
+
+`fn get_left_ref(ref b: Bird) -> ref [b.left] Wing:`
+
+to calculate (in callsite terms) where the returned reference is pointing.
+
+
+After that, it participates in the normal origin checking later on for all subsequent calls (`transfer_some_span`, `read_both_spans`, etc).
+
+
+## Parametric Mutability
+
+Talk about how the above doesn't even care about mutability.
+
+
+TODO: reference https://docs.modular.com/mojo/manual/values/lifetimes/#derived-origins:
+
+> `origin_of(x.y)`
+
+> Note that the `as_ptr()` method takes its self argument as mut self. If it used the default read argument convention, it would be immutable, and the derived origin (`origin_of(self.o_ptr)`) would also be immutable.
+
+```
+fn as_ptr(mut self) -> Pointer[String, origin_of(self.o_ptr)]:
+    return Pointer(to=self.o_ptr[])
+```
+
+
+
+# DictEntryIter's next_ref
+
+I opened this article with this line:
+
+```rs
+    @always_inline
+    fn __next_ref__(
+        mut self,
+    ) -> ref [self.src[]._entries[0].value()] Self.Element:
+        ...
+```
+
+
+This is the best use of return-ref origin paths.
+
+
+It basically says, "We're returning a reference to an `Element` (a `DictEntry[K, V, H]`) that points at some entry's value".
+
+
+Because of this, we can do:
+
+(show what we can do with this)
+
+
+And for that reason, I declare it to be The Most Interesting Line in the Standard Library.
+
+<img src="https://i.imgflip.com/aa6sjx.jpg"/>
+
+(sorry, that's is a reference to the Most Interesting Man in the World, I couldn't help myself!)
+
+
+
+It could also help with error messages:
+
+(show how)
+
+
+# Named Groups
+
+This is all super important, because it will make the language easier. It removes unnecessary complexity.
+
+
+A big part of removing unnecessary complexity is decoupling unnecessary details.
+
+
+(TODO: talk about `x.~y`, nick's named inner regions, reference nick's proposal, reference group borrowing post where we talked about the distinction between a reference to an object or its contents)
+
+
+# Why this is exciting
+
+This is another case of how Mojo is going in a very exciting direction: it's laying the groundwork for easier memory-safe high-performance code.
+
+
+This is something that most of the world believes is impossible.
+
+
+This is coincidentally, the exact sort of thing Vale was chasing. (explain)
+
+
+This is also what Nick's [Group Borrowing](https://verdagon.dev/blog/group-borrowing#foundation-builds-on-cs-single-ownership) design is trying to achieve.
+
+
+Ante is also making some exciting strides here.
+
+
+Even Carbon is looking into this.
+
+
+Niko Matsakis, the Rust tech lead, has also written about this (link to View Types post).
+
+
+All these languages are chasing the same thing: easier memory-safe high-performance code. And they're all heading in roughly the same direction: removing complexity.
+
+
+
+# Where this could go: Argumen Paths
+
+There are still problems to solve, of course.
+
+
+In Rust, I often ran into a problem where I was trying to read the whole world while holding a mutable reference to a single member.
+
+(show example)
+
+
+The common workaround was to do two things:
+
+ * *Refactor* the function to take in a `&mut World`, and change its caller, and its caller, and so on.
+ * Receive *handles* instead.
+ * *Look up* references using the handles.
+
+
+However, this incurs some performance overhead, and it's complicated. References are nice, and suddenly we can only have them in pure functions.
+
+
+Mojo already has the tools to solve this!
+
+
+In Mojo, it would look like this:
+
+(show example)
+
+The fact that this works so cleanly is one of those hints from the universe that you're designing your language right.
+
+
+This is also nice because it enables better error messages:
+
+(check if true, show example)
+
+
+(reference Niko's post)
+
+
+# Conclusion
+
+(TODO: conclusion here)
+
+
+
+
+
+
+# Notes
+
+Feedback from claude:
+
+I'll analyze both documents to evaluate how well the blog post skeleton captures the deep technical content.Now let me analyze how well the blog post skeleton captures the deep technical content:
+
+## Strengths of the Blog Post Skeleton
+
+1. **Accessible Entry Point**: The skeleton starts with an intriguing hook (the `__next_ref__` function signature) that immediately shows something concrete and unusual, which is engaging for readers.
+
+2. **Good Pedagogical Structure**: The progression from "Mojo looks like Rust" → "but there's more" → "here's what's different" is a solid teaching approach that builds on familiar concepts.
+
+3. **Captures Core Concepts**: The skeleton correctly identifies the two fundamental layers:
+   - Origin paths for tracking what is borrowed
+   - Deferred borrowing (checking at callsites rather than at reference creation)
+
+## Critical Gaps and Misrepresentations
+
+However, the skeleton significantly undersells and partially misrepresents the depth of Mojo's innovation:
+
+### 1. **Misses the Temporal Dimension**
+The deep dive emphasizes that references are **passive by default** and only activate at use-sites. The skeleton mentions "checks origins at callsites" but doesn't capture the profound implication that references can exist without holding active borrows. This is THE key insight that enables patterns impossible in Rust.
+
+### 2. **Underplays Sequential Activation**
+The deep dive shows how expressions like `x_ref + increment_x_and_return(point) + x_ref` work through sequential activation. The skeleton doesn't convey that references activate, deactivate, and can reactivate, seeing mutations between uses.
+
+### 3. **Lacks Technical Precision**
+The skeleton's explanation of "no local reference knows whether it's mutable or immutable" is imprecise. The deep dive explains it better: references have a capability to borrow that activates with a mode (mutable/immutable) determined by usage context.
+
+### 4. **Missing Critical Examples**
+The deep dive's most compelling examples aren't in the skeleton:
+- The cache pattern that fails in Rust but works in Mojo
+- Complex interleaving like `left_ref.span + flap_left(bird) + left_ref.span`
+- The distinction between register-passable (Int) and non-copyable (Wing) types
+
+### 5. **Incomplete Origin Path Explanation**
+While the skeleton mentions return types like `ref [b.left] Wing`, it doesn't explain:
+- How origins form an algebraic structure
+- Origin subsumption relationships
+- How the compiler tracks origin identity through chains of function calls
+
+## Suggestions for Improvement
+
+1. **Add a Section on Activation vs Existence**
+   ```mojo
+   ref x_ref = point.x        # Reference exists (passive)
+   increment_x(point)         # point mutably active, x_ref passive - OK!
+   print(x_ref)               # x_ref activates here - sees mutation!
+   ```
+
+2. **Include the Sequential Activation Example**
+   The `x_ref + increment_x_and_return(point) + x_ref` example is crucial for understanding the temporal model.
+
+3. **Explain Why Copyability Matters**
+   The distinction between `Int` (brief activation for copying) vs `Wing` (extended activation) is essential for understanding when patterns work or fail.
+
+4. **Better Motivate the Problem**
+   Start with Rust pain points more explicitly:
+   - The async cache pattern
+   - Field borrowing across function boundaries
+   - Iterator + mutation patterns
+
+5. **Add the Theoretical Foundation**
+   Even in simplified form, explain that origins are type-level metadata, not runtime data.
+
+## The "Secrets" Framing
+
+The "secrets" framing is good for engagement but might undersell this as a principled, deliberate design. Consider reframing as "The Hidden Power of Mojo's Two-Layer Borrowing System" or similar.
+
+## Missing Comparative Analysis
+
+The skeleton should mention:
+- Chris Fallin's deferred borrows proposal (which Mojo essentially implements)
+- How this relates to Polonius and view types in Rust
+- Why Rust can't adopt this (backwards compatibility) but Mojo can
+
+## Conclusion
+
+The skeleton captures maybe 40% of the deep dive's insights. It gets the basic concepts right but misses the profound implications of passive references and sequential activation. The blog post would benefit from:
+1. A clearer explanation of the two-layer model (deferred + origins)
+2. More compelling examples showing impossible-in-Rust patterns
+3. Technical precision about when and how references activate
+4. The broader context of why this matters for language evolution
+
+The skeleton has good bones but needs more meat to truly convey why Mojo's approach is revolutionary rather than just "Rust with some improvements."

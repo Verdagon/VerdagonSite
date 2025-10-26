@@ -25,6 +25,67 @@
       </image-->
 
 
+
+      <item>
+         <title>Group Borrowing: Zero-Cost Memory Safety with Fewer Restrictions</title>
+         <guid>https://verdagon.dev/blog/group-borrowing</guid>
+         <link>https://verdagon.dev/blog/group-borrowing</link>
+         <pubDate>Thu, 28 Aug 2025 01:20:00 -0500</pubDate>
+         <category>Programming Languages</category>
+         <category>Mojo Programming Language</category>
+         <author>noreply@verdagon.dev (Evan Ovadia)</author>
+      </item>
+
+      <item>
+         <title>On Joining the Mojo Compiler Team</title>
+         <guid>https://verdagon.dev/blog/on-joining-mojo-compiler-team</guid>
+         <link>https://verdagon.dev/blog/on-joining-mojo-compiler-team</link>
+         <pubDate>Thu, 28 Aug 2025 01:00:00 -0500</pubDate>
+         <category>Programming Languages</category>
+         <category>Mojo Programming Language</category>
+         <author>noreply@verdagon.dev (Evan Ovadia)</author>
+      </item>
+
+      <item>
+         <title>Crossing the Impossible FFI Boundary, and My Gradual Descent Into Madness</title>
+         <guid>https://verdagon.dev/blog/exploring-seamless-rust-interop-part-2</guid>
+         <link>https://verdagon.dev/blog/exploring-seamless-rust-interop-part-2</link>
+         <pubDate>Mon, 17 Jun 2024 01:00:00 -0500</pubDate>
+         <category>Programming Languages</category>
+         <category>Vale Programming Language</category>
+         <author>noreply@verdagon.dev (Evan Ovadia)</author>
+      </item>
+
+      <item>
+         <title>Exploring Seamless Rust Interop for Newer Languages, Part 1</title>
+         <guid>https://verdagon.dev/blog/exploring-seamless-rust-interop-part-1</guid>
+         <link>https://verdagon.dev/blog/exploring-seamless-rust-interop-part-1</link>
+         <pubDate>Tue, 24 May 2024 01:00:00 -0500</pubDate>
+         <category>Programming Languages</category>
+         <category>Vale Programming Language</category>
+         <author>noreply@verdagon.dev (Evan Ovadia)</author>
+      </item>
+
+      <item>
+         <title>Higher RAII, and the Seven Arcane Uses of Linear Types</title>
+         <guid>https://verdagon.dev/blog/higher-raii-uses-linear-types</guid>
+         <link>https://verdagon.dev/blog/higher-raii-uses-linear-types</link>
+         <pubDate>Tue, 14 May 2024 01:00:00 -0500</pubDate>
+         <category>Programming Languages</category>
+         <category>Vale Programming Language</category>
+         <author>noreply@verdagon.dev (Evan Ovadia)</author>
+      </item>
+
+      <item>
+         <title>Layer-wise inferencing + batching: Small VRAM doesn't limit LLM throughput anymore</title>
+         <guid>https://verdagon.dev/blog/llm-throughput-not-ram-limited</guid>
+         <link>https://verdagon.dev/blog/llm-throughput-not-ram-limited</link>
+         <pubDate>Tue, 14 May 2024 00:00:00 -0500</pubDate>
+         <category>Artificial Intelligence</category>
+         <category>Large Language Models</category>
+         <author>noreply@verdagon.dev (Evan Ovadia)</author>
+      </item>
+
       <item>
          <title>Borrow checking, RC, GC, and the Eleven (!) Other Memory Safety Approaches</title>
          <guid>https://verdagon.dev/grimoire/grimoire</guid>

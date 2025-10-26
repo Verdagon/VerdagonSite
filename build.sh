@@ -289,6 +289,16 @@ if [ $TARGET == "first-100k-lines" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
+if [ $TARGET == "first-150k-lines" ] || [ $TARGET == "all" ] ; then
+  echo "Doing first-150k-lines"
+  echo $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/blog/first-150k-lines src/blog/0.3/first-150k-lines.vmd
+  eval $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/blog/first-150k-lines src/blog/0.3/first-150k-lines.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
 if [ $TARGET == "on-removing-let-let-mut" ] || [ $TARGET == "all" ] ; then
   echo "Doing on-removing-let-let-mut"
   echo $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/blog/on-removing-let-let-mut src/blog/0.2/on-removing-let-let-mut.vmd
@@ -540,6 +550,66 @@ if [ $TARGET == "vision-for-vale" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
+if [ $TARGET == "exploring-seamless-rust-interop-part-1" ] || [ $TARGET == "all" ] ; then
+  echo "Doing exploring-seamless-rust-interop-part-1"
+  echo $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/blog/exploring-seamless-rust-interop-part-1 src/blog/0.3/exploring-seamless-rust-interop-part-1.vmd
+  eval $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/blog/exploring-seamless-rust-interop-part-1 src/blog/0.3/exploring-seamless-rust-interop-part-1.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
+if [ $TARGET == "exploring-seamless-rust-interop-part-2" ] || [ $TARGET == "all" ] ; then
+  echo "Doing exploring-seamless-rust-interop-part-2"
+  echo $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/blog/exploring-seamless-rust-interop-part-2 src/blog/0.3/exploring-seamless-rust-interop-part-2.vmd
+  eval $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/blog/exploring-seamless-rust-interop-part-2 src/blog/0.3/exploring-seamless-rust-interop-part-2.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
+if [ $TARGET == "on-joining-mojo-compiler-team" ] || [ $TARGET == "all" ] ; then
+  echo "Doing on-joining-mojo-compiler-team"
+  echo $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/blog/on-joining-mojo-compiler-team src/blog/mojo/on-joining-mojo-compiler-team.vmd
+  eval $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/blog/on-joining-mojo-compiler-team src/blog/mojo/on-joining-mojo-compiler-team.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
+if [ $TARGET == "group-borrowing" ] || [ $TARGET == "all" ] ; then
+  echo "Doing group-borrowing"
+  echo $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/blog/group-borrowing src/grimoire/group-borrowing.vmd
+  eval $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/blog/group-borrowing src/grimoire/group-borrowing.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
+if [ $TARGET == "impossible-optimization" ] || [ $TARGET == "all" ] ; then
+  echo "Doing impossible-optimization"
+  echo $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/blog/impossible-optimization src/blog/mojo/impossible-optimization.vmd
+  eval $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/blog/impossible-optimization src/blog/mojo/impossible-optimization.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
+if [ $TARGET == "mojo-memory-safety" ] || [ $TARGET == "all" ] ; then
+  echo "Doing mojo-memory-safety"
+  echo $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/blog/mojo-memory-safety src/blog/mojo/mojo-memory-safety.vmd
+  eval $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/blog/mojo-memory-safety src/blog/mojo/mojo-memory-safety.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
 
 
 
@@ -552,8 +622,7 @@ if [ $MODE == "build" ] ; then
   cp src/sponsors.xml public
   cp src/components/*.css public/components
   cp $SNIPPET_DIR/css/*.css public/components
-  cp src/EvanOvadia2022Resume812.pdf public/EvanOvadia2022Resume812.pdf
-  cp src/EvanOvadiaResume2022Dev.pdf public/EvanOvadiaResume2022Dev.pdf
+  cp src/EvanOvadiaResume2024d.pdf public/EvanOvadiaResume2024d.pdf
   cp src/components/*.js public/components
   cp src/components/*.png public/components
   cp src/images/* public/images
