@@ -37,7 +37,9 @@ If you believe that like I did, buckle up! I'm going to show you how metaprogram
 
 Imagine that you had a program using a simple regex function, and you wanted to use it to verify emails: [# ...which is a TERRIBLE idea and you should never do it (see [this page](https://stackoverflow.com/questions/201323/how-can-i-validate-an-email-address-using-a-regular-expression)) but what's life without a little regex-related sin!]
 
-```rs
+
+<ignore>
+```mojo
 fn main():
     email_regex =
         Regex("\\w+(\\+\\w*)?@(\\d+\\.\\d+\\.\\d+\\.\\d+|\\w+\\.\\w+)")
@@ -51,6 +53,21 @@ fn main():
     print(matches(email_regex, "howdy1231.2.3.4"))       # Prints False
     print(matches(email_regex, "howdy123@1/2/3/4"))      # Prints False
 ```
+</ignore>
+
+
+<pre><code><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">main</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"></span>
+    <span style="color: #c9d1d9">email_regex</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9">
+        </span><span style="color: #d2a8ff">Regex</span><span style="color: #d2a8ff">(</span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">w+(</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">w*)?@(</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">d+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">.</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">d+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">.</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">d+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">.</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">d+|</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">w+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">.</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">w+)</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">
+    <span></span>
+    </span><span style="color: #d2a8ff">print</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">matches</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">email_regex</span><span style="color: #d2a8ff">,</span><span style="color: #d2a8ff"> </span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">user@example.com</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">      </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints True</span><span style="color: #c9d1d9">
+    </span><span style="color: #d2a8ff">print</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">matches</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">email_regex</span><span style="color: #d2a8ff">,</span><span style="color: #d2a8ff"> </span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">uexample.com</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">          </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints False</span><span style="color: #c9d1d9">
+    </span><span style="color: #d2a8ff">print</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">matches</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">email_regex</span><span style="color: #d2a8ff">,</span><span style="color: #d2a8ff"> </span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">user@ecom</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">             </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints False</span><span style="color: #c9d1d9">
+    </span><span style="color: #d2a8ff">print</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">matches</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">email_regex</span><span style="color: #d2a8ff">,</span><span style="color: #d2a8ff"> </span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">user+tag@example.com</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">  </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints True</span><span style="color: #c9d1d9">
+    </span><span style="color: #d2a8ff">print</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">matches</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">email_regex</span><span style="color: #d2a8ff">,</span><span style="color: #d2a8ff"> </span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">user@100</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">              </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints False</span><span style="color: #c9d1d9">
+    </span><span style="color: #d2a8ff">print</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">matches</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">email_regex</span><span style="color: #d2a8ff">,</span><span style="color: #d2a8ff"> </span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">howdy123@1.2.3.4</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">      </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints True</span><span style="color: #c9d1d9">
+    </span><span style="color: #d2a8ff">print</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">matches</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">email_regex</span><span style="color: #d2a8ff">,</span><span style="color: #d2a8ff"> </span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">howdy1231.2.3.4</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">       </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints False</span><span style="color: #c9d1d9">
+    </span><span style="color: #d2a8ff">print</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">matches</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">email_regex</span><span style="color: #d2a8ff">,</span><span style="color: #d2a8ff"> </span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">howdy123@1/2/3/4</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">      </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints False</span></code></pre>
 
 
 We all know that regex is pretty slow, because it basically has to run a whole interpreter. Or, if we "precompile" a Regex, it would be interpreting an AST, which is still pretty slow. [#precompileregex]
@@ -58,7 +75,7 @@ We all know that regex is pretty slow, because it basically has to run a whole i
 
 When you really need speed, you skip regex entirely and make a hand-written `matches` function like this:
 
-```rs
+```mojo
 fn matches(text: String) -> Bool:
     var total_consumed = 0
     var pos = 0
@@ -148,7 +165,7 @@ It then navigates up and down the tree according to what character is next in th
 
 To illustrate, here's the top-level `matches` function:
 
-```rs
+```mojo
 
 @no_inline
 fn matches(regex: Regex, text: String) -> Bool:
@@ -159,7 +176,7 @@ fn matches(regex: Regex, text: String) -> Bool:
 
 ...which really just calls into the (recursive) `_match_node` function:
 
-```rs
+```mojo
 fn _match_node(
     nodes: List[RegexNode], node_idx: Int, text: String, start_pos: Int
 ) -> MatchResult:
@@ -175,7 +192,7 @@ fn _match_node(
 
 ...which calls various functions, like the below `_match_repeat` function. This function checks the repeating parts of the regular expression, like how how email regex's `\w+` uses `+` to repeat the `\w`.
 
-```rs
+```mojo
 fn _match_repeat(
     nodes: List[RegexNode],  # All the regex nodes
     node: LiteralNode,       # Which node we're currently on
@@ -235,7 +252,7 @@ So the obvious question: can we inline `_match_node`?
 
 Let's try it, by throwing a `@always_inline` on it:
 
-```rs
+```mojo
 @always_inline
 fn _match_node(
     nodes: List[RegexNode], node_idx: Int, text: String, start_pos: Int
@@ -244,10 +261,10 @@ fn _match_node(
 ```
 
 
-But this doesn't work of course, because you can't inline a recursive call! No language can, that I know of. [# Unless you count tail-call optimization. And I bet there's a recursion-equivalent of loop unrolling too.]
+But this doesn't work of course, because you can't inline a recursive call! No language can, that I know of. [# Unless you count tail-call optimization. And I bet there's a recursion-equivalent of loop unrolling too.] [# TODO: show actual error]
 
 
-So let's table this line of thinking for now. We'll come back to it later.
+So let's table this line of thinking for now. We might come back to it later.
 
 
 ## The Sorcery
@@ -255,7 +272,7 @@ So let's table this line of thinking for now. We'll come back to it later.
 I promised something mind-blowingly _weird_, so let's make things weird.
 
 
-We're going do something I call _The Three Steps of Futamura Sorcery_.
+We're going do something called the [first Futamura projection](https://en.wikipedia.org/wiki/Partial_evaluation#Futamura_projections), or as it's known to some, "the three steps of Futamura sorcery". [# By "some", I mean like three people. Two if you don't count me.]
 
 
 We'll:
@@ -264,15 +281,16 @@ We'll:
  * Make it a compile-time parameter, and use compile-time operations.
  * Inline.
 
-...and then something amazing will happen.
+...and then something amazing happens.
 
 
-This won't make sense at first, but read on and I'll break it down step by step.
+### Step 1: Parse the Regex at compile-time
+
+Most Regex implementations first parse the regular expression into a list of nodes. If we could move that parsing to compile time, we can save some run-time.
 
 
-### Step 1: Compute the Regex at compile-time
+To parse the Regex into nodes at compile time, we simply need to change the `var regex` to `alias regex`.
 
-To compute the Regex at compile time, we simply need to change the `var regex` to `alias regex`.
 
 Before:
 
@@ -293,29 +311,43 @@ _match_node[regex.nodes, regex.root_node](user_string, 0)
 `alias` is Mojo-speak for "compile-time variable". [# I kind of wish Mojo had a `comptime` keyword like Zig, but alas!]
 
 
-"But wait Evan, isn't that moving a lot of calculation to compile-time? Isn't that impossible?"
+"But wait Evan, that's a _lot_ of code to run at compile time, can compilers really execute general code at compile-time?"
 
-Indeed! The `Regex` constructor is pretty heavy. It's a whole parser, with its own recursion, and heap allocation, and all sorts of stuff. And now it's happening at compile-time.
+They can! This is one of the biggest features of Mojo and Zig: a simple keyword (`alias` in Mojo, `comptime` in Zig) can lift almost any computation to compile time. [# I say almost because there are things a language shouldn't allow at compile time, like reading from stdin, etc.] There are other languages too (Scala, MetaOCaml, etc.) but Mojo and Zig stand out to me because they make it a bit easier. [# TODO: doublecheck, any other obvious languages? haskell maybe?]
+
+In this case, the compiler is running a whole little parser, with its own recursion, heap allocation, all sorts of stuff. And now it's happening at compile-time.
 
 
 "Wait, did you say heap allocation? Isn't heap allocation at compile-time impossible?"
 
-Not anymore! Mojo can do it, Zig can do it, [even C++20 can do it](https://accu.org/journals/overload/31/176/fertig/#:~:text=Or%20in,appealing%20use-cases).
+It used to be impossible, but not anymore! Mojo can do it, Zig can do it, and [C++20 enabled it](https://accu.org/journals/overload/31/176/fertig/#:~:text=Or%20in,appealing%20use-cases).
+
+
+Deep inside the Mojo compiler, there's a compile-time interpreter, intertwined with the instantiator (the "elaborator", which monomorphizes all generics), which runs all expressions inside generic arguments (`[...]`) and inside `alias` statements. This compile-time interpreter can execute pretty much any operation that a normal CPU could execute, including malloc and free.
 
 
 ### Step 2: Make Regex a compile-time parameter, use compile-time operations
 
 
-So how do we read this compile-time `Regex` at run-time?
+We just created this `Regex` at compile time.
 
-Do we put it into a global or something?
+Do we read it at run-time? Do we put it into a global or something?
 
-No! We're going to do something weirder: we're going to *only read it at compile-time.*
+No! We're going to *only read it at compile-time.*
 
+
+"But Evan, we _need_ to read the `Regex` at run-time! Otherwise, how does the run-time program even know what to do? How does it know what functions to call, what branches to take, etc.?"
+
+Great question! The answer is that *we can make all those decisions at compile time.*
+
+I know that doesn't make any sense, but bear with me.
+
+
+Here's how we change our program.
 
 Before:
 
-```rs
+```mojo
 fn _match_node(
     nodes: List[RegexNode],
     node_idx: Int,
@@ -335,7 +367,7 @@ fn _match_node(
 
 After:
 
-```rs
+```mojo
 fn _match_node[nodes: List[RegexNode], node_idx: Int](
     text: String,
     start_pos: Int
@@ -361,10 +393,12 @@ There are two main changes:
 That means `_match_node` is now a generic function, a template.
 
 
-There's only one `nodes` value (from the `Regex`), but there are 26 different `node_idx`s for this `Regex`. That means we'll have 26 different instantiations of this `_match_node`, one for each `node_idx`.
+There's only one `nodes` value (from the `Regex`), but there are 28 different `node_idx`s for this `Regex`. That means we'll have 28 different instantiations of this `_match_node`, one for each `node_idx`.
 
 
 Previously, we had a very simple call tree, with only one `_match_node`, that was recursive. The call tree looked like this:
+
+[# TODO: make more compact styling here. CSS override?]
 
  * `main`
     * `match`
@@ -376,76 +410,70 @@ Previously, we had a very simple call tree, with only one `_match_node`, that wa
                       * ... and so on
 
 
-Now, we have 26 versions of `_match_node`, with a call tree that looks like this:
+Now, we have 28 versions of `_match_node`, with a call tree that looks like this:
 
  * `main`
     * `match[Regex instance]`
-       * `_match_node` for root node
-          * `_match_node` for first `\w+`
-             * `_match_node` for first `\w`
-          * `_match_node` for `(\+\w*)?`
-             * `_match_node` for `\+\w*`
-                * `_match_node` for `\+`
-                * `_match_node` for `\w*`
-                   * `_match_node` for `\w`
-          * `_match_node` for `@`
-          * `_match_node` for `(\d+\.\d+\.\d+\.\d+|\w+\.\w+)`
-             * `_match_node` for `\d+\.\d+\.\d+\.\d+`
-                * `_match_node` for `\d+`
-                   * `_match_node` for `\d`
-                * `_match_node` for `\.`
-                * `_match_node` for `\d+`
-                   * `_match_node` for `\d`
-                * `_match_node` for `\.`
-                * `_match_node` for `\d+`
-                   * `_match_node` for `\d`
-                * `_match_node` for `\.`
-                * `_match_node` for `\d+`
-                   * `_match_node` for `\d`
-             * `_match_node` for `\w+\.\w+`
-                * `_match_node` for `\w+`
-                   * `_match_node` for `\w`
-                * `_match_node` for `\.`
-                * `_match_node` for `\w+`
-                   * `_match_node` for `\w`
+       * `_match_node[List(...), 0]` (for whole expr)
+          * ``_match_node[List(...), 1]` (for first `\w+`)
+             * `_match_node[List(...), 2]` (for `\w`)
+          * `_match_node[List(...), 3]` (for `(\+\w*)?`)
+             * `_match_node[List(...), 4]` (for `\+\w*`)
+                * `_match_node[List(...), 5]` (for `\+`)
+                * `_match_node[List(...), 6]` (for `\w*`)
+                   * `_match_node[List(...), 7]` (for `\w`)
+          * `_match_node[List(...), 8]` (for `@`)
+          * `_match_node[List(...), 9]` (for `(\d+\.\d+\.\d+\.\d+|\w+\.\w+)`)
+             * `_match_node[List(...), 10]` (for `\d+\.\d+\.\d+\.\d+`)
+                * `_match_node[List(...), 11]` (for `\d+`)
+                   * `_match_node[List(...), 12]` (for `\d`)
+                * `_match_node[List(...), 13]` (for `\.`)
+                * `_match_node[List(...), 14]` (for `\d+`)
+                   * `_match_node[List(...), 15]` (for `\d`)
+                * `_match_node[List(...), 16]` (for `\.`)
+                * `_match_node[List(...), 17]` (for `\d+`)
+                   * `_match_node[List(...), 18]` (for `\d`)
+                * `_match_node[List(...), 19]` (for `\.`)
+                * `_match_node[List(...), 20]` (for `\d+`)
+                   * `_match_node[List(...), 21]` (for `\d`)
+             * `_match_node[List(...), 22]` (for `\w+\.\w+`)
+                * `_match_node[List(...), 23]` (for `\w+`)
+                   * `_match_node[List(...), 24]` (for `\w`)
+                * `_match_node[List(...), 25]` (for `\.`)
+                * `_match_node[List(...), 26]` (for `\w+`)
+                   * `_match_node[List(...), 27]` (for `\w`)
 
 
-Let's look at the fourth item in that list: the `_match_node` for the first `RepeatNode`.
+28 versions, each different only in their `node_idx` compile-time parameter.
 
 
-When the compiler instantiates it as `_match_node[nodes, 5]`, it would look like below. The `@parameter if` is evaluated at compile time, so only one of its branches is included. I'll leave them in as comments to illustrate:
+To understand that better, let's look at the `_match_node[List(...), 1]` function for the first `\w+`.
 
-```rs
-fn _match_node[nodes, 5](  # Node 5 is a RepeatNode
+
+When the compiler instantiates it as `_match_node[List(...), 1]`, it would look like below. The `@parameter if` is evaluated at compile time, so only one of its branches is included. I'll leave them in as comments to illustrate:
+
+[# TODO: syntax highlighting for mojo]
+
+```mojo
+fn _match_node[List(...), 1](  # Node 1 is a RepeatNode
     text: String,
     start_pos: Int
 ) -> MatchResult:
-    var node = nodes[node_idx]
+#   alias node = nodes[node_idx]
 #   @parameter
 #   if node.isa[LiteralNode]():
 #       alias literal_node = node[LiteralNode]
 #       return _match_literal[nodes, literal_node](text, start_pos)
 #   elif node.isa[RepeatNode]():
-        alias repeat_node = node[RepeatNode]
-        return _match_repeat[nodes, repeat_node](text, start_pos)
+#       alias repeat_node = node[RepeatNode]
+        return _match_repeat[List(...), RepeatNode(2, 1, 0)](text, start_pos)
 #   elif ...
 ```
 
 
-Here it is with the comments removed:
-
-```rs
-fn _match_node[nodes, 5](  # Node 5 is a RepeatNode
-    text: String,
-    start_pos: Int
-) -> MatchResult:
-    alias node = nodes[node_idx]
-    alias repeat_node = node[RepeatNode]
-    return _match_repeat[nodes, repeat_node](text, start_pos)
-```
-
-
 The benefit here is that we don't have to do the `node.isa[LiteralNode]`, `node.isa[RepeatNode]`, etc. at run-time. That's pretty nice, it eliminates a bit of overhead.
+
+It also executed the `alias` statements for us too, so we don't have to do those lookups (and bounds checks) at run-time. Another nice speedup!
 
 
 We'll see the biggest benefit in the next section though.
@@ -457,50 +485,71 @@ Let's look at the call tree again:
 
  * `main`
     * `match[Regex instance]`
-       * `_match_node` for `root node`
-          * `_match_node` for first `\w+`
-             * `_match_node` for first `\w`
-          * `_match_node` for `(\+\w*)?`
-             * `_match_node` for `\+\w*`
-                * `_match_node` for `\+`
-                * `_match_node` for `\w*`
-                   * `_match_node` for `\w`
-          * `_match_node` for `@`
-          * `_match_node` for `(\d+\.\d+\.\d+\.\d+|\w+\.\w+)`
-             * `_match_node` for `\d+\.\d+\.\d+\.\d+`
-                * `_match_node` for `\d+`
-                   * `_match_node` for `\d`
-                * `_match_node` for `\.`
-                * `_match_node` for `\d+`
-                   * `_match_node` for `\d`
-                * `_match_node` for `\.`
-                * `_match_node` for `\d+`
-                   * `_match_node` for `\d`
-                * `_match_node` for `\.`
-                * `_match_node` for `\d+`
-                   * `_match_node` for `\d`
-             * `_match_node` for `\w+\.\w+`
-                * `_match_node` for `\w+`
-                   * `_match_node` for `\w`
-                * `_match_node` for `\.`
-                * `_match_node` for `\w+`
-                   * `_match_node` for `\w`
+       * `_match_node[List(...), 0]` (for whole expr)
+          * ``_match_node[List(...), 1]` (for first `\w+`)
+             * `_match_node[List(...), 2]` (for `\w`)
+          * `_match_node[List(...), 3]` (for `(\+\w*)?`)
+             * `_match_node[List(...), 4]` (for `\+\w*`)
+                * `_match_node[List(...), 5]` (for `\+`)
+                * `_match_node[List(...), 6]` (for `\w*`)
+                   * `_match_node[List(...), 7]` (for `\w`)
+          * `_match_node[List(...), 8]` (for `@`)
+          * `_match_node[List(...), 9]` (for `(\d+\.\d+\.\d+\.\d+|\w+\.\w+)`)
+             * `_match_node[List(...), 10]` (for `\d+\.\d+\.\d+\.\d+`)
+                * `_match_node[List(...), 11]` (for `\d+`)
+                   * `_match_node[List(...), 12]` (for `\d`)
+                * `_match_node[List(...), 13]` (for `\.`)
+                * `_match_node[List(...), 14]` (for `\d+`)
+                   * `_match_node[List(...), 15]` (for `\d`)
+                * `_match_node[List(...), 16]` (for `\.`)
+                * `_match_node[List(...), 17]` (for `\d+`)
+                   * `_match_node[List(...), 18]` (for `\d`)
+                * `_match_node[List(...), 19]` (for `\.`)
+                * `_match_node[List(...), 20]` (for `\d+`)
+                   * `_match_node[List(...), 21]` (for `\d`)
+             * `_match_node[List(...), 22]` (for `\w+\.\w+`)
+                * `_match_node[List(...), 23]` (for `\w+`)
+                   * `_match_node[List(...), 24]` (for `\w`)
+                * `_match_node[List(...), 25]` (for `\.`)
+                * `_match_node[List(...), 26]` (for `\w+`)
+                   * `_match_node[List(...), 27]` (for `\w`)
 
 
-Note how these are *not actually recursive calls* anymore. The compiler doesn't see these as recursive, it sees them as completely different functions.
+Note how these are *not actually recursive calls* anymore. The compiler doesn't see these as recursive, it sees them as completely different functions, because they are.
 
 As far as the compiler is concerned, this is a normal call tree, not a potentially infinite call tree.
 
 
 So... maybe we can inline them? Can we put `@always_inline` on these functions?
 
-Yes we can! Let's inline _everything_.
+Yes we can!
 
 
-Remember this function?
+Let's start by inlining the `_match_repeat` function. We do that by putting `@always_inline` on `fn _match_repeat`:
 
-```rs
-fn _match_node[nodes, 5](  # Node 5 is a RepeatNode
+```mojo
+@always_inline
+fn _match_repeat[
+    nodes: List[RegexNode], repeat_node: RepeatNode  # Compile-time parameter!
+](text: String, start_pos: Int) -> MatchResult:
+    var matches = 0
+    var total_consumed = 0
+    var pos = start_pos
+    while True:
+        if node.maximum_times >= 0 and matches >= node.maximum_times:
+            break
+        var result = _match_node[nodes, node.repeated](text, pos)
+        ...
+```
+
+
+And now it will be inlined into its caller.
+
+
+Remember our `_match_node[List(...), 1]` function?
+
+```mojo
+fn _match_node[List(...), 5](  # Node 5 is a RepeatNode
     text: String,
     start_pos: Int
 ) -> MatchResult:
@@ -510,25 +559,10 @@ fn _match_node[nodes, 5](  # Node 5 is a RepeatNode
     return _match_repeat[nodes, repeat_node](text, start_pos)
 ```
 
+Now that `_match_repeat` is inlined, `_match_node` looks more like this now:
 
-Let's inline the `_match_repeat` call first. We do that by putting `@always_inline` on `fn _match_repeat`:
-
-```rs
-@always_inline
-fn _match_repeat[
-    nodes: List[RegexNode], repeat_node: RepeatNode  # Compile-time parameter!
-](text: String, start_pos: Int) -> MatchResult:
-    var matches = 0
-    var total_consumed = 0
-    while True:
-        ...
-```
-
-
-Now it will be inlined into our `_match_node[nodes, 5]` call, which now looks like this:
-
-```rs
-fn _match_node[nodes, 5](  # Node 5 is a RepeatNode
+```mojo
+fn _match_node[List(...), 1](  # Node 1 is a RepeatNode
     text: String,
     start_pos: Int
 ) -> MatchResult:
@@ -538,12 +572,69 @@ fn _match_node[nodes, 5](  # Node 5 is a RepeatNode
     var matches = 0
     var total_consumed = 0
     while True:
+        if node.maximum_times >= 0 and matches >= node.maximum_times:
+            break
+        var result = _match_node[nodes, node.repeated](text, pos)
         ...
     ...
 ```
 
+And the compiler will also execute those `alias` statements at compile time and inline their results.
 
-And let's throw `@always_inline` on all the other functions too:
+This part:
+
+```
+if node.maximum_times >= 0 and matches >= node.maximum_times:
+    break
+```
+
+actually becomes:
+
+```
+if RepeatNode(2, 1, -1)_times >= 0 and matches >= RepeatNode(2, 1, 0).maximum_times:
+    break
+```
+
+which then becomes:
+
+```
+if -1 >= 0 and matches >= -1:
+    break
+```
+
+which then becomes:
+
+```
+if False and matches >= -1:
+    break
+```
+
+which is then completely eliminated, because it's impossible.
+
+So in the end, our `_match_node[List(...), 1]` function is much simpler, and more specialized to this particular RepeatNode.
+
+```mojo
+fn _match_node[List(...), 1](  # Node 1 is a RepeatNode
+    text: String,
+    start_pos: Int
+) -> MatchResult:
+    # No node lookup!
+    var matches = 0
+    var total_consumed = 0
+    while True:
+        # No useless maximum_times checks here!
+        var result = _match_node[nodes, node.repeated](text, pos)
+        ...
+    ...
+```
+
+[# TODO: explain maximum_times earlier better, show what that means in regex]
+
+
+We got all that benefit from just one `@always_inline` on one function!
+
+
+Let's throw `@always_inline` on all the functions:
 
  * `_match_literal`
  * `_match_charclass`
@@ -573,6 +664,29 @@ The final results (tested on an M2 Macbook Pro), run 200,000,000 times:
 
 The metaprogrammed version is *10x faster than the normal recursive version,* and within ~5% of the hand-written version.
 
+[# TODO: get better results]
+
+## The Downside
+
+Let's talk about the main downside: *compile times!*
+
+
+This takes much more time to compile, because the compiler is generating _much_ more code. In this example, we made 28 `_match_node[...]` functions, each about a fifth of the size of the original run-time recursive `_match_node`. So this technique generated about 5x as much `_match_node` code.
+
+
+One should use this technique wisely, probably only code that needs to run fast.
+
+
+## Could this go even faster than the hand-written version?
+
+I believe so!
+
+Regex libraries often do extra "optimizations" on the AST, before matching against the user's strings.
+
+For example, [# TODO: show an example]
+
+Of course, one must be mindful of compile times. As with any optimizations, you trade away run time for extra compile time.
+
 
 ## The Impossible Optimization
 
@@ -582,53 +696,30 @@ The metaprogrammed version is *10x faster than the normal recursive version,* an
 It turns out, if we use comptime, recursion, and inlining in the right way, we can accomplish amazing things.
 
 
-This is "metaprogramming". It's a term I've heard for many, many years, but I didn't truly understand its power and implications until now.
+_This_ is metaprogramming. It's not just templates and `constexpr`. It's moving entire aspects of your entire program into compile-time, doing custom optimizations so that it can work even better than hand-written code.
 
-
-## The Downside
-
-Let's talk about the main downside: *compile times!*
-
-
-This takes much more time to compile, because the compiler is generating _much_ more code. In this example, we made 26 `_match_node[...]` functions, each about a fifth of the size of the original run-time recursive `_match_node`. So this technique generated about 5x as much `_match_node` code.
-
-
-One should use this technique wisely, probably only code that needs to run fast.
+Metaprogramming is a term I've heard for many, many years, but I admit, I didn't truly understand its power and implications until now.
 
 
 ## The Implications
 
-This regex example is just something most of us can relate to, but it can be used for much more than compiling DSLs. This technique can be pushed ridiculously far.
+This regex example is just something most of us can relate to, but I think this technique can be used for much, much more.
 
 
-You could compile entire database transactions, fuse graphics shaders or GPU kernels together, and do all sorts of things with this technique.
+You could compile entire database transactions or fuse graphics shaders or fuse GPU kernels together. You could probably use this to eliminate redundant network calls or other expensive operations, like eliminating redundant regex sub-expressions. [# TODO: make sure to show that]
 
 
 *Any time you are making a predictable decision based on constant data, you could apply this technique.*
 
-
-It's particularly nice because it makes the call tree known at compile-time, which enables inlining, which enables all sorts of optimizations.
+In a way, this is like constant propagation taken to the extreme. [# If one thinks about it this way, one wonders why this technique is so obscure.]
 
 
 Now, some wild speculation. I think you could also use this:
 
  * To enable more intricate transformations, like in-memory journaled/persistent data structures.
  * With the `MaybeComptime` concept [here](https://github.com/modular/modular/issues/4887#issuecomment-3045841971) (for working with data when you don't know if it's known at compile time) to gracefully fallback to run-time operations.
- * To enable better remote execution of code.
 
-
-## Prior Art
-
-This technique is known as the "First Futamura Projection", but it's been impossible to do this with mainstream languages until recently.
-
-
-There are probably a lot of smaller languages can do this, but the biggest three I know of are C++ (as of C++20), Zig, and Mojo.
-
-
-This entire post was inspired by [Alexandros Naskos](https://github.com/alexnask)'s [ctregex](https://github.com/alexnask/ctregex.zig/tree/master) Zig library, and Zig's [print](https://github.com/ziglang/zig/blob/feb05a716d1ae105cf0e8f9966b6ade7f32dc680/lib/std/Io/Writer.zig#L594) function parses its format string at compile time.
-
-
-There are likely countless academic papers on this. If you zoom out three levels and squint, one could think of this as just the natural conclusion of good constant propagation.
+[# TODO: redo that last bit]
 
 
 ## Conclusion
