@@ -75,6 +75,8 @@ We all know that regex is pretty slow, because it basically has to run a whole i
 
 When you really need speed, you skip regex entirely and make a hand-written `matches` function like this:
 
+
+<ignore>
 ```mojo
 fn matches(text: String) -> Bool:
     var total_consumed = 0
@@ -107,6 +109,7 @@ fn matches(text: String) -> Bool:
     total_consumed += word_total_consumed
     ...  # much more code, for the rest of the pattern
 ```
+</ignore>
 
 
 This is literally 10x faster.
