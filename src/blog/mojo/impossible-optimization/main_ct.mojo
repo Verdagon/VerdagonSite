@@ -57,7 +57,6 @@ fn _match_literal[
     if end_pos > len(text):
         return MatchResult(False, 0)
 
-    # Could potentially unroll this loop too for small literals
     for i in range(len(literal)):
         if text[start_pos + i] != literal[i]:
             return MatchResult(False, 0)

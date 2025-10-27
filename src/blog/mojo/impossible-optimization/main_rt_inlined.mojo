@@ -15,6 +15,7 @@ from benchmark import keep
 from time import perf_counter_ns
 
 
+@always_inline
 fn _match_node(
     nodes: List[RegexNode], node_idx: Int, text: String, start_pos: Int
 ) -> MatchResult:
@@ -38,6 +39,7 @@ fn _match_node(
         return MatchResult(False, 0)
 
 
+@always_inline
 fn _match_literal(
     nodes: List[RegexNode], node: LiteralNode, text: String, start_pos: Int
 ) -> MatchResult:
@@ -56,6 +58,7 @@ fn _match_literal(
     return MatchResult(True, len(literal))
 
 
+@always_inline
 fn _match_charclass(
     nodes: List[RegexNode], node: CharClassNode, text: String, start_pos: Int
 ) -> MatchResult:
@@ -98,6 +101,7 @@ fn _match_charclass(
         return MatchResult(False, 0)
 
 
+@always_inline
 fn _match_or(
     nodes: List[RegexNode], node: OrNode, text: String, start_pos: Int
 ) -> MatchResult:
@@ -111,6 +115,7 @@ fn _match_or(
     return MatchResult(False, 0)
 
 
+@always_inline
 fn _match_repeat(
     nodes: List[RegexNode], node: RepeatNode, text: String, start_pos: Int
 ) -> MatchResult:
@@ -134,6 +139,7 @@ fn _match_repeat(
         return MatchResult(False, 0)
 
 
+@always_inline
 fn _match_sequence(
     nodes: List[RegexNode], node: SequenceNode, text: String, start_pos: Int
 ) -> MatchResult:

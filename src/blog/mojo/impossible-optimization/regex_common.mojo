@@ -269,11 +269,14 @@ struct Parser(Movable):
             return len(self.nodes) - 1
 
 
-@fieldwise_init
 struct MatchResult(Copyable, Movable):
     var matched: Bool
     var chars_consumed: Int
 
+    @always_inline
+    fn __init__(out self, matched: Bool, chars_consumed: Int):
+        self.matched = matched
+        self.chars_consumed = chars_consumed
 
 struct Regex(ImplicitlyCopyable):
     var nodes: List[RegexNode]

@@ -9,28 +9,19 @@ namespace: c-blog m-annotated
 ---
 
 
-<ignore>
-TODO:
-* scala
-* strengthen i am me
-* mention that we could theoretically get information about the host machine
-* flip perspective: why are langs forcing to runtime? not very zero cost
-* parser combinator?
-* "if you have a sequence describing things to do"
-
-</ignore>
-
-
 Every once in a while, you come across an optimization that is so mind-blowingly _weird_, that you feel like you're peering into some sort of alternate dimension.
 
 
-Until recently, I believed that metaprogramming is just a way to write code that writes code. That's not interesting, we've been doing that for decades! Heck, that's _all you do_ in PHP. And that's C++ templates. Metaprogramming is just C++ templates, plus all the neat compile-time features like `constexpr`, right?
+Until recently, I believed that metaprogramming is basically just normal C++ templates with a few neat features like `constexpr` thrown on top. I thought it was just "writing code that writes code", like we've been doing with PHP since the dawn of time. Simple stuff, right?
 
 
-If you believe that like I did, buckle up! I'm going to show you how metaprogramming can be used to unlock what I call *the impossible optimization*, a way to speed up your code tenfold.
+If you believe that like I did, buckle up! I'm going to show you how metaprogramming can be used to unlock what I call *the impossible optimization*.
 
 
-! Big shout-out to [Zig](https://ziglang.org/) and Alexandros Naskos for his [ctregex](https://github.com/alexnask/ctregex.zig/tree/master) Zig library. While I was investigating Mojo's dependent types superpowers, I found that library which inspired this whole thing. This post explains that technique, and expands on it to talk about how far we can take it.
+And I don't just mean little 5% optimizations. I'm talking about crazy optimizations that make your code _ten times_ faster.
+
+
+! Big shout-out to Alexandros Naskos's [ctregex](https://github.com/alexnask/ctregex.zig/tree/master) Zig library, which is a great example of what metaprogramming can do, and inspired the examples in this post.
 
 
 ## The Impossible Optimization
@@ -56,21 +47,25 @@ fn main():
 </ignore>
 
 
-<pre><code><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">main</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"></span>
-    <span style="color: #c9d1d9">email_regex</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9">
-        </span><span style="color: #d2a8ff">Regex</span><span style="color: #d2a8ff">(</span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">w+(</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">w*)?@(</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">d+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">.</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">d+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">.</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">d+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">.</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">d+|</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">w+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">.</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">w+)</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">
-    <span></span>
-    </span><span style="color: #d2a8ff">print</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">matches</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">email_regex</span><span style="color: #d2a8ff">,</span><span style="color: #d2a8ff"> </span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">user@example.com</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">      </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints True</span><span style="color: #c9d1d9">
-    </span><span style="color: #d2a8ff">print</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">matches</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">email_regex</span><span style="color: #d2a8ff">,</span><span style="color: #d2a8ff"> </span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">uexample.com</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">          </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints False</span><span style="color: #c9d1d9">
-    </span><span style="color: #d2a8ff">print</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">matches</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">email_regex</span><span style="color: #d2a8ff">,</span><span style="color: #d2a8ff"> </span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">user@ecom</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">             </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints False</span><span style="color: #c9d1d9">
-    </span><span style="color: #d2a8ff">print</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">matches</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">email_regex</span><span style="color: #d2a8ff">,</span><span style="color: #d2a8ff"> </span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">user+tag@example.com</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">  </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints True</span><span style="color: #c9d1d9">
-    </span><span style="color: #d2a8ff">print</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">matches</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">email_regex</span><span style="color: #d2a8ff">,</span><span style="color: #d2a8ff"> </span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">user@100</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">              </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints False</span><span style="color: #c9d1d9">
-    </span><span style="color: #d2a8ff">print</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">matches</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">email_regex</span><span style="color: #d2a8ff">,</span><span style="color: #d2a8ff"> </span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">howdy123@1.2.3.4</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">      </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints True</span><span style="color: #c9d1d9">
-    </span><span style="color: #d2a8ff">print</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">matches</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">email_regex</span><span style="color: #d2a8ff">,</span><span style="color: #d2a8ff"> </span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">howdy1231.2.3.4</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">       </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints False</span><span style="color: #c9d1d9">
-    </span><span style="color: #d2a8ff">print</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">matches</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">email_regex</span><span style="color: #d2a8ff">,</span><span style="color: #d2a8ff"> </span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">howdy123@1/2/3/4</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">      </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints False</span></code></pre>
+<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">main</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">email&#95;regex</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span>
+<span style="color: #c9d1d9">        </span><span style="color: #d2a8ff">Regex</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">&quot;</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">w+(</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">w*)?@(</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">d+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">.</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">d+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">.</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">d+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">.</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">d+|</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">w+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">.</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">w+)</span><span style="color: #c9d1d9">&quot;</span><span style="color: #c9d1d9">)</span>
+<span></span>
+<span style="color: #c9d1d9">    </span><span style="color: #d2a8ff">print</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">matches</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">email&#95;regex</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #c9d1d9">&quot;</span><span style="color: #a5d6ff">user@example.com</span><span style="color: #c9d1d9">&quot;</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">      </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints True</span>
+<span style="color: #c9d1d9">    </span><span style="color: #d2a8ff">print</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">matches</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">email&#95;regex</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #c9d1d9">&quot;</span><span style="color: #a5d6ff">uexample.com</span><span style="color: #c9d1d9">&quot;</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">          </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints False</span>
+<span style="color: #c9d1d9">    </span><span style="color: #d2a8ff">print</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">matches</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">email&#95;regex</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #c9d1d9">&quot;</span><span style="color: #a5d6ff">user@ecom</span><span style="color: #c9d1d9">&quot;</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">             </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints False</span>
+<span style="color: #c9d1d9">    </span><span style="color: #d2a8ff">print</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">matches</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">email&#95;regex</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #c9d1d9">&quot;</span><span style="color: #a5d6ff">user+tag@example.com</span><span style="color: #c9d1d9">&quot;</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">  </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints True</span>
+<span style="color: #c9d1d9">    </span><span style="color: #d2a8ff">print</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">matches</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">email&#95;regex</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #c9d1d9">&quot;</span><span style="color: #a5d6ff">user@100</span><span style="color: #c9d1d9">&quot;</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">              </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints False</span>
+<span style="color: #c9d1d9">    </span><span style="color: #d2a8ff">print</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">matches</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">email&#95;regex</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #c9d1d9">&quot;</span><span style="color: #a5d6ff">howdy123@1.2.3.4</span><span style="color: #c9d1d9">&quot;</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">      </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints True</span>
+<span style="color: #c9d1d9">    </span><span style="color: #d2a8ff">print</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">matches</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">email&#95;regex</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #c9d1d9">&quot;</span><span style="color: #a5d6ff">howdy1231.2.3.4</span><span style="color: #c9d1d9">&quot;</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">       </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints False</span>
+<span style="color: #c9d1d9">    </span><span style="color: #d2a8ff">print</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">matches</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">email&#95;regex</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #c9d1d9">&quot;</span><span style="color: #a5d6ff">howdy123@1/2/3/4</span><span style="color: #c9d1d9">&quot;</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">      </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints False</span></code></pre>
 
 
-We all know that regex is pretty slow, because it basically has to run a whole interpreter. Or, if we "precompile" a Regex, it would be interpreting an AST, which is still pretty slow. [#precompileregex]
+
+
+
+
+We all know that regex is pretty slow, because it basically has to run a whole interpreter. Or, if we "precompile" a Regex, it would be interpreting an AST (or a DFA), which is still pretty slow. [#precompileregex]
 
 
 When you really need speed, you skip regex entirely and make a hand-written `matches` function like this:
@@ -112,6 +107,44 @@ fn matches(text: String) -> Bool:
 </ignore>
 
 
+<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">matches</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Bool</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">total&#95;consumed</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">pos</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">text&#95;len</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">len</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">text</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">word&#95;matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">word&#95;total&#95;consumed</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">while</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">True</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">pos</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">text&#95;len</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">            </span><span style="color: #ff7b72">break</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">ch</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">text</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">pos</span><span style="color: #c9d1d9">]</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">alias</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">char&#95;class</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">&quot;</span><span style="color: #a5d6ff">word</span><span style="color: #c9d1d9">&quot;</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">char&#95;matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">False</span>
+<span style="color: #c9d1d9">        </span><span style="color: #c9d1d9">char&#95;matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">(</span>
+<span style="color: #c9d1d9">            </span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">ord</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">&quot;</span><span style="color: #a5d6ff">a</span><span style="color: #c9d1d9">&quot;</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&lt;=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">ord</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">ch</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&lt;=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">ord</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">&quot;</span><span style="color: #a5d6ff">z</span><span style="color: #c9d1d9">&quot;</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">            </span><span style="color: #ff7b72">or</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">ord</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">&quot;</span><span style="color: #a5d6ff">A</span><span style="color: #c9d1d9">&quot;</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&lt;=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">ord</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">ch</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&lt;=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">ord</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">&quot;</span><span style="color: #a5d6ff">Z</span><span style="color: #c9d1d9">&quot;</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">            </span><span style="color: #ff7b72">or</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">ord</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">&quot;</span><span style="color: #a5d6ff">0</span><span style="color: #c9d1d9">&quot;</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&lt;=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">ord</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">ch</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&lt;=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">ord</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">&quot;</span><span style="color: #a5d6ff">9</span><span style="color: #c9d1d9">&quot;</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">            </span><span style="color: #ff7b72">or</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">ch</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">==</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">&quot;</span><span style="color: #a5d6ff">&#95;</span><span style="color: #c9d1d9">&quot;</span>
+<span style="color: #c9d1d9">        </span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">not</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">char&#95;matches</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">            </span><span style="color: #ff7b72">break</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">chars&#95;consumed</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">1</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">chars&#95;consumed</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">==</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">            </span><span style="color: #ff7b72">break</span>
+<span style="color: #c9d1d9">        </span><span style="color: #c9d1d9">word&#95;matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">+=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">1</span>
+<span style="color: #c9d1d9">        </span><span style="color: #c9d1d9">word&#95;total&#95;consumed</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">+=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">chars&#95;consumed</span>
+<span style="color: #c9d1d9">        </span><span style="color: #c9d1d9">pos</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">+=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">chars&#95;consumed</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">word&#95;matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&lt;</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">1</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">return</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">False</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">total&#95;consumed</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">+=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">word&#95;total&#95;consumed</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">...</span><span style="color: #c9d1d9">  </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> much more code, for the rest of the pattern</span></code></pre>
+
+
+
+
+
+
+
+
 This is literally 10x faster.
 
 
@@ -119,7 +152,7 @@ It makes you wonder, can an optimizer somehow do this for us? Unfortunately, no.
 
 
 <slice>
-#precompileregex: TODO: more explanation here, link out
+#precompileregex: Real regex engines don't convert patterns into ASTs (Abstract Syntax Trees) like this example; they instead convert them into state machines (DFAs/NFAs) that process input with state transitions. This toy implementation uses a recursive AST interpreter instead, which has function call overhead at every node, but it much better illustrates the powers of this technique: _all_ the overhead is eliminated.
 </slice>
 
 
@@ -163,11 +196,13 @@ The problem is that `matches` is kind of like an interpreter. It takes in a cons
 It then navigates up and down the tree according to what character is next in the user's string.
 
 
-! Actual regex implementations are a _lot_ more sophisticated, and use state machines instead of an AST like this. This is my own simplistic Regex subset implementation made just for this post. [# I had to hold myself back from adding even more interesting features to it, like SIMD.]
+! Actual regex implementations are a _lot_ more sophisticated, and use state machines instead of an AST like this. This is my own simplistic Regex subset implementation made just for this post. [# I had to hold myself back from adding even more interesting features to it, like SIMD. This implementation also doesn't support backtracking, which real regex engines need for more complex patterns.]
 
 
 To illustrate, here's the top-level `matches` function:
 
+
+<ignore>
 ```mojo
 
 @no_inline
@@ -175,10 +210,20 @@ fn matches(regex: Regex, text: String) -> Bool:
     var result = _match_node(regex.nodes, regex.root_idx, text, 0)
     return result.matched and result.chars_consumed == len(text)
 ```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span></span>
+<span style="color: #c9d1d9">@</span><span style="color: #d2a8ff">no&#95;inline</span>
+<span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">matches</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">regex</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Regex</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Bool</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">result</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">regex</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">nodes</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">regex</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">root&#95;idx</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">text</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">return</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">result</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">matched</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">and</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">result</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">chars&#95;consumed</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">==</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">len</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">text</span><span style="color: #c9d1d9">)</span></code></pre>
 
 
 ...which really just calls into the (recursive) `_match_node` function:
 
+
+<ignore>
 ```mojo
 fn _match_node(
     nodes: List[RegexNode], node_idx: Int, text: String, start_pos: Int
@@ -192,9 +237,26 @@ fn _match_node(
         return _match_repeat(nodes, repeat_node, text, start_pos)
     elif ...
 ```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">(</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">nodes</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">List</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">RegexNode</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">node&#95;idx</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">start&#95;pos</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span>
+<span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">MatchResult</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">nodes</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">node&#95;idx</span><span style="color: #c9d1d9">]</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">isa</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">LiteralNode</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">        </span><span style="color: #c9d1d9">ref</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">literal&#95;node</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">LiteralNode</span><span style="color: #c9d1d9">]</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">return</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;literal</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">nodes</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">literal&#95;node</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">text</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">start&#95;pos</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">elif</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">isa</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">RepeatNode</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">        </span><span style="color: #c9d1d9">ref</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">repeat&#95;node</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">RepeatNode</span><span style="color: #c9d1d9">]</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">return</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;repeat</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">nodes</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">repeat&#95;node</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">text</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">start&#95;pos</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">elif</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">...</span></code></pre>
+
 
 ...which calls various functions, like the below `_match_repeat` function. This function checks the repeating parts of the regular expression, like how how email regex's `\w+` uses `+` to repeat the `\w`.
 
+
+<ignore>
 ```mojo
 fn _match_repeat(
     nodes: List[RegexNode],  # All the regex nodes
@@ -221,6 +283,33 @@ fn _match_repeat(
     else:
         return MatchResult(False, 0)
 ```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;repeat</span><span style="color: #c9d1d9">(</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">nodes</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">List</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">RegexNode</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9">  </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> All the regex nodes</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">node</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">LiteralNode</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9">       </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Which node we&#039;re currently on</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9">            </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> User&#039;s string</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">start&#95;pos</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span><span style="color: #c9d1d9">           </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Where in the user&#039;s string we&#039;re at</span>
+<span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">MatchResult</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">total&#95;consumed</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">pos</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">start&#95;pos</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">while</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">True</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">maximum&#95;times</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">and</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">maximum&#95;times</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">            </span><span style="color: #ff7b72">break</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">result</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">nodes</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">node</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">repeated</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">text</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">pos</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">not</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">result</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">matched</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">            </span><span style="color: #ff7b72">break</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">result</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">chars&#95;consumed</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">==</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">            </span><span style="color: #ff7b72">break</span>
+<span style="color: #c9d1d9">        </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">+=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">1</span>
+<span style="color: #c9d1d9">        </span><span style="color: #c9d1d9">total&#95;consumed</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">+=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">result</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">chars&#95;consumed</span>
+<span style="color: #c9d1d9">        </span><span style="color: #c9d1d9">pos</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">+=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">result</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">chars&#95;consumed</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">minimum&#95;times</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">return</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">MatchResult</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">True</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">total&#95;consumed</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">else</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">return</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">MatchResult</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">False</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9">)</span></code></pre>
 
 
 One benefit of the recursive approach is that it's very flexible. It can execute an arbitrary tree of nodes; it can execute an arbitrary regular expression. The hand-written version doesn't have that flexibility, it's coded up-front.
@@ -231,12 +320,20 @@ But of course, the *flexibility has a cost*: recursion requires more function ca
 
 Another problem is that this general regex code has extra flexibility that the hand-written one doesn't need. Look at this condition from above:
 
-```
+
+<ignore>
+```mojo
     if node.maximum_times >= 0 and matches >= node.maximum_times:
         break
 ```
+</ignore>
 
-This code is only relevant when we want a maximum number of matches. But `\w+` has no upper limit, we want it to match any number of `\w` characters. So it's unfortunate that this useless code is in here. The hand-written version is faster because it doesn't have that problem.
+
+<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #c9d1d9">    </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">maximum&#95;times</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">and</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">maximum&#95;times</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">break</span></code></pre>
+
+
+This code is only relevant when we want a maximum number of matches, as if we said `\w{,7}` to mean maximum 7 matches. But `\w+` has no upper limit, we want it to match any number of `\w` characters. So it's unfortunate that this useless code is in here. The hand-written version is faster because it doesn't have that problem.
 
 
 The hand-written version is also theoretically more optimizable because everything is in one function, as if we *inlined all these recursive `_match_node`, `_match_repeat`, etc calls.* Optimizers generally do better when everything is in one function.
@@ -255,6 +352,8 @@ So the obvious question: can we inline `_match_node`?
 
 Let's try it, by throwing a `@always_inline` on it:
 
+
+<ignore>
 ```mojo
 @always_inline
 fn _match_node(
@@ -262,9 +361,36 @@ fn _match_node(
 ) -> MatchResult:
     ...
 ```
+</ignore>
 
 
-But this doesn't work of course, because you can't inline a recursive call! No language can, that I know of. [# Unless you count tail-call optimization. And I bet there's a recursion-equivalent of loop unrolling too.] [# TODO: show actual error]
+<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #c9d1d9">@</span><span style="color: #d2a8ff">always&#95;inline</span>
+<span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">(</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">nodes</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">List</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">RegexNode</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">node&#95;idx</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">start&#95;pos</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span>
+<span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">MatchResult</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">...</span></code></pre>
+
+
+But of course, trying to inline a recursive call causes a compile error:
+
+
+```
+main_rt_inlined.mojo:19:4: error: function has recursive call to 'always_inline' function
+fn _match_node(
+   ^
+main_rt_inlined.mojo:28:29: note: through call here
+        return _match_repeat(nodes, repeat_node, text, start_pos)
+                            ^
+main_rt_inlined.mojo:119:4: note: to function marked 'always_inline' here
+fn _match_repeat(
+   ^
+main_rt_inlined.mojo:128:33: note: call here recurses
+        var result = _match_node(nodes, node.repeated, text, pos)
+                                ^
+main_rt_inlined.mojo:19:4: note: back to function here
+fn _match_node(
+   ^
+```
 
 
 So let's table this line of thinking for now. We might come back to it later.
@@ -297,33 +423,51 @@ To parse the Regex into nodes at compile time, we simply need to change the `var
 
 Before:
 
-```
+
+<ignore>
+```mojo
 # Parse the regex (at runtime)
 var regex = Regex("\w+(\+\w*)?@(\d+\.\d+\.\d+\.\d+|\w+\.\w+)")
 regex.match(regex.nodes, regex.root_node, user_string, 0)
 ```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #8b949e">#</span><span style="color: #8b949e"> Parse the regex (at runtime)</span>
+<span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">regex</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">Regex</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">&quot;</span><span style="color: #a5d6ff">\w+(\+\w*)?@(\d+\.\d+\.\d+\.\d+|\w+\.\w+)</span><span style="color: #c9d1d9">&quot;</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">regex</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">match</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">regex</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">nodes</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">regex</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">root&#95;node</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">user&#95;string</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9">)</span></code></pre>
+
 
 After:
 
-```
+
+<ignore>
+```mojo
 # Parse the regex (at compile time)
 alias regex = Regex("\w+(\+\w*)?@(\d+\.\d+\.\d+\.\d+|\w+\.\w+)")
 _match_node[regex.nodes, regex.root_node](user_string, 0)
 ```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #8b949e">#</span><span style="color: #8b949e"> Parse the regex (at compile time)</span>
+<span style="color: #ff7b72">alias</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">regex</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">Regex</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">&quot;</span><span style="color: #a5d6ff">\w+(\+\w*)?@(\d+\.\d+\.\d+\.\d+|\w+\.\w+)</span><span style="color: #c9d1d9">&quot;</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">&#95;match&#95;node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">regex</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">nodes</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">regex</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">root&#95;node</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">user&#95;string</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9">)</span></code></pre>
+
 
 `alias` is Mojo-speak for "compile-time variable". [# I kind of wish Mojo had a `comptime` keyword like Zig, but alas!]
 
 
 "But wait Evan, that's a _lot_ of code to run at compile time, can compilers really execute general code at compile-time?"
 
-They can! This is one of the biggest features of Mojo and Zig: a simple keyword (`alias` in Mojo, `comptime` in Zig) can lift almost any computation to compile time. [# I say almost because there are things a language shouldn't allow at compile time, like reading from stdin, etc.] There are other languages too (Scala, MetaOCaml, etc.) but Mojo and Zig stand out to me because they make it a bit easier. [# TODO: doublecheck, any other obvious languages? haskell maybe?]
+They can! This is one of the nicer features of Mojo (and a few other languages like D, Nim, Zig, etc.). A simple keyword (`alias`) can lift almost any computation [# I say almost because there are things a language shouldn't allow at compile time, like reading from stdin, etc.] to compile time, and the same code can be run at compile-time or run-time depending on how it's used (like `var` vs `alias`).
 
 In this case, the compiler is running a whole little parser, with its own recursion, heap allocation, all sorts of stuff. And now it's happening at compile-time.
 
 
-"Wait, did you say heap allocation? Isn't heap allocation at compile-time impossible?"
+"Wait Evan, did you say heap allocation? Isn't heap allocation at compile-time impossible?"
 
-It used to be impossible, but not anymore! Mojo can do it, Zig can do it, and [C++20 enabled it](https://accu.org/journals/overload/31/176/fertig/#:~:text=Or%20in,appealing%20use-cases).
+It's rare, but not impossible! Lisps were doing it back in the 60s, D has done it since 2011, Mojo and Zig can do it, and [C++20 enabled it](https://accu.org/journals/overload/31/176/fertig/#:~:text=Or%20in,appealing%20use-cases) too.
 
 
 Deep inside the Mojo compiler, there's a compile-time interpreter, intertwined with the instantiator (the "elaborator", which monomorphizes all generics), which runs all expressions inside generic arguments (`[...]`) and inside `alias` statements. This compile-time interpreter can execute pretty much any operation that a normal CPU could execute, including malloc and free.
@@ -350,6 +494,8 @@ Here's how we change our program.
 
 Before:
 
+
+<ignore>
 ```mojo
 fn _match_node(
     nodes: List[RegexNode],
@@ -366,10 +512,29 @@ fn _match_node(
         return _match_repeat(nodes, repeat_node, text, start_pos)
     elif ...
 ```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">(</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">nodes</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">List</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">RegexNode</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">,</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">node&#95;idx</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span><span style="color: #c9d1d9">,</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">,</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">start&#95;pos</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span>
+<span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">MatchResult</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">nodes</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">node&#95;idx</span><span style="color: #c9d1d9">]</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">isa</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">LiteralNode</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">        </span><span style="color: #c9d1d9">ref</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">literal&#95;node</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">LiteralNode</span><span style="color: #c9d1d9">]</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">return</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;literal</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">nodes</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">literal&#95;node</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">text</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">start&#95;pos</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">elif</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">isa</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">RepeatNode</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">        </span><span style="color: #c9d1d9">ref</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">repeat&#95;node</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">RepeatNode</span><span style="color: #c9d1d9">]</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">return</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;repeat</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">nodes</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">repeat&#95;node</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">text</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">start&#95;pos</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">elif</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">...</span></code></pre>
 
 
 After:
 
+
+<ignore>
 ```mojo
 fn _match_node[nodes: List[RegexNode], node_idx: Int](
     text: String,
@@ -385,6 +550,22 @@ fn _match_node[nodes: List[RegexNode], node_idx: Int](
         return _match_repeat[nodes, repeat_node](text, start_pos)
     elif ...
 ```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #79c0ff">nodes</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">List</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">RegexNode</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">node&#95;idx</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">,</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">start&#95;pos</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span>
+<span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">MatchResult</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">alias</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">nodes</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">node&#95;idx</span><span style="color: #c9d1d9">]</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">@</span><span style="color: #d2a8ff">parameter</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">isa</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">LiteralNode</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">alias</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">literal&#95;node</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">LiteralNode</span><span style="color: #c9d1d9">]</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">return</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">&#95;match&#95;literal</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">nodes</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">literal&#95;node</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">text</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">start&#95;pos</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">elif</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">isa</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">RepeatNode</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">alias</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">repeat&#95;node</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">RepeatNode</span><span style="color: #c9d1d9">]</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">return</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">&#95;match&#95;repeat</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">nodes</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">repeat&#95;node</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">text</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">start&#95;pos</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">elif</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">...</span></code></pre>
 
 
 There are two main changes:
@@ -401,8 +582,6 @@ There's only one `nodes` value (from the `Regex`), but there are 28 different `n
 
 Previously, we had a very simple call tree, with only one `_match_node`, that was recursive. The call tree looked like this:
 
-[# TODO: make more compact styling here. CSS override?]
-
  * `main`
     * `match`
        * `_match_node`
@@ -418,7 +597,7 @@ Now, we have 28 versions of `_match_node`, with a call tree that looks like this
  * `main`
     * `match[Regex instance]`
        * `_match_node[List(...), 0]` (for whole expr)
-          * ``_match_node[List(...), 1]` (for first `\w+`)
+          * `_match_node[List(...), 1]` (for first `\w+`)
              * `_match_node[List(...), 2]` (for `\w`)
           * `_match_node[List(...), 3]` (for `(\+\w*)?`)
              * `_match_node[List(...), 4]` (for `\+\w*`)
@@ -455,8 +634,8 @@ To understand that better, let's look at the `_match_node[List(...), 1]` functio
 
 When the compiler instantiates it as `_match_node[List(...), 1]`, it would look like below. The `@parameter if` is evaluated at compile time, so only one of its branches is included. I'll leave them in as comments to illustrate:
 
-[# TODO: syntax highlighting for mojo]
 
+<ignore>
 ```mojo
 fn _match_node[List(...), 1](  # Node 1 is a RepeatNode
     text: String,
@@ -472,6 +651,22 @@ fn _match_node[List(...), 1](  # Node 1 is a RepeatNode
         return _match_repeat[List(...), RepeatNode(2, 1, 0)](text, start_pos)
 #   elif ...
 ```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">List(...), 1</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">  </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Node 1 is a RepeatNode</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">,</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">start&#95;pos</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span>
+<span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">MatchResult</span><span style="color: #c9d1d9">:</span>
+<span style="color: #8b949e">#</span><span style="color: #8b949e">   alias node = nodes&#91;node&#95;idx]</span>
+<span style="color: #8b949e">#</span><span style="color: #8b949e">   @parameter</span>
+<span style="color: #8b949e">#</span><span style="color: #8b949e">   if node.isa&#91;LiteralNode]():</span>
+<span style="color: #8b949e">#</span><span style="color: #8b949e">       alias literal&#95;node = node&#91;LiteralNode]</span>
+<span style="color: #8b949e">#</span><span style="color: #8b949e">       return &#95;match&#95;literal&#91;nodes, literal&#95;node](text, start&#95;pos)</span>
+<span style="color: #8b949e">#</span><span style="color: #8b949e">   elif node.isa&#91;RepeatNode]():</span>
+<span style="color: #8b949e">#</span><span style="color: #8b949e">       alias repeat&#95;node = node&#91;RepeatNode]</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">return</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">&#95;match&#95;repeat</span><span style="color: #c9d1d9">&#91;</span><span style="color: #d2a8ff">List</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">...</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">RepeatNode</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">2</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #79c0ff">1</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">text</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">start&#95;pos</span><span style="color: #c9d1d9">)</span>
+<span style="color: #8b949e">#</span><span style="color: #8b949e">   elif ...</span></code></pre>
 
 
 The benefit here is that we don't have to do the `node.isa[LiteralNode]`, `node.isa[RepeatNode]`, etc. at run-time. That's pretty nice, it eliminates a bit of overhead.
@@ -489,7 +684,7 @@ Let's look at the call tree again:
  * `main`
     * `match[Regex instance]`
        * `_match_node[List(...), 0]` (for whole expr)
-          * ``_match_node[List(...), 1]` (for first `\w+`)
+          * `_match_node[List(...), 1]` (for first `\w+`)
              * `_match_node[List(...), 2]` (for `\w`)
           * `_match_node[List(...), 3]` (for `(\+\w*)?`)
              * `_match_node[List(...), 4]` (for `\+\w*`)
@@ -530,6 +725,8 @@ Yes we can!
 
 Let's start by inlining the `_match_repeat` function. We do that by putting `@always_inline` on `fn _match_repeat`:
 
+
+<ignore>
 ```mojo
 @always_inline
 fn _match_repeat[
@@ -544,6 +741,21 @@ fn _match_repeat[
         var result = _match_node[nodes, node.repeated](text, pos)
         ...
 ```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #c9d1d9">@</span><span style="color: #d2a8ff">always&#95;inline</span>
+<span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;repeat</span><span style="color: #c9d1d9">&#91;</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">nodes</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">List</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">RegexNode</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">repeat&#95;node</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">RepeatNode</span><span style="color: #c9d1d9">  </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Compile-time parameter!</span>
+<span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">start&#95;pos</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">MatchResult</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">total&#95;consumed</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">pos</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">start&#95;pos</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">while</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">True</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">maximum&#95;times</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">and</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">maximum&#95;times</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">            </span><span style="color: #ff7b72">break</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">result</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">&#95;match&#95;node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">nodes</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">repeated</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">text</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">pos</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">        </span><span style="color: #c9d1d9">...</span></code></pre>
 
 
 And now it will be inlined into its caller.
@@ -551,6 +763,8 @@ And now it will be inlined into its caller.
 
 Remember our `_match_node[List(...), 1]` function?
 
+
+<ignore>
 ```mojo
 fn _match_node[List(...), 5](  # Node 5 is a RepeatNode
     text: String,
@@ -561,9 +775,23 @@ fn _match_node[List(...), 5](  # Node 5 is a RepeatNode
     # Let's inline this _match_repeat call first!
     return _match_repeat[nodes, repeat_node](text, start_pos)
 ```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">List(...), 5</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">  </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Node 5 is a RepeatNode</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">,</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">start&#95;pos</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span>
+<span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">MatchResult</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">alias</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">nodes</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">node&#95;idx</span><span style="color: #c9d1d9">]</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">alias</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">repeat&#95;node</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">RepeatNode</span><span style="color: #c9d1d9">]</span>
+<span style="color: #c9d1d9">    </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Let&#039;s inline this &#95;match&#95;repeat call first!</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">return</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">&#95;match&#95;repeat</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">nodes</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">repeat&#95;node</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">text</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">start&#95;pos</span><span style="color: #c9d1d9">)</span></code></pre>
+
 
 Now that `_match_repeat` is inlined, `_match_node` looks more like this now:
 
+
+<ignore>
 ```mojo
 fn _match_node[List(...), 1](  # Node 1 is a RepeatNode
     text: String,
@@ -581,41 +809,94 @@ fn _match_node[List(...), 1](  # Node 1 is a RepeatNode
         ...
     ...
 ```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">List(...), 1</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">  </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Node 1 is a RepeatNode</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">,</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">start&#95;pos</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span>
+<span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">MatchResult</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">alias</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">nodes</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">node&#95;idx</span><span style="color: #c9d1d9">]</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">alias</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">repeat&#95;node</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">RepeatNode</span><span style="color: #c9d1d9">]</span>
+<span style="color: #c9d1d9">    </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Inlined `&#95;match&#95;repeat` call</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">total&#95;consumed</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">while</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">True</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">maximum&#95;times</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">and</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">maximum&#95;times</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">            </span><span style="color: #ff7b72">break</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">result</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">&#95;match&#95;node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">nodes</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">repeated</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">text</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">pos</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">        </span><span style="color: #c9d1d9">...</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">...</span></code></pre>
+
 
 And the compiler will also execute those `alias` statements at compile time and inline their results.
 
 This part:
 
-```
+
+<ignore>
+```mojo
 if node.maximum_times >= 0 and matches >= node.maximum_times:
     break
 ```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">maximum&#95;times</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">and</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">maximum&#95;times</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">break</span></code></pre>
+
 
 actually becomes:
 
-```
+
+<ignore>
+```mojo
 if RepeatNode(2, 1, -1)_times >= 0 and matches >= RepeatNode(2, 1, 0).maximum_times:
     break
 ```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">RepeatNode</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">2</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #79c0ff">1</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #ff7b72">-</span><span style="color: #79c0ff">1</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">&#95;times</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">and</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">RepeatNode</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">2</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #79c0ff">1</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">maximum&#95;times</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">break</span></code></pre>
+
 
 which then becomes:
 
-```
+
+<ignore>
+```mojo
 if -1 >= 0 and matches >= -1:
     break
 ```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">-</span><span style="color: #79c0ff">1</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">and</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">-</span><span style="color: #79c0ff">1</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">break</span></code></pre>
+
 
 which then becomes:
 
-```
+
+<ignore>
+```mojo
 if False and matches >= -1:
     break
 ```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">False</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">and</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">-</span><span style="color: #79c0ff">1</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">break</span></code></pre>
+
 
 which is then completely eliminated, because it's impossible.
 
 So in the end, our `_match_node[List(...), 1]` function is much simpler, and more specialized to this particular RepeatNode.
 
+
+<ignore>
 ```mojo
 fn _match_node[List(...), 1](  # Node 1 is a RepeatNode
     text: String,
@@ -630,8 +911,21 @@ fn _match_node[List(...), 1](  # Node 1 is a RepeatNode
         ...
     ...
 ```
+</ignore>
 
-[# TODO: explain maximum_times earlier better, show what that means in regex]
+
+<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">List(...), 1</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">  </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Node 1 is a RepeatNode</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">,</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">start&#95;pos</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span>
+<span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">MatchResult</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> No node lookup!</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">total&#95;consumed</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">while</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">True</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">        </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> No useless maximum&#95;times checks here!</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">result</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">&#95;match&#95;node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">nodes</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">repeated</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">text</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">pos</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">        </span><span style="color: #c9d1d9">...</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">...</span></code></pre>
 
 
 We got all that benefit from just one `@always_inline` on one function!
@@ -660,14 +954,33 @@ And looking at the generated IR, *it was all folded down into one function*, str
 
 The final results (tested on an M2 Macbook Pro), run 200,000,000 times:
 
- * Normal recursive version (main_rt.mojo): 135.23 seconds
- * Metaprogrammed version (main_ct.mojo): 13.38 seconds
- * Hand-written version (12.72 seconds)
+ * Normal recursive version (main_rt.mojo): 135.9 seconds
+ * Metaprogrammed version (main_ct.mojo): 13.4 seconds
+ * Hand-written version (13.0 seconds)
 
 
-The metaprogrammed version is *10x faster than the normal recursive version,* and within ~5% of the hand-written version.
+The metaprogrammed version is *10x faster than the normal recursive version,* and within ~3% of the hand-written version.
 
-[# TODO: get better results]
+Pretty impressive!
+
+
+## Could this go even faster than the hand-written version?
+
+It could!
+
+
+Regex libraries often do their own custom optimizations on the AST, before matching against the user's strings.
+
+For example, the pattern `(catastrophe|catapult|category)` shares the prefix 'cat'. At compile-time, we could detect this and generate code that's more like `cat(astrophe|apult|egory)`, saving some comparisons.
+
+Or, for patterns like `\b(GET|POST|PUT|DELETE)\b`, it could figure out (at compile-time) a perfect hash table or trie, replacing 4 string comparisons with one hash lookup / string compare.
+
+
+These are techniques you rarely see in hand-written versions, but are very common in normal regex engines.
+
+If we combine those with this technique, we could get those optimizations _on top of_ hand-written performance.
+
+
 
 ## The Downside
 
@@ -677,27 +990,14 @@ Let's talk about the main downside: *compile times!*
 This takes much more time to compile, because the compiler is generating _much_ more code. In this example, we made 28 `_match_node[...]` functions, each about a fifth of the size of the original run-time recursive `_match_node`. So this technique generated about 5x as much `_match_node` code.
 
 
+And if you do custom optimizations like I mentioned in the last section, that also gets more performance at the cost of more compile time.
+
+
 One should use this technique wisely, probably only code that needs to run fast.
 
 
-## Could this go even faster than the hand-written version?
 
-I believe so!
-
-Regex libraries often do extra "optimizations" on the AST, before matching against the user's strings.
-
-For example, [# TODO: show an example]
-
-Of course, one must be mindful of compile times. As with any optimizations, you trade away run time for extra compile time.
-
-
-## The Impossible Optimization
-
-...isn't so impossible anymore!
-
-
-It turns out, if we use comptime, recursion, and inlining in the right way, we can accomplish amazing things.
-
+## Metaprogramming
 
 _This_ is metaprogramming. It's not just templates and `constexpr`. It's moving entire aspects of your entire program into compile-time, doing custom optimizations so that it can work even better than hand-written code.
 
@@ -709,24 +1009,48 @@ Metaprogramming is a term I've heard for many, many years, but I admit, I didn't
 This regex example is just something most of us can relate to, but I think this technique can be used for much, much more.
 
 
-You could compile entire database transactions or fuse graphics shaders or fuse GPU kernels together. You could probably use this to eliminate redundant network calls or other expensive operations, like eliminating redundant regex sub-expressions. [# TODO: make sure to show that]
+This is just wild speculation, but I think you could use this for:
+
+ * Compiling entire database queries
+ * Fusing graphics shaders together or GPU kernels together
+ * Eliminate redundant network, like how we eliminated those redundant regex sub-expressions
+ * Eliminate redundant matrix operations (like two transposes next to each other)
+ * Combining a map, reduce, and map all into one operation
+ * Crazy data structures, like in-memory journaled databases / persistent data structures.
 
 
-*Any time you are making a predictable decision based on constant data, you could apply this technique.*
+If I was to generalize:
 
-In a way, this is like constant propagation taken to the extreme. [# If one thinks about it this way, one wonders why this technique is so obscure.]
-
-
-Now, some wild speculation. I think you could also use this:
-
- * To enable more intricate transformations, like in-memory journaled/persistent data structures.
- * With the `MaybeComptime` concept [here](https://github.com/modular/modular/issues/4887#issuecomment-3045841971) (for working with data when you don't know if it's known at compile time) to gracefully fallback to run-time operations.
-
-[# TODO: redo that last bit]
+ * Any time you are *making decisions based on information that you know at compile time,* you could apply this technique.
+ * This lets you do *custom, high-level optimizations*.
+ * If you ever have *data describing computations*, you could use this to remove that data layer, to remove that abstraction.
 
 
-## Conclusion
+There's a few other directions I want to explore here:
 
-(TODO: conclusion here)
+ * If you squint, this is a kind of constant propagation, where a compiler is more aware of what's known at compile-time and what's not. And given that, I suspect we could combine it with the `MaybeComptime` concept described [here](https://github.com/modular/modular/issues/4887#issuecomment-3045841971) and [here](https://github.com/modular/modular/issues/1731#issuecomment-1931462973) (for working with data when you don't know if it's known at compile time) to take it one step further and let the compiler constant-propagate even more.
+ * If we get can feed in more details about the target machine, like cache size, kind of CPU, kind of graphics or compute cards, etc., then we can specialize code according to those details, giving us code that's way, way faster. This is actually pretty convenient for Mojo, which is compiled on the user's machine, since it's part of the Python ecosystem.
+
+
+If you have any thoughts on where this technique can go, let me know!
+
+
+## The Impossible Optimization
+
+...is totally possible, it turns out!
+
+
+If you want to read more on this technique, search for [first Futamura projection](https://en.wikipedia.org/wiki/Partial_evaluation#Futamura_projections) or "staged programming" which is a similar concept.
+
 
 If you want to see the code, you can find it [here](https://github.com/Verdagon/MojoCompileTimeRegex).
+
+
+I hope you enjoyed this! Stay tuned for more articles by subscribing to the [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), or the [r/Vale](https://reddit.com/r/vale) subreddit, and come hang out in the [Vale discord](https://discord.gg/SNB8yGH).
+
+
+Cheers!
+
+- Evan
+
+
