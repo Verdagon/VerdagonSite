@@ -44,13 +44,8 @@ fn _match_node[
 
 @always_inline
 fn _match_literal[
-    nodes: List[RegexNode], literal_node: LiteralNode  # Compile-time parameter!
+    nodes: List[RegexNode], literal_node: LiteralNode
 ](text: String, start_pos: Int) -> MatchResult:
-    """Match a literal string with full compile-time specialization.
-
-    The literal_node is passed as a compile-time parameter, allowing the
-    compiler to generate optimized code for this specific literal.
-    """
     alias literal = literal_node.string_literal
     var end_pos = start_pos + len(literal)
 
@@ -67,16 +62,8 @@ fn _match_literal[
 @always_inline
 fn _match_charclass[
     nodes: List[RegexNode],
-    charclass_node: CharClassNode,  # Compile-time parameter!
+    charclass_node: CharClassNode,
 ](text: String, start_pos: Int) -> MatchResult:
-    """Match a character class with full compile-time specialization.
-
-    Supports:
-    - "word": [a-zA-Z0-9_]
-    - "digit": [0-9]
-    - "space": [ \t\n\r]
-    - "any": any character
-    """
     if start_pos >= len(text):
         return MatchResult(False, 0)
 
@@ -110,15 +97,8 @@ fn _match_charclass[
 
 @always_inline
 fn _match_or[
-    nodes: List[RegexNode], or_node: OrNode  # Compile-time parameter!
+    nodes: List[RegexNode], or_node: OrNode
 ](text: String, start_pos: Int) -> MatchResult:
-    """Match OR node with full compile-time specialization.
-
-    Since or_node is a compile-time parameter, or_node.num_options is compile-time too,
-    so we can use it directly in the range! The compiler generates exactly the right
-    number of iterations - no extra bounds checks needed.
-    """
-
     @parameter
     for i in range(or_node.num_options):
         var result = _match_node[nodes, or_node.options[i]](text, start_pos)
@@ -130,14 +110,12 @@ fn _match_or[
 
 @always_inline
 fn _match_repeat[
-    nodes: List[RegexNode], repeat_node: RepeatNode  # Compile-time parameter!
+    nodes: List[RegexNode], repeat_node: RepeatNode
 ](text: String, start_pos: Int) -> MatchResult:
-    """Match repetition node with compile-time specialization."""
     var matches = 0
     var total_consumed = 0
     var pos = start_pos
 
-    # Note: This loop must remain runtime since we don't know how many matches until we try
     while True:
         if (
             repeat_node.maximum_times >= 0
@@ -157,7 +135,6 @@ fn _match_repeat[
         total_consumed += result.chars_consumed
         pos += result.chars_consumed
 
-    # Check if we met the minimum requirement
     if matches >= repeat_node.minimum_times:
         return MatchResult(True, total_consumed)
     else:
@@ -167,14 +144,8 @@ fn _match_repeat[
 @always_inline
 fn _match_sequence[
     nodes: List[RegexNode],
-    sequence_node: SequenceNode,  # Compile-time parameter!
+    sequence_node: SequenceNode,
 ](text: String, start_pos: Int) -> MatchResult:
-    """Match sequence with full compile-time specialization.
-
-    Since sequence_node is a compile-time parameter, sequence_node.num_items is compile-time too,
-    so we can use it directly in the range! The compiler generates exactly the right
-    number of iterations - no extra bounds checks needed.
-    """
     var total_consumed = 0
     var pos = start_pos
 
@@ -192,21 +163,6 @@ fn _match_sequence[
 
 @no_inline
 fn matches[regex: Regex](text: String) -> Bool:
-    """Check if regex matches text (compile-time optimized version).
-
-    Takes regex as a compile-time parameter, enabling aggressive optimizations.
-    The entire regex structure is known at compile-time, allowing the compiler
-    to generate specialized matching code.
-
-    Parameters:
-        regex: The compiled regex pattern (compile-time constant).
-
-    Args:
-        text: The text to match against.
-
-    Returns:
-        True if the entire text matches the pattern, False otherwise.
-    """
     var result = _match_node[regex.nodes, regex.root_idx](text, 0)
     return result.matched and result.chars_consumed == len(text)
 

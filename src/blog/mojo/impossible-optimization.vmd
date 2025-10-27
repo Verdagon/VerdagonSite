@@ -140,15 +140,12 @@ fn matches(text: String) -> Bool:
 
 
 
+This is about 10.5x faster. [# Tested on an M2 Macbook Pro, run 200,000,000 times, more details below.]
 
 
+It makes you wonder, can an optimizer somehow do this for us?
 
-
-
-This is literally 10x faster.
-
-
-It makes you wonder, can an optimizer somehow do this for us? Unfortunately, no. There are a lot of challenges in the way, as I'll explain below.
+Unfortunately, no. There are a lot of challenges in the way, as I'll explain below.
 
 
 <slice>
@@ -315,7 +312,7 @@ fn _match_repeat(
 One benefit of the recursive approach is that it's very flexible. It can execute an arbitrary tree of nodes; it can execute an arbitrary regular expression. The hand-written version doesn't have that flexibility, it's coded up-front.
 
 
-But of course, the *flexibility has a cost*: recursion requires more function calls than the hand-written version, and *function calls have overhead.* Every time we call a function, that's pushing and popping on the stack. The hand-written version is faster because it doesn't have that problem.
+But of course, the *flexibility has a cost:* recursion requires more function calls than the hand-written version, and *function calls have overhead.* Every time we call a function, that's pushing and popping on the stack. The hand-written version is faster because it doesn't have that problem.
 
 
 Another problem is that this general regex code has extra flexibility that the hand-written one doesn't need. Look at this condition from above:
@@ -333,7 +330,7 @@ Another problem is that this general regex code has extra flexibility that the h
 <span style="color: #c9d1d9">        </span><span style="color: #ff7b72">break</span></code></pre>
 
 
-This code is only relevant when we want a maximum number of matches, as if we said `\w{,7}` to mean maximum 7 matches. But `\w+` has no upper limit, we want it to match any number of `\w` characters. So it's unfortunate that this useless code is in here. The hand-written version is faster because it doesn't have that problem.
+This code is only relevant when we want a maximum number of matches, as if we said `\w{,7}` to mean maximum 7 matches. But our particular email regex has things like `\w+` with no upper limit, to match any number of `\w` characters. So it's unfortunate that this useless code is in here, slowing things down. The hand-written version is faster because it doesn't have that problem.
 
 
 The hand-written version is also theoretically more optimizable because everything is in one function, as if we *inlined all these recursive `_match_node`, `_match_repeat`, etc calls.* Optimizers generally do better when everything is in one function.
@@ -730,7 +727,7 @@ Let's start by inlining the `_match_repeat` function. We do that by putting `@al
 ```mojo
 @always_inline
 fn _match_repeat[
-    nodes: List[RegexNode], repeat_node: RepeatNode  # Compile-time parameter!
+    nodes: List[RegexNode], repeat_node: RepeatNode
 ](text: String, start_pos: Int) -> MatchResult:
     var matches = 0
     var total_consumed = 0
@@ -746,7 +743,7 @@ fn _match_repeat[
 
 <pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #c9d1d9">@</span><span style="color: #d2a8ff">always&#95;inline</span>
 <span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;repeat</span><span style="color: #c9d1d9">&#91;</span>
-<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">nodes</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">List</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">RegexNode</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">repeat&#95;node</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">RepeatNode</span><span style="color: #c9d1d9">  </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Compile-time parameter!</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">nodes</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">List</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">RegexNode</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">repeat&#95;node</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">RepeatNode</span><span style="color: #c9d1d9"></span>
 <span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">start&#95;pos</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">MatchResult</span><span style="color: #c9d1d9">:</span>
 <span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span>
 <span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">total&#95;consumed</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span>
@@ -941,7 +938,7 @@ Let's throw `@always_inline` on all the functions:
  * `_match_node`
 
 
-### The Result
+## The Result
 
 Suddenly, our large call tree above becomes simply this:
 
@@ -976,7 +973,7 @@ For example, the pattern `(catastrophe|catapult|category)` shares the prefix 'ca
 Or, for patterns like `\b(GET|POST|PUT|DELETE)\b`, it could figure out (at compile-time) a perfect hash table or trie, replacing 4 string comparisons with one hash lookup / string compare.
 
 
-These are techniques you rarely see in hand-written versions, but are very common in normal regex engines.
+These are techniques you rarely see in hand-written versions, but are common in normal regex engines.
 
 If we combine those with this technique, we could get those optimizations _on top of_ hand-written performance.
 
@@ -993,7 +990,7 @@ This takes much more time to compile, because the compiler is generating _much_ 
 And if you do custom optimizations like I mentioned in the last section, that also gets more performance at the cost of more compile time.
 
 
-One should use this technique wisely, probably only code that needs to run fast.
+One should use this technique wisely, only on code that needs to run fast.
 
 
 
@@ -1001,7 +998,7 @@ One should use this technique wisely, probably only code that needs to run fast.
 
 _This_ is metaprogramming. It's not just templates and `constexpr`. It's moving entire aspects of your entire program into compile-time, doing custom optimizations so that it can work even better than hand-written code.
 
-Metaprogramming is a term I've heard for many, many years, but I admit, I didn't truly understand its power and implications until now.
+Metaprogramming is a term I've heard for many, many years, but I admit, I didn't truly understand its power and implications until seeing what it could do here.
 
 
 ## The Implications
@@ -1013,7 +1010,7 @@ This is just wild speculation, but I think you could use this for:
 
  * Compiling entire database queries
  * Fusing graphics shaders together or GPU kernels together
- * Eliminate redundant network, like how we eliminated those redundant regex sub-expressions
+ * Eliminate redundant network fetches or file system reads, like how we eliminated those redundant regex sub-expressions
  * Eliminate redundant matrix operations (like two transposes next to each other)
  * Combining a map, reduce, and map all into one operation
  * Crazy data structures, like in-memory journaled databases / persistent data structures.
@@ -1035,15 +1032,16 @@ There's a few other directions I want to explore here:
 If you have any thoughts on where this technique can go, let me know!
 
 
-## The Impossible Optimization
+## Conclusion
 
-...is totally possible, it turns out!
+It turns out, the impossible optimization is totally possible!
+
+All it took was a little metaprogramming sorcery.
+
+If you want to see the code, you can find it [here](https://github.com/Verdagon/MojoCompileTimeRegex).
 
 
 If you want to read more on this technique, search for [first Futamura projection](https://en.wikipedia.org/wiki/Partial_evaluation#Futamura_projections) or "staged programming" which is a similar concept.
-
-
-If you want to see the code, you can find it [here](https://github.com/Verdagon/MojoCompileTimeRegex).
 
 
 I hope you enjoyed this! Stay tuned for more articles by subscribing to the [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), or the [r/Vale](https://reddit.com/r/vale) subreddit, and come hang out in the [Vale discord](https://discord.gg/SNB8yGH).

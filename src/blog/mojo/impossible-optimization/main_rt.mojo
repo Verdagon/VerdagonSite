@@ -41,7 +41,6 @@ fn _match_node(
 fn _match_literal(
     nodes: List[RegexNode], node: LiteralNode, text: String, start_pos: Int
 ) -> MatchResult:
-    """Internal function to match a literal string."""
     var literal = node.string_literal
     var end_pos = start_pos + len(literal)
 
@@ -59,14 +58,6 @@ fn _match_literal(
 fn _match_charclass(
     nodes: List[RegexNode], node: CharClassNode, text: String, start_pos: Int
 ) -> MatchResult:
-    """Internal function to match a character class.
-
-    Supports:
-    - "word": [a-zA-Z0-9_]
-    - "digit": [0-9]
-    - "space": [ \t\n\r]
-    - "any": any character
-    """
     if start_pos >= len(text):
         return MatchResult(False, 0)
 
@@ -101,7 +92,6 @@ fn _match_charclass(
 fn _match_or(
     nodes: List[RegexNode], node: OrNode, text: String, start_pos: Int
 ) -> MatchResult:
-    """Internal function to match an alternation (OR) node (runtime version)."""
     # Try each option in the OR
     for i in range(node.num_options):
         var result = _match_node(nodes, node.options[i], text, start_pos)
@@ -137,7 +127,6 @@ fn _match_repeat(
 fn _match_sequence(
     nodes: List[RegexNode], node: SequenceNode, text: String, start_pos: Int
 ) -> MatchResult:
-    """Internal function to match a sequence of nodes (runtime version)."""
     var total_consumed = 0
     var pos = start_pos
 
@@ -155,15 +144,6 @@ fn _match_sequence(
 
 @no_inline
 fn matches(regex: Regex, text: String) -> Bool:
-    """Check if the regex matches the entire text string (runtime version).
-
-    Args:
-        regex: The compiled regex pattern.
-        text: The text to match against.
-
-    Returns:
-        True if the entire text matches the pattern, False otherwise.
-    """
     var result = _match_node(regex.nodes, regex.root_idx, text, 0)
     return result.matched and result.chars_consumed == len(text)
 

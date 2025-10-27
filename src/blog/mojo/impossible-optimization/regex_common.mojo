@@ -1,16 +1,7 @@
-"""Common regex data structures and parser.
-
-This module contains the shared code between compile-time and runtime regex implementations:
-- Node type definitions
-- Parser implementation
-- Regex struct
-"""
-
 from utils import Variant, StaticTuple
 from os import abort
 from collections import InlineArray
 
-alias MAX_NODES = 100
 alias MAX_OPTIONS = 20  # Max branches in an OR node
 alias MAX_SEQUENCE_ITEMS = 20  # Max items in a sequence
 
@@ -27,7 +18,7 @@ struct CharClassNode(ImplicitlyCopyable, Movable):
 
 @fieldwise_init
 struct OrNode(ImplicitlyCopyable, Movable):
-    var options: StaticTuple[Int, MAX_OPTIONS]
+    var options: StaticTuple[Int, MAX_OPTIONS]  # TODO: Use List instead
     var num_options: Int
 
 
@@ -40,7 +31,7 @@ struct RepeatNode(ImplicitlyCopyable, Movable):
 
 @fieldwise_init
 struct SequenceNode(ImplicitlyCopyable, Movable):
-    var items: StaticTuple[Int, MAX_SEQUENCE_ITEMS]
+    var items: StaticTuple[Int, MAX_SEQUENCE_ITEMS]  # TODO: Use List instead
     var num_items: Int
 
 
@@ -92,11 +83,11 @@ struct Parser(Movable):
         if len(options) == 1:
             return options[0]
         else:
+            # TODO: Use List instead
             if len(options) > MAX_OPTIONS:
                 raise Error(
                     "Too many OR branches: maximum is " + String(MAX_OPTIONS)
                 )
-
             var static_options = StaticTuple[Int, MAX_OPTIONS]()
             for i in range(len(options)):
                 static_options[i] = options[i]
@@ -126,6 +117,7 @@ struct Parser(Movable):
                     + String(MAX_SEQUENCE_ITEMS)
                 )
 
+            # TODO: Use List instead
             var static_items = StaticTuple[Int, MAX_SEQUENCE_ITEMS]()
             for i in range(len(items)):
                 static_items[i] = items[i]
@@ -299,10 +291,6 @@ struct Regex(ImplicitlyCopyable):
             )
 
     fn __copyinit__(out self, existing: Self):
-        """Copy constructor - deep copy the nodes list.
-
-        Required for ImplicitlyCopyable, which is needed for compile-time parameters.
-        """
         self.nodes = List[RegexNode]()
         for i in range(len(existing.nodes)):
             self.nodes.append(existing.nodes[i])

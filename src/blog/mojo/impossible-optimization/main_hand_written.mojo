@@ -110,7 +110,6 @@ fn matches(text: String) -> Bool:
         if pos >= text_len:
             break
         var ch_digit = text[pos]
-        alias char_class_digit = "digit"
         var digit_char_matches = False
         digit_char_matches = ord("0") <= ord(ch_digit) <= ord("9")
         if not digit_char_matches:
@@ -136,7 +135,6 @@ fn matches(text: String) -> Bool:
                 if pos >= text_len:
                     break
                 var ch_digit2 = text[pos]
-                alias char_class_digit2 = "digit"
                 var digit_char_matches2 = False
                 digit_char_matches2 = ord("0") <= ord(ch_digit2) <= ord("9")
                 if not digit_char_matches2:
@@ -161,7 +159,6 @@ fn matches(text: String) -> Bool:
                         if pos >= text_len:
                             break
                         var ch_digit3 = text[pos]
-                        alias char_class_digit3 = "digit"
                         var digit_char_matches3 = False
                         digit_char_matches3 = ord("0") <= ord(ch_digit3) <= ord("9")
                         if not digit_char_matches3:
@@ -186,7 +183,6 @@ fn matches(text: String) -> Bool:
                                 if pos >= text_len:
                                     break
                                 var ch_digit4 = text[pos]
-                                alias char_class_digit4 = "digit"
                                 var digit_char_matches4 = False
                                 digit_char_matches4 = ord("0") <= ord(ch_digit4) <= ord("9")
                                 if not digit_char_matches4:
