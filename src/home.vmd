@@ -17,6 +17,7 @@ I use this site to blog about my endeavors. Enjoy!
 # Recent posts:
 
 
+ * [The Impossible Optimization, and the Metaprogramming To Achieve It](https://verdagon.dev/blog/impossible-optimization)
  * [Group Borrowing: Zero-Cost Memory Safety with Fewer Restrictions](/blog/group-borrowing)
  * [On Joining the Mojo Compiler Team](/blog/on-joining-mojo-compiler-team)
  * [Crossing the Impossible FFI Boundary, and My Gradual Descent Into Madness](/blog/exploring-seamless-rust-interop-part-2)

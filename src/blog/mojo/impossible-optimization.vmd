@@ -24,6 +24,9 @@ And I don't just mean little 5% optimizations. I'm talking about crazy optimizat
 ! Big shout-out to Alexandros Naskos's [ctregex](https://github.com/alexnask/ctregex.zig/tree/master) Zig library, which is a great example of what metaprogramming can do, and inspired the examples in this post.
 
 
+<slice/>
+
+
 ## The Impossible Optimization
 
 Imagine that you had a program using a simple regex function, and you wanted to use it to verify emails: [# ...which is a TERRIBLE idea and you should never do it (see [this page](https://stackoverflow.com/questions/201323/how-can-i-validate-an-email-address-using-a-regular-expression)) but what's life without a little regex-related sin!]
@@ -47,7 +50,7 @@ fn main():
 </ignore>
 
 
-<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">main</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">main</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
 <span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">email&#95;regex</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span>
 <span style="color: #c9d1d9">        </span><span style="color: #d2a8ff">Regex</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">&quot;</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">w+(</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">w*)?@(</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">d+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">.</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">d+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">.</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">d+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">.</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">d+|</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">w+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">.</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">w+)</span><span style="color: #c9d1d9">&quot;</span><span style="color: #c9d1d9">)</span>
 <span></span>
@@ -107,7 +110,7 @@ fn matches(text: String) -> Bool:
 </ignore>
 
 
-<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">matches</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Bool</span><span style="color: #c9d1d9">:</span>
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">matches</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Bool</span><span style="color: #c9d1d9">:</span>
 <span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">total&#95;consumed</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span>
 <span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">pos</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span>
 <span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">text&#95;len</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">len</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">text</span><span style="color: #c9d1d9">)</span>
@@ -140,7 +143,7 @@ fn matches(text: String) -> Bool:
 
 
 
-This is about 10.5x faster. [# Tested on an M2 Macbook Pro, run 200,000,000 times, more details below.]
+This is about 10.5x faster in my benchmarks. [# Tested on M2 Macbook Pro, run 200,000,000 times, more details below.]
 
 
 It makes you wonder, can an optimizer somehow do this for us?
@@ -149,7 +152,7 @@ Unfortunately, no. There are a lot of challenges in the way, as I'll explain bel
 
 
 <slice>
-#precompileregex: Real regex engines don't convert patterns into ASTs (Abstract Syntax Trees) like this example; they instead convert them into state machines (DFAs/NFAs) that process input with state transitions. This toy implementation uses a recursive AST interpreter instead, which has function call overhead at every node, but it much better illustrates the powers of this technique: _all_ the overhead is eliminated.
+#precompileregex: Real regex engines typically parse patterns into ASTs first, then compile them to state machines (DFAs/NFAs) that process input with state transitions. This toy implementation uses a recursive AST interpreter instead, which has function call overhead at every node, but it much better illustrates the powers of this technique: _all_ the overhead is eliminated.
 </slice>
 
 
@@ -210,7 +213,7 @@ fn matches(regex: Regex, text: String) -> Bool:
 </ignore>
 
 
-<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span></span>
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span></span>
 <span style="color: #c9d1d9">@</span><span style="color: #d2a8ff">no&#95;inline</span>
 <span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">matches</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">regex</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Regex</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Bool</span><span style="color: #c9d1d9">:</span>
 <span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">result</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">regex</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">nodes</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">regex</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">root&#95;idx</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">text</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9">)</span>
@@ -237,7 +240,7 @@ fn _match_node(
 </ignore>
 
 
-<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">(</span>
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">(</span>
 <span style="color: #c9d1d9">    </span><span style="color: #79c0ff">nodes</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">List</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">RegexNode</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">node&#95;idx</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">start&#95;pos</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span>
 <span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">MatchResult</span><span style="color: #c9d1d9">:</span>
 <span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">nodes</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">node&#95;idx</span><span style="color: #c9d1d9">]</span>
@@ -283,7 +286,7 @@ fn _match_repeat(
 </ignore>
 
 
-<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;repeat</span><span style="color: #c9d1d9">(</span>
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;repeat</span><span style="color: #c9d1d9">(</span>
 <span style="color: #c9d1d9">    </span><span style="color: #79c0ff">nodes</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">List</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">RegexNode</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9">  </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> All the regex nodes</span>
 <span style="color: #c9d1d9">    </span><span style="color: #79c0ff">node</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">LiteralNode</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9">       </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Which node we&#039;re currently on</span>
 <span style="color: #c9d1d9">    </span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9">            </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> User&#039;s string</span>
@@ -326,7 +329,7 @@ Another problem is that this general regex code has extra flexibility that the h
 </ignore>
 
 
-<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #c9d1d9">    </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">maximum&#95;times</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">and</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">maximum&#95;times</span><span style="color: #c9d1d9">:</span>
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #c9d1d9">    </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">maximum&#95;times</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">and</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">maximum&#95;times</span><span style="color: #c9d1d9">:</span>
 <span style="color: #c9d1d9">        </span><span style="color: #ff7b72">break</span></code></pre>
 
 
@@ -337,6 +340,9 @@ The hand-written version is also theoretically more optimizable because everythi
 
 
 Is there a way to get these benefits for our general `Regex` code?
+
+
+<slice/>
 
 
 ## Can we inline recursive calls?
@@ -361,7 +367,7 @@ fn _match_node(
 </ignore>
 
 
-<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #c9d1d9">@</span><span style="color: #d2a8ff">always&#95;inline</span>
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #c9d1d9">@</span><span style="color: #d2a8ff">always&#95;inline</span>
 <span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">(</span>
 <span style="color: #c9d1d9">    </span><span style="color: #79c0ff">nodes</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">List</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">RegexNode</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">node&#95;idx</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">start&#95;pos</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span>
 <span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">MatchResult</span><span style="color: #c9d1d9">:</span>
@@ -393,12 +399,15 @@ fn _match_node(
 So let's table this line of thinking for now. We might come back to it later.
 
 
+<slice/>
+
+
 ## The Sorcery
 
 I promised something mind-blowingly _weird_, so let's make things weird.
 
 
-We're going do something called the [first Futamura projection](https://en.wikipedia.org/wiki/Partial_evaluation#Futamura_projections), or as it's known to some, "the three steps of Futamura sorcery". [# By "some", I mean like three people. Two if you don't count me.]
+We're going to do some [multi-stage programming](https://en.wikipedia.org/wiki/Multi-stage_programming) to get similar effects to the [first Futamura projection](https://en.wikipedia.org/wiki/Partial_evaluation#Futamura_projections), [# Specifically, we're specializing an interpreter for a specific program, though we'll use a few explicit staging annotations (`alias` and square brackets) rather than automatic partial evaluation.] or as it's known to some, "the three steps of Futamura sorcery". [# By "some", I mean like three people. Two if you don't count me.]
 
 
 We'll:
@@ -408,6 +417,9 @@ We'll:
  * Inline.
 
 ...and then something amazing happens.
+
+
+<slice/>
 
 
 ### Step 1: Parse the Regex at compile-time
@@ -430,7 +442,7 @@ regex.match(regex.nodes, regex.root_node, user_string, 0)
 </ignore>
 
 
-<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #8b949e">#</span><span style="color: #8b949e"> Parse the regex (at runtime)</span>
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #8b949e">#</span><span style="color: #8b949e"> Parse the regex (at runtime)</span>
 <span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">regex</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">Regex</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">&quot;</span><span style="color: #a5d6ff">\w+(\+\w*)?@(\d+\.\d+\.\d+\.\d+|\w+\.\w+)</span><span style="color: #c9d1d9">&quot;</span><span style="color: #c9d1d9">)</span>
 <span style="color: #c9d1d9">regex</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">match</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">regex</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">nodes</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">regex</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">root&#95;node</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">user&#95;string</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9">)</span></code></pre>
 
@@ -447,7 +459,7 @@ _match_node[regex.nodes, regex.root_node](user_string, 0)
 </ignore>
 
 
-<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #8b949e">#</span><span style="color: #8b949e"> Parse the regex (at compile time)</span>
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #8b949e">#</span><span style="color: #8b949e"> Parse the regex (at compile time)</span>
 <span style="color: #ff7b72">alias</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">regex</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">Regex</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">&quot;</span><span style="color: #a5d6ff">\w+(\+\w*)?@(\d+\.\d+\.\d+\.\d+|\w+\.\w+)</span><span style="color: #c9d1d9">&quot;</span><span style="color: #c9d1d9">)</span>
 <span style="color: #c9d1d9">&#95;match&#95;node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">regex</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">nodes</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">regex</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">root&#95;node</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">user&#95;string</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9">)</span></code></pre>
 
@@ -464,10 +476,13 @@ In this case, the compiler is running a whole little parser, with its own recurs
 
 "Wait Evan, did you say heap allocation? Isn't heap allocation at compile-time impossible?"
 
-It's rare, but not impossible! Lisps were doing it back in the 60s, D has done it since 2011, Mojo and Zig can do it, and [C++20 enabled it](https://accu.org/journals/overload/31/176/fertig/#:~:text=Or%20in,appealing%20use-cases) too.
+It's rare, but not impossible! Mojo, D, Nim, and Zig can do it, and C++ [as of C++20](https://accu.org/journals/overload/31/176/fertig/#:~:text=Or%20in,appealing%20use-cases). There are likely some other languages that can do it, but these are the only ones that can truly run normal run-time code at compile time, as opposed to requiring compile-time calculations to be expressed in a different dialect. Though, I'd bet that some Lisps were doing all this back in the 60s and 70s too, as is usually the case!
 
 
-Deep inside the Mojo compiler, there's a compile-time interpreter, intertwined with the instantiator (the "elaborator", which monomorphizes all generics), which runs all expressions inside generic arguments (`[...]`) and inside `alias` statements. This compile-time interpreter can execute pretty much any operation that a normal CPU could execute, including malloc and free.
+Deep inside the Mojo compiler, there's a compile-time interpreter that works closely with the instantiator (the "elaborator", which monomorphizes all generics), which runs all expressions inside generic arguments (`[...]`) and inside `alias` statements. This compile-time interpreter can execute pretty much any operation that a normal CPU could execute, including malloc and free.
+
+
+<slice/>
 
 
 ### Step 2: Make Regex a compile-time parameter, use compile-time operations
@@ -512,7 +527,7 @@ fn _match_node(
 </ignore>
 
 
-<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">(</span>
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">(</span>
 <span style="color: #c9d1d9">    </span><span style="color: #79c0ff">nodes</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">List</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">RegexNode</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">,</span>
 <span style="color: #c9d1d9">    </span><span style="color: #79c0ff">node&#95;idx</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span><span style="color: #c9d1d9">,</span>
 <span style="color: #c9d1d9">    </span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">,</span>
@@ -550,7 +565,7 @@ fn _match_node[nodes: List[RegexNode], node_idx: Int](
 </ignore>
 
 
-<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #79c0ff">nodes</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">List</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">RegexNode</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">node&#95;idx</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span>
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #79c0ff">nodes</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">List</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">RegexNode</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">node&#95;idx</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span>
 <span style="color: #c9d1d9">    </span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">,</span>
 <span style="color: #c9d1d9">    </span><span style="color: #79c0ff">start&#95;pos</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span>
 <span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">MatchResult</span><span style="color: #c9d1d9">:</span>
@@ -651,7 +666,7 @@ fn _match_node[List(...), 1](  # Node 1 is a RepeatNode
 </ignore>
 
 
-<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">List(...), 1</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">  </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Node 1 is a RepeatNode</span>
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">List(...), 1</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">  </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Node 1 is a RepeatNode</span>
 <span style="color: #c9d1d9">    </span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">,</span>
 <span style="color: #c9d1d9">    </span><span style="color: #79c0ff">start&#95;pos</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span>
 <span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">MatchResult</span><span style="color: #c9d1d9">:</span>
@@ -672,6 +687,9 @@ It also executed the `alias` statements for us too, so we don't have to do those
 
 
 We'll see the biggest benefit in the next section though.
+
+
+<slice/>
 
 
 ### Step 3: Inline
@@ -741,9 +759,9 @@ fn _match_repeat[
 </ignore>
 
 
-<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #c9d1d9">@</span><span style="color: #d2a8ff">always&#95;inline</span>
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #c9d1d9">@</span><span style="color: #d2a8ff">always&#95;inline</span>
 <span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;repeat</span><span style="color: #c9d1d9">&#91;</span>
-<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">nodes</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">List</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">RegexNode</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">repeat&#95;node</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">RepeatNode</span><span style="color: #c9d1d9"></span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">nodes</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">List</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">RegexNode</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">repeat&#95;node</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">RepeatNode</span>
 <span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">start&#95;pos</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">MatchResult</span><span style="color: #c9d1d9">:</span>
 <span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span>
 <span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">total&#95;consumed</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span>
@@ -775,7 +793,7 @@ fn _match_node[List(...), 5](  # Node 5 is a RepeatNode
 </ignore>
 
 
-<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">List(...), 5</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">  </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Node 5 is a RepeatNode</span>
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">List(...), 5</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">  </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Node 5 is a RepeatNode</span>
 <span style="color: #c9d1d9">    </span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">,</span>
 <span style="color: #c9d1d9">    </span><span style="color: #79c0ff">start&#95;pos</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span>
 <span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">MatchResult</span><span style="color: #c9d1d9">:</span>
@@ -809,7 +827,7 @@ fn _match_node[List(...), 1](  # Node 1 is a RepeatNode
 </ignore>
 
 
-<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">List(...), 1</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">  </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Node 1 is a RepeatNode</span>
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">List(...), 1</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">  </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Node 1 is a RepeatNode</span>
 <span style="color: #c9d1d9">    </span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">,</span>
 <span style="color: #c9d1d9">    </span><span style="color: #79c0ff">start&#95;pos</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span>
 <span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">MatchResult</span><span style="color: #c9d1d9">:</span>
@@ -839,7 +857,7 @@ if node.maximum_times >= 0 and matches >= node.maximum_times:
 </ignore>
 
 
-<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">maximum&#95;times</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">and</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">maximum&#95;times</span><span style="color: #c9d1d9">:</span>
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">maximum&#95;times</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">and</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">node</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">maximum&#95;times</span><span style="color: #c9d1d9">:</span>
 <span style="color: #c9d1d9">    </span><span style="color: #ff7b72">break</span></code></pre>
 
 
@@ -854,7 +872,7 @@ if RepeatNode(2, 1, -1)_times >= 0 and matches >= RepeatNode(2, 1, 0).maximum_ti
 </ignore>
 
 
-<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">RepeatNode</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">2</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #79c0ff">1</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #ff7b72">-</span><span style="color: #79c0ff">1</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">&#95;times</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">and</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">RepeatNode</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">2</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #79c0ff">1</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">maximum&#95;times</span><span style="color: #c9d1d9">:</span>
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">RepeatNode</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">2</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #79c0ff">1</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #ff7b72">-</span><span style="color: #79c0ff">1</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">&#95;times</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">and</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">RepeatNode</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">2</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #79c0ff">1</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">maximum&#95;times</span><span style="color: #c9d1d9">:</span>
 <span style="color: #c9d1d9">    </span><span style="color: #ff7b72">break</span></code></pre>
 
 
@@ -869,7 +887,7 @@ if -1 >= 0 and matches >= -1:
 </ignore>
 
 
-<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">-</span><span style="color: #79c0ff">1</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">and</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">-</span><span style="color: #79c0ff">1</span><span style="color: #c9d1d9">:</span>
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">-</span><span style="color: #79c0ff">1</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">and</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">-</span><span style="color: #79c0ff">1</span><span style="color: #c9d1d9">:</span>
 <span style="color: #c9d1d9">    </span><span style="color: #ff7b72">break</span></code></pre>
 
 
@@ -884,7 +902,7 @@ if False and matches >= -1:
 </ignore>
 
 
-<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">False</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">and</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">-</span><span style="color: #79c0ff">1</span><span style="color: #c9d1d9">:</span>
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">False</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">and</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">matches</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">&gt;=</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">-</span><span style="color: #79c0ff">1</span><span style="color: #c9d1d9">:</span>
 <span style="color: #c9d1d9">    </span><span style="color: #ff7b72">break</span></code></pre>
 
 
@@ -911,7 +929,7 @@ fn _match_node[List(...), 1](  # Node 1 is a RepeatNode
 </ignore>
 
 
-<pre style="background-color: black; padding: 16px; font-size: 80%;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">List(...), 1</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">  </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Node 1 is a RepeatNode</span>
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">&#95;match&#95;node</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">List(...), 1</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">  </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Node 1 is a RepeatNode</span>
 <span style="color: #c9d1d9">    </span><span style="color: #79c0ff">text</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">String</span><span style="color: #c9d1d9">,</span>
 <span style="color: #c9d1d9">    </span><span style="color: #79c0ff">start&#95;pos</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span>
 <span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">MatchResult</span><span style="color: #c9d1d9">:</span>
@@ -938,6 +956,9 @@ Let's throw `@always_inline` on all the functions:
  * `_match_node`
 
 
+<slice/>
+
+
 ## The Result
 
 Suddenly, our large call tree above becomes simply this:
@@ -961,6 +982,9 @@ The metaprogrammed version is *10x faster than the normal recursive version,* an
 Pretty impressive!
 
 
+<slice/>
+
+
 ## Could this go even faster than the hand-written version?
 
 It could!
@@ -978,6 +1002,8 @@ These are techniques you rarely see in hand-written versions, but are common in 
 If we combine those with this technique, we could get those optimizations _on top of_ hand-written performance.
 
 
+<slice/>
+
 
 ## The Downside
 
@@ -993,12 +1019,20 @@ And if you do custom optimizations like I mentioned in the last section, that al
 One should use this technique wisely, only on code that needs to run fast.
 
 
+I should mention, I suspect drawback can be mitigated or avoided entirely. I think a user could theoretically use [MaybeComptime](https://github.com/modular/modular/issues/4887#issuecomment-3045841971) and a few accompanying tools to have a dev/test mode where these calculations happen at run-time instead. Not proven, but my spidey sense says it's possible.
+
+
+<slice/>
+
 
 ## Metaprogramming
 
 _This_ is metaprogramming. It's not just templates and `constexpr`. It's moving entire aspects of your entire program into compile-time, doing custom optimizations so that it can work even better than hand-written code.
 
 Metaprogramming is a term I've heard for many, many years, but I admit, I didn't truly understand its power and implications until seeing what it could do here.
+
+
+<slice/>
 
 
 ## The Implications
@@ -1032,6 +1066,9 @@ There's a few other directions I want to explore here:
 If you have any thoughts on where this technique can go, let me know!
 
 
+<slice/>
+
+
 ## Conclusion
 
 It turns out, the impossible optimization is totally possible!
@@ -1044,7 +1081,7 @@ If you want to see the code, you can find it [here](https://github.com/Verdagon/
 If you want to read more on this technique, search for [first Futamura projection](https://en.wikipedia.org/wiki/Partial_evaluation#Futamura_projections) or "staged programming" which is a similar concept.
 
 
-I hope you enjoyed this! Stay tuned for more articles by subscribing to the [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/vale_pl), or the [r/Vale](https://reddit.com/r/vale) subreddit, and come hang out in the [Vale discord](https://discord.gg/SNB8yGH).
+I hope you enjoyed this! Stay tuned for more articles by subscribing to the [RSS feed](https://verdagon.dev/rss.xml), [twitter](https://twitter.com/verdagon), and come hang out in the [Mojo discord](https://discord.gg/modular) or find me on the [Vale discord](https://discord.gg/SNB8yGH).
 
 
 Cheers!

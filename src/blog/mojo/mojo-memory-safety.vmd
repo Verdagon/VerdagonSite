@@ -382,42 +382,465 @@ All these languages are chasing the same thing: easier memory-safe high-performa
 
 
 
-# Where this could go: Argumen Paths
+# Where this could go: Argument Paths
 
 There are still problems to solve, of course.
 
 
-In Rust, I often ran into a problem where I was trying to read the whole world while holding a mutable reference to a single member.
-
-(show example)
+We've enabled local mutable aliasing, and we have return ref origin paths to help us with local mutable aliasing, but there's a gap: we aren't able to extract out helper functions anymore.
 
 
-The common workaround was to do two things:
-
- * *Refactor* the function to take in a `&mut World`, and change its caller, and its caller, and so on.
- * Receive *handles* instead.
- * *Look up* references using the handles.
+For example, if we start with this:
 
 
-However, this incurs some performance overhead, and it's complicated. References are nice, and suddenly we can only have them in pure functions.
+```rs
+@fieldwise_init
+struct Wing(Copyable, Movable):
+    var span: Int
+
+@fieldwise_init
+struct Tail(Copyable, Movable):
+    var length: Int
+
+@fieldwise_init
+struct Bird:
+    var left: Wing
+    var right: Wing
+    var tail: Tail
+
+    fn get_weight(self):
+        return left.span + right.span + tail.length
+
+fn main():
+    var bird = Bird(Wing(10), Wing(20), Tail(15))
+    ref tail_ref = bird.tail
+    tail_ref.length += bird.get_weight()
+```
 
 
-Mojo already has the tools to solve this!
+...and we try to split the `main` into two functions:
 
 
-In Mojo, it would look like this:
+```
+fn main():
+    var bird = Bird(Wing(10), Wing(20), Tail(15))
+    ref tail_ref = bird.tail
+    evolve(bird, tail_ref)
 
-(show example)
+fn evolve(bird: Bird, mut tail_ref: Tail):
+    tail.length += bird.get_weight()
+```
 
-The fact that this works so cleanly is one of those hints from the universe that you're designing your language right.
+we unfortunately get this error:
+
+```
+fn main():
+    var bird = Bird(Wing(10), Wing(20), Tail(15))
+    ref tail_ref = bird.tail
+
+    # error: argument of 'evolve' call allows writing a memory location previously readable through another aliased argument
+    evolve(bird, tail_ref)
+    #     ^~~~~  ~~~~~~~~
+    # note: 'bird.tail' value is passed through aliasing 'mut' argument
+
+fn evolve(bird: Bird, mut tail_ref: Tail):
+    tail_ref.length += bird.get_weight()
+```
 
 
-This is also nice because it enables better error messages:
-
-(check if true, show example)
+As far as I know, this is the only time we can't extract a local scope into a helper function.
 
 
-(reference Niko's post)
+In this way, Mojo _code_ can have mutable aliasing, but Mojo _programs_ do not. Mojo programs will largely be shaped like Rust programs, because this benefit is foiled at function call boundaries.
+
+
+Luckily, there is a way we can express this to the compiler nicely.
+
+
+"Aha! Is the answer that we make `evolve` take in a single argument `mut bird: Bird`?"
+
+Good question! But no, that's not what I'm talking about. That does work in simple cases, but it doesn't scale well: when we try that workaround on anything larger than a simple function, we incur extra complexity, performance problems, and architectural risks.
+
+
+Before I give you the real solution, I'll show you those scaling problems with a couple examples: one from a simple game, and one from Google Earth.
+
+
+Buckle up, because this blog is about to live up to its name!
+
+
+## Example: A Simple Game
+
+Let's take this example.
+
+In a little roguelike game, we might have a `plan` method that is purely for the `Entity` to re-orient themselves, and figure out what they want to do (but not actually do it yet).
+
+
+Here's the `plan` method, plus the structs it interacts with.
+
+There's a certain problem with it, which I'll explain below.
+
+
+```
+struct PursueDirective:
+    enemy_id: Int
+    enemy_last_seen_loc: Location
+    path: List[Location]
+
+struct LoiterDirective: pass  # empty
+
+alias Directive = Variant[LoiterDirective, PursueDirective]
+
+struct Entity:
+    loc: Location
+    is_blinded: Bool
+    directive: Directive
+
+struct World:
+    entities: List[Entity]
+    tiles: List[List[Entity]]
+
+
+# Entity looks around and thinks and decides their objective
+fn plan(read world: World, mut entity: Entity):
+    # If there's an existing directive, check it and see if it even makes sense anymore.
+    # In which case, set to loiter.
+    match entity.directive:
+        case LoiterDirective as walk:
+            pass
+        case PursueDirective as pursue:
+            enemy_loc = world.entities[enemy_id].loc
+
+            if can_see_loc(world, entity, enemy_loc):
+                pursue.enemy_last_seen_at = enemy_loc
+                # Store the path to the enemy. Keep the path around so we
+                # have something to follow if we lose sight of the enemy.
+                pursue.path = find_path(entity.loc, enemy_loc)
+                if len(pursue.path) == 0:
+                    # We see them but can't get to them, abort.
+                    entity.directive = LoiterDirective()
+                if not world.tiles[pursue.path[0]].walkable:
+                    # Next step is unwalkable for some reason, abort.
+                    entity.directive = LoiterDirective()
+                else: # There's a path to the enemy!
+                    pass # Keep pursuing!
+            else: # Can't see the player.
+                if entity.loc == pursue.enemy_last_seen_at:
+                    # We reached where we last saw them. Give up.
+                    entity.directive = LoiterDirective()
+                else:
+                    pass # Keep pursuing!
+    ...
+
+fn can_see_loc(world: World, entity: Entity, loc: Location) -> Bool:
+    return (
+        not is_blinded(entity) and
+        has_line_of_sight(world, entity.loc, loc)
+    )
+```
+
+
+So let's see the problem. Look at the signature again:
+
+```
+fn plan(read world: World, mut entity: Entity):
+```
+
+That `entity` is _inside_ the `World`. So, Mojo rejects this:
+
+(show error)
+
+
+The classic Rust solution would be to refactor `plan` to give it *mutable access to the entire World* (`&mut World`) and a handle (`entity_id`) that we can use to find the `Entity` in the `World`.
+
+
+```
+// Entity looks around and thinks and decides their objective
+fn plan(world: &mut World, entity_id: usize) {
+    let entity_read = &world.entities[entity_id];
+
+    // if there's an existing directive, check it and see if it even makes sense anymore.
+    // In which case, set to loiter.
+    // TODO: try to get rid of this clone. then we'll have a mut ref supposedly and we can overwrite it
+    match entity_read.directive.clone() {
+        LoiterDirective => {}
+        PursueDirective(existing_pursue) => {
+            let enemy_loc = world.entities[existing_pursue.enemy_id].loc.clone();
+
+            if can_see_loc(&world, entity_read, &enemy_loc) {
+                // we store path to the enemy. keep the path around so we
+                // dont have to recalculate it every turn, just recalculate
+                // if we run into something.
+                let new_path = find_path(&world, &entity_read.loc, &enemy_loc);
+                if new_path.steps.len() == 0 {
+                    // we see them but can't get to them. loiter instead.
+                    // need to re-fetch because we need to mutate.
+                    // Mention: ironically, this is why vale did its gen ref thing.
+                    let entity_mut = &mut world.entities[entity_id];
+                    entity_mut.directive = LoiterDirective;
+                } else if !world.tile_at(&new_path.steps[0]).walkable {
+                    // next step is unwalkable for some reason, stop
+                    // need to re-fetch because we need to mutate.
+                    let entity_mut = &mut world.entities[entity_id];
+                    entity_mut.directive = LoiterDirective;
+                } else { // there's a path to the enemy
+                    // keep pursuing
+                    let entity_mut = &mut world.entities[entity_id];
+                    entity_mut.directive = PursueDirective(Pursue {
+                        enemy_id: existing_pursue.enemy_id,
+                        enemy_last_seen_loc: enemy_loc,
+                        path: new_path
+                    });
+                }
+            } else { // can't see the player
+                if entity_read.loc == existing_pursue.enemy_last_seen_loc {
+                    // we're where we last saw them. give up.
+                    // need to re-fetch because we need to mutate.
+                    let entity_mut = &mut world.entities[entity_id];
+                    entity_mut.directive = LoiterDirective;
+                } else {
+                    // keep pursuing
+                    let entity_mut = &mut world.entities[entity_id];
+                    entity_mut.directive = PursueDirective(Pursue {
+                        enemy_id: existing_pursue.enemy_id,
+                        enemy_last_seen_loc: enemy_loc,
+                        path: existing_pursue.path
+                    });
+                }
+            }
+        }
+    }
+}
+
+fn can_see_loc(world: &World, entity: &Entity, loc: &Location) -> bool {
+    return !entity.is_blinded &&
+        world.has_line_of_sight(&entity.loc, loc);
+}
+
+// TODO: change from usize to generational_index
+```
+
+We needed to hand in a `&mut World` because:
+
+ * We need mutable access to something inside it.
+ * We need access to `World` for various functions (`can_see_loc`, etc.).
+
+
+However, we just introduced two problems:
+
+ 1. We just made it slower: the borrow checker forced us to do `let entity_read = &world.entities[entity_id];` to look up the entity. Unfortunate, because the caller likely already had a reference handy.
+ 2. We made it slower again: the borrow checker forced us to add an extra `let entity_mut = &mut world.entities[entity_id];` lookup on each path because we couldn't use our `entity_read` to mutate.
+ 3. `plan` now has mutable access to the entire World.
+
+
+Let's talk about that last one. This is problematic for two reasons:
+
+ * We risk architectural violations: we now risk someone modifying something outside of this entity, if they didn't understand that `plan` is only supposed to modify this single unit's intentions, it's not supposed to modify anything else in the World.
+ * It's viral: it forces all of `plan`'s callers to receive a `&mut World`, so they can give it to `plan`.
+
+
+In other words, it's a viral architectural risk.
+
+
+Don't get me wrong, the borrow checker is great and a net positive. But this is a very strong drawback.
+
+
+And unfortunately, Mojo needs to have the same drawback.
+
+
+...or does it?
+
+
+Perhaps not!
+
+
+There's nothing inherently unsafe with the original code. This is one of those cases where the borrow checker just doesn't have the right information, and therefore has to conservatively reject a valid program.
+
+
+So what is the right information?
+
+
+It's one simple addition, to tell the compiler what makes it safe: an *argument origin path.*
+
+
+We'd simply add `[world.entities]` to the `entity` argument:
+
+```
+fn plan(read world: World, mut [world.entities] entity: Entity):
+```
+
+That's it.
+
+
+The rest of the function doesn't need to change. I'll show the full function anyway for reference, and then I'll explain how it works below.
+
+
+```
+# Entity looks around and thinks and decides their objective
+fn plan(read world: World, mut [world.entities] entity: Entity):
+    # if there's an existing directive, check it and see if it even makes sense anymore.
+    # In which case, set to loiter.
+    match entity.directive:
+        case LoiterDirective as walk:
+            pass
+        case PursueDirective as pursue:
+            # convenient: we're not holding an enemy_ref. but if we were,
+            # it might be fine because of origin path tracking.
+            enemy_loc = world.entities[enemy_id].loc
+
+            if can_see_loc(world, entity, enemy_loc):
+                pursue.enemy_last_seen_at = enemy_loc
+                # we store path to the enemy. keep the path around so we
+                # dont have to recalculate it every turn, just recalculate
+                # if we run into something.
+                pursue.path = find_path(entity.loc, enemy_loc)
+                if len(pursue.path) == 0:
+                    # we see them but can't get to them. loiter instead.
+                    entity.directive = LoiterDirective()
+                if not world.tiles[pursue.path[0]].walkable:
+                    # next step is unwalkable for some reason, stop
+                    entity.directive = LoiterDirective()
+                else: # there's a path to the enemy
+                    pass # keep pursuing
+            else: # can't see the player
+                if entity.loc == pursue.enemy_last_seen_at:
+                    # we're where we last saw them. give up.
+                    entity.directive = LoiterDirective()
+                else:
+                    # keep pursuing
+                    pass
+
+fn can_see_loc(world: World, entity: Entity, loc: Location) -> Bool:
+    return (
+        not is_blinded(entity) and
+        has_line_of_sight(world, entity.loc, loc)
+    )
+
+```
+
+
+So how does this work? All we did was change the signature:
+
+
+```
+fn plan(read world: World, mut [world.entities] entity: Entity):
+```
+
+
+How did that one addition of `[world.entities]` make this entire thing memory safe?
+
+
+It's because the compiler now knows two things:
+
+ * The `entity` reference is pointing at one of the entities in `world.entities`. And therefore...
+ * If we ever temporarily turn the `entity` reference immutable (easy), then the entire `world` is temporarily immutable.
+
+
+And suddenly, with that last item there, we've solved the problems that led to the harmful `&mut World` workaround:
+
+ * We have mutable access to the `Entity`. No need for `&mut World`!
+ * We have immutable access to `World` for various functions (`can_see_loc`, etc.). No need for `&mut World`!
+
+
+This is much better, because now our type system is helping us maintain our architecture, instead of working against us.
+
+
+Okay, but this is just a toy example, let's hear about a real use case!
+
+
+(TODO: doesn't this also enable better error messages?)
+(TODO: reference Niko's View Types post wherever possible)
+
+
+## Example: Google Earth
+
+Long ago, in the earlier days of [Google Earth](https://earth.google.com/web/), we were constantly facing state management challenges, because Earth was such a large app with such complex requirements, and we weren't that principled about it.
+
+
+(And yes, before you ask, we couldn't eliminate this state. This was _inherent_ state. Client-side apps can't avoid inherent state, you just have to be disciplined about how you handle it.)
+
+
+Some of these problems got so complicated and spaghetti-ish that there were some bugs that took _weeks_ to fix.
+
+These problems seemed to rhyme, and my spidey sense was tingling. I eventually found the common pattern in all of these problems:
+
+ * Presenter A modifies the AppState.
+    * Presenter B observes this, and modifies the AppState in response.
+ * Presenter A reads the AppState, found it in a completely unexpected state, and crashed.
+
+
+We then put some constraints on our system [#statemanager] which completely eliminated this entire class of bugs. One of them was this:
+
+> AppState methods could read and mutate the AppState, but could only _read_ the surrounding world.
+
+
+This was in C++, so we simply gave AppState some const references to the other subsystems.
+
+In Rust, we might have needed the same workaround:
+
+ * Take a &mut App and suddenly have mutable access to *everything*
+ * Take a &mut self, and & refs to everything else (very verbose, there are a lot, cant call other methods)
+
+(Or we could take in 20 subsystems in as arguments)
+
+
+And Mojo would have the same problems.
+
+
+But with argument paths, we could make a function like this:
+
+```
+struct App:
+    var document_manager: DocumentManager
+    var app_state: AppState
+    var network_requester: NetworkRequester
+    var lfs: LocalFileSystem
+    ... # About 15 more
+
+    fn can_show_document(self, document_id: Int) -> bool:
+        return (
+            self.network_requester.ready() and
+            self.document_manager.ready() and
+            self.document_manager.document_loaded(document_id)
+        )
+
+fn open_document_view(
+    read app: App,
+    mut [app.state] app_state: AppState,
+    document_id: Int  # TODO: I think this could even be a ref now?
+) -> Bool:
+    app_state.currently_open_card_id = None
+    app_state.legend_is_open = False
+    app_state.currently_open_document_id = document_id
+    if app.can_show_document(document_id):
+        app_state.current_view = CurrentView::Document
+        return True
+    else:
+        return False
+```
+
+
+(This is of course a simplified version of the actual Google Earth logic, [# For example, there were a few more AppState methods that would be called when the `network_requester` and `document_manager` were all ready.] but you get the idea.)
+
+
+Note how `open_document_view` is reading the `app` with `app.can_show_document(document_id)`, yet it also has a `mut app_state`. This is possible because of the `app` argument's `[app.state]` origin path.
+
+
+This is much better, because now our type system is helping us maintain our architecture, instead of working against us.
+
+
+(TODO: doesn't this also enable better error messages?)
+(TODO: reference Niko's View Types post wherever possible)
+
+
+<slice>
+#statemanager: The complete list of constraints:
+
+ * If Presenter A needs to modify Presenter B's state ("cross-cutting mutation"), move that state into the central AppState class.
+ * All cross-cutting mutation logic (`OpenDocumentView` which closes CardView, `SetShownCard` which hides the LegendView, etc.) should be in an AppState method.
+ * When a presenter observes a change, it cannot ask AppState to mutate anything in response.
+ * AppState methods could only mutate AppState, but could also _read_ the surrounding world.
+</slice>
+
 
 
 # Conclusion
