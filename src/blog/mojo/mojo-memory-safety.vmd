@@ -26,13 +26,16 @@ Todos:
 
 My favorite line in the Mojo standard library is in this snippet:
 
-```rs
+
+<ignore>
+```mojo
     @always_inline
     fn __next_ref__(
         mut self,
     ) -> ref [self.src[]._entries[0].value()] Self.Element:
         ...
 ```
+</ignore>
 
 
 This comes from the [_DictEntryIter](https://github.com/modular/modular/blob/7a1e73b40ca99f150f27e0837f8565ed1f40922f/mojo/stdlib/stdlib/collections/dict.mojo#L100) struct.
@@ -84,7 +87,9 @@ Here's a simple Rust program with a borrow checking error:
 
 And here's the equivalent Mojo program:
 
-```rs
+
+<ignore>
+```mojo
 @fieldwise_init
 struct Wing(Copyable, Movable):
     var span: Int
@@ -107,6 +112,7 @@ fn main():
 
     transfer_some_span(left_ref, other_left_ref) # Error!
 ```
+</ignore>
 
 
 However, there are two major differences between Mojo and Rust:
@@ -126,7 +132,9 @@ In normal borrow checking, one cannot have a shared (read-only) reference and a 
 
 However, Mojo's origin system actually allows this:
 
-```rs
+
+<ignore>
+```mojo
 @fieldwise_init
 struct Wing(Copyable, Movable):
     var span: Int
@@ -155,6 +163,7 @@ fn main():
 
     print(sum)  # Prints 32
 ```
+</ignore>
 
 
 This is because in Mojo, *no local reference knows whether it's mutable or immutable*.
@@ -167,9 +176,12 @@ What do I mean by that?
 
 Let's look at original `main`'s call to `transfer_some_span`:
 
-```rs
+
+<ignore>
+```mojo
 transfer_some_span(left_ref, other_left_ref)
 ```
+</ignore>
 
 
 Here's what the compiler does here:
@@ -183,9 +195,12 @@ Here's what the compiler does here:
 
 Now let's look at the new `main`'s call to `add_to_wingspan`:
 
-```rs
+
+<ignore>
+```mojo
 transfer_some_span(left_ref, right_ref)
 ```
+</ignore>
 
 
 Here's what the compiler does here:
@@ -224,7 +239,9 @@ Let's take another step in the right direction! Let's talk about how Mojo can co
 
 Let's call a function that returns a reference:
 
-```rs
+
+<ignore>
+```mojo
 @fieldwise_init
 struct Wing(Copyable, Movable):
     var span: Int
@@ -255,6 +272,7 @@ fn main():
 
     print(sum)  # Prints 32
 ```
+</ignore>
 
 
 Note how we changed:
@@ -267,10 +285,13 @@ to:
 
 and we added this function:
 
-```rs
+
+<ignore>
+```mojo
 fn get_left_ref(ref b: Bird) -> ref [b.left] Wing:
     return b.left
 ```
+</ignore>
 
 
 That ` -> ref [b.left] Wing` means "We're returning the `Wing` at `b.left`".
@@ -300,10 +321,13 @@ TODO: reference https://docs.modular.com/mojo/manual/values/lifetimes/#derived-o
 
 > Note that the `as_ptr()` method takes its self argument as mut self. If it used the default read argument convention, it would be immutable, and the derived origin (`origin_of(self.o_ptr)`) would also be immutable.
 
-```
+
+<ignore>
+```mojo
 fn as_ptr(mut self) -> Pointer[String, origin_of(self.o_ptr)]:
     return Pointer(to=self.o_ptr[])
 ```
+</ignore>
 
 
 
@@ -311,13 +335,16 @@ fn as_ptr(mut self) -> Pointer[String, origin_of(self.o_ptr)]:
 
 I opened this article with this line:
 
-```rs
+
+<ignore>
+```mojo
     @always_inline
     fn __next_ref__(
         mut self,
     ) -> ref [self.src[]._entries[0].value()] Self.Element:
         ...
 ```
+</ignore>
 
 
 This is the best use of return-ref origin paths.
@@ -393,7 +420,8 @@ We've enabled local mutable aliasing, and we have return ref origin paths to hel
 For example, if we start with this:
 
 
-```rs
+<ignore>
+```mojo
 @fieldwise_init
 struct Wing(Copyable, Movable):
     var span: Int
@@ -416,24 +444,30 @@ fn main():
     ref tail_ref = bird.tail
     tail_ref.length += bird.get_weight()
 ```
+</ignore>
 
 
 ...and we try to split the `main` into two functions:
 
 
-```
+<ignore>
+```mojo
 fn main():
     var bird = Bird(Wing(10), Wing(20), Tail(15))
     ref tail_ref = bird.tail
     evolve(bird, tail_ref)
 
 fn evolve(bird: Bird, mut tail_ref: Tail):
-    tail.length += bird.get_weight()
+    tail_ref.length += bird.get_weight()
 ```
+</ignore>
+
 
 we unfortunately get this error:
 
-```
+
+<ignore>
+```mojo
 fn main():
     var bird = Bird(Wing(10), Wing(20), Tail(15))
     ref tail_ref = bird.tail
@@ -446,6 +480,7 @@ fn main():
 fn evolve(bird: Bird, mut tail_ref: Tail):
     tail_ref.length += bird.get_weight()
 ```
+</ignore>
 
 
 As far as I know, this is the only time we can't extract a local scope into a helper function.
@@ -462,10 +497,13 @@ Luckily, there is a way we can express this to the compiler nicely.
 Good question! But no, that's not what I'm talking about. That does work in simple cases, but it doesn't scale well: when we try that workaround on anything larger than a simple function, we incur extra complexity, performance problems, and architectural risks.
 
 
-Before I give you the real solution, I'll show you those scaling problems with a couple examples: one from a simple game, and one from Google Earth.
+Before I explain the real solution, I'll show you those scaling problems with a couple examples: one from a simple game, and one from Google Earth.
 
 
 Buckle up, because this blog is about to live up to its name!
+
+
+(Or you can [skip to the real solution](#argument-paths))
 
 
 ## Example: A Simple Game
@@ -480,7 +518,8 @@ Here's the `plan` method, plus the structs it interacts with.
 There's a certain problem with it, which I'll explain below.
 
 
-```
+<ignore>
+```mojo
 struct PursueDirective:
     enemy_id: Int
     enemy_last_seen_loc: Location
@@ -537,13 +576,18 @@ fn can_see_loc(world: World, entity: Entity, loc: Location) -> Bool:
         has_line_of_sight(world, entity.loc, loc)
     )
 ```
+</ignore>
 
 
 So let's see the problem. Look at the signature again:
 
-```
+
+<ignore>
+```mojo
 fn plan(read world: World, mut entity: Entity):
 ```
+</ignore>
+
 
 That `entity` is _inside_ the `World`. So, Mojo rejects this:
 
@@ -553,7 +597,8 @@ That `entity` is _inside_ the `World`. So, Mojo rejects this:
 The classic Rust solution would be to refactor `plan` to give it *mutable access to the entire World* (`&mut World`) and a handle (`entity_id`) that we can use to find the `Entity` in the `World`.
 
 
-```
+<ignore>
+```mojo
 // Entity looks around and thinks and decides their objective
 fn plan(world: &mut World, entity_id: usize) {
     let entity_read = &world.entities[entity_id];
@@ -618,6 +663,8 @@ fn can_see_loc(world: &World, entity: &Entity, loc: &Location) -> bool {
 
 // TODO: change from usize to generational_index
 ```
+</ignore>
+
 
 We needed to hand in a `&mut World` because:
 
@@ -664,9 +711,13 @@ It's one simple addition, to tell the compiler what makes it safe: an *argument 
 
 We'd simply add `[world.entities]` to the `entity` argument:
 
-```
+
+<ignore>
+```mojo
 fn plan(read world: World, mut [world.entities] entity: Entity):
 ```
+</ignore>
+
 
 That's it.
 
@@ -674,7 +725,8 @@ That's it.
 The rest of the function doesn't need to change. I'll show the full function anyway for reference, and then I'll explain how it works below.
 
 
-```
+<ignore>
+```mojo
 # Entity looks around and thinks and decides their objective
 fn plan(read world: World, mut [world.entities] entity: Entity):
     # if there's an existing directive, check it and see if it even makes sense anymore.
@@ -716,14 +768,17 @@ fn can_see_loc(world: World, entity: Entity, loc: Location) -> Bool:
     )
 
 ```
+</ignore>
 
 
 So how does this work? All we did was change the signature:
 
 
-```
+<ignore>
+```mojo
 fn plan(read world: World, mut [world.entities] entity: Entity):
 ```
+</ignore>
 
 
 How did that one addition of `[world.entities]` make this entire thing memory safe?
@@ -788,7 +843,9 @@ And Mojo would have the same problems.
 
 But with argument paths, we could make a function like this:
 
-```
+
+<ignore>
+```mojo
 struct App:
     var document_manager: DocumentManager
     var app_state: AppState
@@ -817,6 +874,7 @@ fn open_document_view(
     else:
         return False
 ```
+</ignore>
 
 
 (This is of course a simplified version of the actual Google Earth logic, [# For example, there were a few more AppState methods that would be called when the `network_requester` and `document_manager` were all ready.] but you get the idea.)
@@ -842,6 +900,180 @@ This is much better, because now our type system is helping us maintain our arch
 </slice>
 
 
+## Argument Paths
+
+In all three of those examples, we added *argument origin paths* to let us access a mutable part of an otherwise-immutable whole.
+
+
+We helped the compiler understand that `evolve` was memory-safe by specifying `tail_ref`'s origin path was `[bird.tail]`:
+
+
+<ignore>
+```mojo
+fn main():
+    var bird = Bird(Wing(10), Wing(20), Tail(15))
+    ref tail_ref = bird.tail
+    evolve(bird, tail_ref)
+
+fn evolve(bird: Bird, mut [bird.tail] tail_ref: Tail):
+    tail_ref.length += bird.get_weight()
+```
+</ignore>
+
+
+We helped the compiler understand that `plan` was memory-safe by specifying `entity`'s origin path was `[world.entities]`:
+
+
+<ignore>
+```mojo
+fn plan(read world: World, mut [world.entities] entity: Entity):
+    ...
+```
+<ignore>
+
+
+And we helped the compiler understand that `open_document_view` was memory-safe by specifying `app_state`'s origin path was `[app.state]`:
+
+
+<ignore>
+```mojo
+fn open_document_view(
+    read app: App,
+    mut [app.state] app_state: AppState,
+    document_id: Int
+) -> Bool:
+    ...
+```
+</ignore>
+
+
+So how does this actually work under the hood?
+
+
+Let's look at the first example:
+
+
+<ignore>
+```mojo
+fn main():
+    var bird = Bird(Wing(10), Wing(20), Tail(15))
+    ref tail_ref = bird.tail
+    evolve(bird, tail_ref)
+
+fn evolve(bird: Bird, mut [bird.tail] tail_ref: Tail):
+    tail_ref.length += bird.get_weight()
+```
+</ignore>
+
+
+That `evolve` is equivalent to this, which uses a temporary variable:
+
+
+<ignore>
+```mojo
+fn evolve(bird: Bird, mut [bird.tail] tail_ref: Tail):
+    var weight = bird.get_weight()
+    tail_ref.length += weight
+```
+</ignore>
+
+
+Now I'll add a few comments that explain the compiler's thinking:
+
+
+<ignore>
+```mojo
+fn evolve(bird: Bird, mut [bird.tail] tail_ref: Tail):
+    var weight =
+        borrow_imm tail_ref {
+            # Begin temporary scope, in which `tail_ref` is an immutable borrow.
+            # Now, `bird` *and* everything inside it (`tail_ref`) is immutable.
+            # We can now pass an immutable `bird` to `get_weight`.
+            bird.get_weight()
+            # End temporary scope, `tail_ref` becomes mutable again.
+        }
+    # `tail_ref` is mutable here, so add to its `length`.
+    tail_ref.length += weight
+```
+</ignore>
+
+
+In other words, when we try to pass something (`bird`) to a function (`get_weight`) that wants to receive it immutably (the `read` in `fn get_weight(read self)`), we temporarily turn all of its "contained references" (`tail_ref`) immutable, so the entire thing (`bird`) is immutable.
+
+
+### Limitations
+
+There are some limitations to this mechanism, of course:
+
+ * We can't pass an object as both `read` and `mut` (though we can pass it as `mut` and `mut`).
+ * (any other limitations?)
+
+
+First, we can't pass the same object as both `read` and `mut`. We can't do this:
+
+
+<ignore>
+```mojo
+fn main():
+    var bird = Bird(Wing(10), Wing(20), Tail(15))
+    ref tail_ref = bird.tail
+    evolve(bird, tail_ref, tail_ref)
+
+fn evolve(
+    bird: Bird,
+    read [bird.tail] tail_a: Tail,
+    mut [bird.tail] tail_b: Tail
+):
+    tail_b.length += bird.get_weight() + tail_a.length
+```
+</ignore>
+
+
+However, we can pass them both as `mut`:
+
+
+<ignore>
+```mojo
+fn main():
+    var bird = Bird(Wing(10), Wing(20), Tail(15))
+    ref tail_ref = bird.tail
+    evolve(bird, tail_ref, tail_ref)
+
+fn evolve(
+    bird: Bird,
+    mut [bird.tail] tail_a: Tail,
+    mut [bird.tail] tail_b: Tail
+):
+    tail_b.length += bird.get_weight() + tail_a.length
+```
+</ignore>
+
+
+And it should compose well with the existing origin checking machinery.
+
+
+And if we want to, we can pass them both as `read` (this works today):
+
+
+<ignore>
+```mojo
+fn main():
+    var bird = Bird(Wing(10), Wing(20), Tail(15))
+    ref tail_ref = bird.tail
+    evolve(bird, tail_ref, tail_ref)
+
+fn evolve(
+    bird: Bird,
+    read tail_a: Tail,
+    read tail_b: Tail
+):
+    print(tail_b.length + bird.get_weight() + tail_a.length)
+```
+</ignore>
+
+
+(other limitations here)
+
 
 # Conclusion
 
@@ -849,45 +1081,29 @@ This is much better, because now our type system is helping us maintain our arch
 
 
 
-
-
-
+<ignore>
 # Notes
-
-Feedback from claude:
-
-I'll analyze both documents to evaluate how well the blog post skeleton captures the deep technical content.Now let me analyze how well the blog post skeleton captures the deep technical content:
-
-## Strengths of the Blog Post Skeleton
-
-1. **Accessible Entry Point**: The skeleton starts with an intriguing hook (the `__next_ref__` function signature) that immediately shows something concrete and unusual, which is engaging for readers.
-
-2. **Good Pedagogical Structure**: The progression from "Mojo looks like Rust" → "but there's more" → "here's what's different" is a solid teaching approach that builds on familiar concepts.
-
-3. **Captures Core Concepts**: The skeleton correctly identifies the two fundamental layers:
-   - Origin paths for tracking what is borrowed
-   - Deferred borrowing (checking at callsites rather than at reference creation)
 
 ## Critical Gaps and Misrepresentations
 
 However, the skeleton significantly undersells and partially misrepresents the depth of Mojo's innovation:
 
-### 1. **Misses the Temporal Dimension**
-The deep dive emphasizes that references are **passive by default** and only activate at use-sites. The skeleton mentions "checks origins at callsites" but doesn't capture the profound implication that references can exist without holding active borrows. This is THE key insight that enables patterns impossible in Rust.
+### 1 *Misses the Temporal Dimension*
+The deep dive emphasizes that references are *passive by default* and only activate at use-sites. The skeleton mentions "checks origins at callsites" but doesn't capture the profound implication that references can exist without holding active borrows. This is THE key insight that enables patterns impossible in Rust.
 
-### 2. **Underplays Sequential Activation**
+### 2 *Underplays Sequential Activation*
 The deep dive shows how expressions like `x_ref + increment_x_and_return(point) + x_ref` work through sequential activation. The skeleton doesn't convey that references activate, deactivate, and can reactivate, seeing mutations between uses.
 
-### 3. **Lacks Technical Precision**
+### 3 *Lacks Technical Precision*
 The skeleton's explanation of "no local reference knows whether it's mutable or immutable" is imprecise. The deep dive explains it better: references have a capability to borrow that activates with a mode (mutable/immutable) determined by usage context.
 
-### 4. **Missing Critical Examples**
+### 4 *Missing Critical Examples*
 The deep dive's most compelling examples aren't in the skeleton:
 - The cache pattern that fails in Rust but works in Mojo
 - Complex interleaving like `left_ref.span + flap_left(bird) + left_ref.span`
 - The distinction between register-passable (Int) and non-copyable (Wing) types
 
-### 5. **Incomplete Origin Path Explanation**
+### 5 *Incomplete Origin Path Explanation*
 While the skeleton mentions return types like `ref [b.left] Wing`, it doesn't explain:
 - How origins form an algebraic structure
 - Origin subsumption relationships
@@ -895,26 +1111,26 @@ While the skeleton mentions return types like `ref [b.left] Wing`, it doesn't ex
 
 ## Suggestions for Improvement
 
-1. **Add a Section on Activation vs Existence**
+1 *Add a Section on Activation vs Existence*
    ```mojo
    ref x_ref = point.x        # Reference exists (passive)
    increment_x(point)         # point mutably active, x_ref passive - OK!
    print(x_ref)               # x_ref activates here - sees mutation!
    ```
 
-2. **Include the Sequential Activation Example**
+2 *Include the Sequential Activation Example*
    The `x_ref + increment_x_and_return(point) + x_ref` example is crucial for understanding the temporal model.
 
-3. **Explain Why Copyability Matters**
+3 *Explain Why Copyability Matters*
    The distinction between `Int` (brief activation for copying) vs `Wing` (extended activation) is essential for understanding when patterns work or fail.
 
-4. **Better Motivate the Problem**
+4 *Better Motivate the Problem*
    Start with Rust pain points more explicitly:
    - The async cache pattern
    - Field borrowing across function boundaries
    - Iterator + mutation patterns
 
-5. **Add the Theoretical Foundation**
+5 *Add the Theoretical Foundation*
    Even in simplified form, explain that origins are type-level metadata, not runtime data.
 
 ## The "Secrets" Framing
@@ -931,9 +1147,11 @@ The skeleton should mention:
 ## Conclusion
 
 The skeleton captures maybe 40% of the deep dive's insights. It gets the basic concepts right but misses the profound implications of passive references and sequential activation. The blog post would benefit from:
-1. A clearer explanation of the two-layer model (deferred + origins)
-2. More compelling examples showing impossible-in-Rust patterns
-3. Technical precision about when and how references activate
-4. The broader context of why this matters for language evolution
+
+1 A clearer explanation of the two-layer model (deferred + origins)
+2 More compelling examples showing impossible-in-Rust patterns
+3 Technical precision about when and how references activate
+4 The broader context of why this matters for language evolution
 
 The skeleton has good bones but needs more meat to truly convey why Mojo's approach is revolutionary rather than just "Rust with some improvements."
+</ignore>
