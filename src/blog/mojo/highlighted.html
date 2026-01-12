@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mojo Syntax Highlighting Example</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #0d1117;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            color: #c9d1d9;
+        }
+        pre {
+            margin: 0;
+            padding: 16px;
+            background-color: #161b22;
+            border-radius: 6px;
+            overflow-x: auto;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+        code {
+            font-family: inherit;
+        }
+    </style>
+</head>
+<body>
+<pre><code><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">main</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9">
+</span><span style="color: #c9d1d9">email_regex</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9">
+    </span><span style="color: #d2a8ff">Regex</span><span style="color: #d2a8ff">(</span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">w+(</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">w*)?@(</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">d+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">.</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">d+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">.</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">d+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">.</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">d+|</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">w+</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">.</span><span style="color: #a5d6ff">\\</span><span style="color: #a5d6ff">w+)</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">
+</span><span style="color: #d2a8ff">print</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">matches</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">email_regex</span><span style="color: #d2a8ff">,</span><span style="color: #d2a8ff"> </span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">user@example.com</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">      </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints True</span><span style="color: #c9d1d9">
+</span><span style="color: #d2a8ff">print</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">matches</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">email_regex</span><span style="color: #d2a8ff">,</span><span style="color: #d2a8ff"> </span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">uexample.com</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">          </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints False</span><span style="color: #c9d1d9">
+</span><span style="color: #d2a8ff">print</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">matches</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">email_regex</span><span style="color: #d2a8ff">,</span><span style="color: #d2a8ff"> </span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">user@ecom</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">             </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints False</span><span style="color: #c9d1d9">
+</span><span style="color: #d2a8ff">print</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">matches</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">email_regex</span><span style="color: #d2a8ff">,</span><span style="color: #d2a8ff"> </span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">user+tag@example.com</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">  </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints True</span><span style="color: #c9d1d9">
+</span><span style="color: #d2a8ff">print</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">matches</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">email_regex</span><span style="color: #d2a8ff">,</span><span style="color: #d2a8ff"> </span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">user@100</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">              </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints False</span><span style="color: #c9d1d9">
+</span><span style="color: #d2a8ff">print</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">matches</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">email_regex</span><span style="color: #d2a8ff">,</span><span style="color: #d2a8ff"> </span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">howdy123@1.2.3.4</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">      </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints True</span><span style="color: #c9d1d9">
+</span><span style="color: #d2a8ff">print</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">matches</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">email_regex</span><span style="color: #d2a8ff">,</span><span style="color: #d2a8ff"> </span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">howdy1231.2.3.4</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">       </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints False</span><span style="color: #c9d1d9">
+</span><span style="color: #d2a8ff">print</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">matches</span><span style="color: #d2a8ff">(</span><span style="color: #d2a8ff">email_regex</span><span style="color: #d2a8ff">,</span><span style="color: #d2a8ff"> </span><span style="color: #a5d6ff">&quot;</span><span style="color: #a5d6ff">howdy123@1/2/3/4</span><span style="color: #a5d6ff">&quot;</span><span style="color: #d2a8ff">)</span><span style="color: #d2a8ff">)</span><span style="color: #c9d1d9">      </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Prints False</span></code></pre>
+</body>
+</html>

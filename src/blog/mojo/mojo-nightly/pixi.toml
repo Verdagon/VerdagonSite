@@ -1,0 +1,11 @@
+[workspace]
+authors = ["Evan Ovadia <verdagon_null@verdagon.dev>"]
+channels = ["https://conda.modular.com/max-nightly", "conda-forge"]
+name = "mojo-nightly"
+platforms = ["osx-arm64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+max = ">=25.7.0.dev2025102323,<26"

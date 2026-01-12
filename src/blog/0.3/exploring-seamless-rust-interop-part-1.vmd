@@ -1,0 +1,699 @@
+---
+title: Exploring Seamless Rust Interop for Newer Languages, Part 1
+subtitle: Committing language interop sins for science
+author: Evan Ovadia
+date: May 24, 2024
+realm: blog
+path: blog/exploring-seamless-rust-interop-part-1
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+Languages like C++, Typescript, Kotlin, and Swift had a brilliant approach: they were created to *harness an existing ecosystem* of libraries from another pre-existing language.
+
+
+But that's easier said than done! Especially for newer languages focusing on memory safety and speed. [# High-level languages can compile to the JVM or Javascript to harness those ecosystems, but languages without GC have quite a challenging time.]
+
+
+<img style="width: 100%" src="/images/EmberDeep.png"/>
+
+
+Luckily, newer languages can tap into C's ecosystem by adding FFI [# Stands for Foreign Function Interface, a way to call into C code.] "bindings" (or "wrappers") to call into C, like the following Vale code:
+
+```vale
+extern func stdlib_launch_command(args []str, maybe_cwd str) i64;
+```
+
+...which calls into this C function:
+
+```c
+int64_t stdlib_launch_command(stdlib_StrArray* chain, ValeStr* cwd_str) {
+  ...
+}
+```
+
+
+However, there are some downsides to these wrappers:
+
+ * It can be tricky to translate between C's and the newer language's concepts.
+ * They often fall out of date as the underlying C libraries evolve.
+ * It can be hard to find a good cross-platform C library for something.
+
+
+This is, sadly, the state of affairs for a lot of new languages.
+
+
+<ignore>
+things. [# Besides the pretty slow compile times, that is. It's written in Scala... amazing for development velocity, not great for speed. I might have to rewrite the compiler in Rust just to make compilation times fast enough to rewrite it in Vale. That's a weird thought.]
+
+
+The biggest question a new language faces is *how do we interoperate with an existing ecosystem of libraries?* [# That's how Typescript did it, that's how America does it, and it's [worked out pretty well so far](https://www.youtube.com/watch?t=34&v=YBC1Qob27sM&feature=youtu.be).]
+
+
+It's a problem that plagues every new language, especially the low-level ones.
+</ignore>
+
+
+And alas, we dare not dream for more. [# We look, ever hopeful, at webassembly to rescue our poor souls from the desolate landscape of language interop. Alas, forlorn, we are forgotten.] [# Actually, Zig has a really cool approach here, they can [directly import a C header file](https://ziglang.org/documentation/master/#Import-from-C-Header-File). That wouldn't work for a memory-safe language like Vale, but I still like it a lot.]
+
+
+<slice />
+
+# Some hope
+
+
+Unless I'm mistaken, it might be possible to *seamlessly call into Rust code*, without writing bindings or wrappers or anything, similar to how C++, Typescript, Kotlin, and Swift all called into their predecessors.
+
+
+If a new language could do this, it could tap into the [over 100,000 crates](https://www.reddit.com/r/rust/comments/ztdnqe/cratesio_now_has_more_than_100000_crates/) on cargo. [# It's uncertain how many of those are just squatted, but most of them are valid.]
+
+
+This technique could even be used from C or C++, as our little proof-of-concept shows below. I use C++ a lot, so I'm personally pretty excited to call into Rust libraries more easily from C++. [# It might even allow migrating from C++ to Rust a lot easier too, something the entire world would love.]
+
+
+<slice />
+
+## Can't we already do that?
+
+"But Evan," you say, "don't [cbindgen](https://github.com/mozilla/cbindgen) and [cxx](https://github.com/dtolnay/cxx) already do this?"
+
+
+Unfortunately, not quite. For example, if I want to use a third-party library like [subprocess](https://docs.rs/subprocess/latest/subprocess/) from my C code, I'll need to write the binding for cbindgen and cxx, and we're back at step one.
+
+
+On top of that, they require us to use a limited whitelist of types that both sides understand; our C code can't receive a `subprocess::Popen`  object.
+
+
+It would be really nice if we could instead just call directly into Rust code.
+
+
+<ignore>
+The benefits would be huge: Rust libraries are fast and pretty memory-safe, and their standard library is being formally proven via [RustBelt](https://www.janestreet.com/tech-talks/rustbelt/) and [translation to Coq](https://formal.land/blog/2024/04/26/translation-core-alloc-crates).
+</ignore>
+
+
+<slice />
+
+## Impossible challenges
+
+Of course, calling directly into Rust code is widely believed to be impossible, because:
+
+ * Rust [doesn't have a stable ABI](https://www.reddit.com/r/rust/comments/ss2p6c/what_does_it_mean_when_people_say_that_rust_does/); you can't link to a Rust library because `rustc` doesn't expose a predictable API for code to link to.
+ * Rust has generics. How would we expose a `Vec<T>` when Rust doesn't even know how big `T` is?
+ * How do we make Rust's mental model work with something like Vale that doesn't have a traditional borrow checker?
+ * How do we uphold Vale's other features, like determinism and [perfect replayability](https://verdagon.dev/blog/perfect-replayability-prototyped) if we can call directly into Rust?
+
+
+These points are all true, but *I think they're all solvable.*
+
+
+And if they are solvable, it paves the way to real "Rust++" style interop that lets us easily use a vast amount of existing Rust libraries. [# "Easily" might be a stretch. I still can't figure out how we'd deal with macros. Luckily, a lot of crates that lean on macros also offer a normal imperative API.]
+
+
+! To be clear, *I'm not 100% certain that this approach is viable!* My little C/Rust interop proof-of-concept works for several small test cases, but I don't know if there's any flaws in this design. I wrote this article to get your feedback on the approach, so let me know in the comments!
+
+
+<ignore>
+# Why would we embark on this quest?
+
+(Or [skip to the technical stuff LINK HERE](#fsdf)!)
+
+## Adoption
+
+Choosing a language based on existing libraries is a pretty common phenomenon. And it makes sense!
+
+ * If someone wants to use LLVM, they use C++. [# It has perfectly good C and Rust bindings too, though they aren't quite as seamless as one would like.]
+ * If someone wants to make a basic web server, they'll likely use Javascript, Python, or Go, because they think that's where the most widely-used and well-known web servers are.
+ * If someone wants to do anything with machine learning, they'll use Python.
+ * If someone wants to make a first-person shooter, they use C++ because all the popular frameworks like [Unreal Engine](https://www.unrealengine.com/en-US) are written for C++.
+
+
+And this is one of the biggest factors *holding back newer languages* like Vale! Not having an existing ecosystem is a _huge_ drag on adoption.
+
+
+<slice />
+
+## Standard Library
+
+On top of that, it's *a lot of work to write a standard library.* Collections like List, HashMap, etc. are easy, but then you get to the harder stuff, like:
+
+ * Interacting with the file system
+ * Launching a subprocess
+ * Sending requests over the network
+
+
+You would assume that it's easy to make a `MakeDirectory` function. I did too.
+
+Except then we had to handle the errors. [# It's surprisingly annoying to deal with errors on all the different operating systems, and then make a common abstraction for them.]
+
+And then we had to make it work for Windows too. [# I support Windows because I'm a masochist.]
+
+And then we had to write tests. A _lot_ of them.
+
+
+Once we got to the "launching a subprocess" item, I was already begging for mercy. So I turned to the [subprocess](https://github.com/sheredom/subprocess.h) C library...
+
+But then that had a lot of subtle bugs, and it felt like playing whack-a-mole to use the library correctly.
+
+
+I then looked over at the Rust standard library, and started thinking.
+</ignore>
+
+
+<slice />
+
+# A concrete example
+
+Let's see an example of a language (C in this case) seamlessly calling into Rust, and then farther below we'll talk about how to make it work.
+
+
+*This approach is mainly designed with newer languages in mind, but we're exploring it with C for now.* Later I'll talk about how we'll make it work with the Vale compiler.
+
+
+We're going to make a C program that can use the Rust [subprocess](https://docs.rs/subprocess/latest/subprocess/) crate to launch a `/bin/cat` command to print out the contents of `hello.txt`.
+
+
+If it were written in Rust, it would look like the below code (unidiomatically crafted to better match the C code below it).
+
+```rs
+use std::ffi::OsString;
+use subprocess::Popen;
+use subprocess::PopenConfig;
+
+fn main() {
+  let mut argv = Vec::new();
+  argv.push(OsString::from("/bin/cat"));
+  argv.push(OsString::from("hello.txt"));
+  let create_result = Popen::create(&argv, PopenConfig::default());
+
+  let mut process = 
+    match create_result {
+      Err(_) => panic!("Failed to open subprocess!"),
+      Ok(process) => process
+    };
+
+  let wait_result = process.wait();
+  if !wait_result.is_ok() {
+    panic!("Failed to wait on subprocess!");
+  }
+
+  println!("Success!");
+}
+```
+
+
+Below, we've rewritten `main` in C, and have it call into the Rust code. Some notes about it:
+
+ * All the noisy `#pragma rsuse` under the `// Import methods` comment shouldn't be needed for newer languages. I'll explain more about that later on.
+ * I've also included the Rust equivalent to each line, to better show the equivalences.
+ * Below the C code is an explanation of the basics.
+ * This is an actual working example!
+
+
+```c
+// Import types
+#pragma rsuse OsString = std::ffi::OsString
+#pragma rsuse VecOsString = std::vec::Vec<OsString>
+#pragma rsuse PopenConfig = subprocess::PopenConfig
+#pragma rsuse Popen = subprocess::Popen
+#pragma rsuse PopenResult = subprocess::Result<Popen>
+#pragma rsuse ExitStatusResult = subprocess::Result<subprocess::ExitStatus>
+// Import methods (theoretically not needed with integrated compiler)
+#pragma rsuse OsString_from_str = OsString::From<&str>::from
+#pragma rsuse OsString_drop = OsString::drop
+#pragma rsuse VecOsString_new = VecOsString::new
+#pragma rsuse VecOsString_push = VecOsString::push
+#pragma rsuse VecOsString_as_slice = VecOsString::as_slice
+#pragma rsuse VecOsString_drop = VecOsString::Drop::drop
+#pragma rsuse PopenConfig_default = PopenConfig::default
+#pragma rsuse Popen_create = Popen::create::<OsString>
+#pragma rsuse Popen_wait = Popen::wait
+#pragma rsuse Popen_drop = Popen::Drop::drop
+#pragma rsuse PopenResult_is_ok = PopenResult::is_ok
+#pragma rsuse PopenResult_unwrap = PopenResult::unwrap
+#pragma rsuse PopenResult_drop = PopenResult::drop
+#pragma rsuse ExitStatusResult_is_ok = ExitStatusResult::is_ok
+#pragma rsuse ExitStatusResult_drop = ExitStatusResult::drop
+// Import the header generated by the Makefile invoking the tool
+#include "rust_deps/rust_deps.h"
+
+#include <stdio.h>
+
+int main() {
+  // let mut argv = Vec::new();
+  VecOsString argv = VecOsString_new();
+  // argv.push(OsString::from("/bin/cat"));
+  VecOsString_push(&argv, OsString_from_str(VR_StrFromCStr("/bin/cat")));
+  // argv.push(OsString::from("hello.txt"));
+  VecOsString_push(&argv, OsString_from_str(VR_StrFromCStr("hello.txt")));
+
+  // let create_result = Popen::create(&argv, PopenConfig::default());
+  PopenResult create_result =
+      Popen_create(
+          VecOsString_as_slice(&argv),
+          PopenConfig_default());
+
+  // let mut process = 
+  //   match create_result {
+  //     Err(_) => panic!("Failed to open subprocess!"),
+  //     Ok(process) => process
+  //   };
+  if (!PopenResult_is_ok(&create_result)) {
+    printf("Failed to open subprocess!\n");
+    // Drops implicit in Rust
+    PopenResult_drop(create_result);
+    VecOsString_drop(argv);
+    return 1;
+  }
+  Popen process = PopenResult_unwrap(create_result);
+
+  // let wait_result = process.wait();
+  // if !wait_result.is_ok() {
+  //   panic!("Failed to wait on subprocess!");
+  // }
+  ExitStatusResult wait_result = Popen_wait(&process);
+  if (!ExitStatusResult_is_ok(&wait_result)) {
+    printf("Failed to wait on subprocess!\n");
+    // Drops implicit in Rust
+    ExitStatusResult_drop(wait_result);
+    Popen_drop(process);
+    PopenResult_drop(create_result);
+    VecOsString_drop(argv);
+    return 1;
+  }
+
+  // println!("Success!");
+  printf("Success!\n");
+
+  // Drops implicit in Rust
+  ExitStatusResult_drop(wait_result);
+  Popen_drop(process);
+  PopenResult_drop(create_result);
+  VecOsString_drop(argv);
+  return 0;
+}
+
+```
+
+
+That's a lot! Before we talk about how it works under the hood, here's an explanation of what's going on from the C programmer's perspective.
+
+
+The `#pragma rsuse OsString = std:ffi::OsString` is setting up a name that our C code can use to refer to the Rust type.
+
+C ignores unrecognized `#pragma`s like these, but our Makefile will grep for all `#pragma rsuse` lines and send them to our tool so it can generate `rust_deps/rust_deps.h`.
+
+We `#include "rust_deps/rust_deps.h"` to bring in all those newly generated things, such as the `VecOsString_new` we later use.
+
+
+In `main`, we call `VecOsString_new`, a generated wrapper that calls Rust's `Vec<String>::new()`.
+
+It returns an opaque type `VecOsString`. With a smart enough compiler we can access its fields directly, but C or C++ will have to use accessor functions.
+
+We later hand a pointer to other functions, like `VecOsString_push`, `VecOsString_as_slice`, or `VecOsString_drop`.
+
+
+Next, we call `VR_StrFromCStr`. This is a built-in function that takes a constant-data C string and returns an equivalent to Rust's `&str`. [# Since we didn't alias `&str`, that struct is default named `VR_str_ref`.]
+
+
+The rest is pretty much the same.
+
+
+Though, I do want to point out that since this is C, we need to manage our own memory: we need to call the right `drop` methods at the right times. Newer languages with RAII should be able to do this automatically, and wouldn't need all those calls to the `drop` methods.
+
+C code also needs to be mindful of memory safety, and shouldn't move anything that has a live pointer pointing at it. More advanced languages will need to handle this carefully, and make their memory safety paradigms compatible with Rust's here.
+
+I've got some plans for this in Vale. In [grimoire-speak](/grimoire/grimoire), the short-term plan is to do move-only programming with Rust objects, then shift to a certain regions/unique-references blend later on. [# With Not-MVS as an intermediate step between the two!]
+
+
+Okay, now that we know how to use it, let's talk about how it works under the hood!
+
+
+<ignore>
+, until we get down to `PopenResult_drop`, where I want to point out that C doesn't manage memory for us. In fact, as we'll see in other examples, we need to manage our memory safety as well
+
+makes a Rust `&str` out of a constant-data C string.
+
+We didn't alias the type `&str` so it received an auto-generated name (`VR_str_ref`). It's 
+
+Our tool parses the `std::ffi::OsString` and uses information from rustc [# This part is hard. Persuading `rustc` to give us the right information is a path fraught with peril.] follows the imports to figure out that we're talking about `std::ffi::os_str::OsString`. This part is _really hard._ [#resolve] The entire tool is 3,200 lines of code, and most of that is just to resolve e.g. the string "OsString::From<&str>::from" to the correct `impl`. By the way, did you know that `OsString` has six different `From` implementations?]
+
+ * The `#pragma rsuse` lines aren't actually real pragmas, they're glorified comments.
+ * When we run our makefile, it does a `grep "#pragma rsuse"` and feeds all those lines into the tool.
+ * Each `#pragma rsuse` line sets up a C-compatible name that refers to a Rust type.
+    * Our tool is parsing these 
+ * The tool generates a `rust_deps/rust_deps.h` header file, that we `#include`d from our C code.
+</ignore>
+
+
+<slice />
+
+# The approach: passing opaque types by value
+
+
+So what in the world is going on here?
+
+
+Let's first talk about at that `VecOsString` type that our tool generated from `Vec<OsString>`.
+
+
+<slice />
+
+## A struct
+
+It's an "opaque struct" of the right size: 24 bytes.
+
+
+<<<<
+Here's the Rust definition:
+
+```rs
+#[repr(C, align(8))]
+pub struct VecOsString(
+    std::mem::MaybeUninit<[u8; 24]>);
+```
+////
+...and what cbindgen made from it:
+
+```c
+typedef struct VALIGN(8) VecOsString {
+  uint8_t _0[24];
+} VecOsString;
+```
+>>>>
+
+
+The important part is the `[u8; 24]` which is just a 24-byte array.
+
+
+More details:
+
+ * We got the size (24) and alignment (8) from the original `Vec<OsString>`, we'll talk about that below too.
+ * The `VALIGN(8)` expands to `__attribute__((aligned(n)))` [# I'm looking into changing this to `_Alignas`/`alignas` too, they seem more recent.] to align it correctly. Thanks to Jeff Niu, [snej](https://lobste.rs/s/0iskz9/exploring_seamless_rust_interop_for#c_29igsc), and [kornel](https://internals.rust-lang.org/t/different-way-to-call-into-rust-from-other-languages/20912/2?u=verdagon) for noticing this was missing!
+ * The `MaybeUninit` avoids some undefined behavior, we'll talk about that below. Thanks to bjorn3 for this part!
+
+
+So what goes in that 24 bytes? For the answer, let's look at the generated `VecOsString_new()` function.
+
+
+<slice />
+
+## A function returning some data by value
+
+Here's the generated Rust code, paraphrased for clarity: [# The tool actually generates Rust code with fully qualified names, for example `alloc::vec::Vec` instead of `Vec`. It also does a static_assert to make sure the sizes are correct.]
+
+```rs
+#[no_mangle]
+pub extern "C" fn VecOsString_new() -> VecOsString {
+  let result_rs: Vec<OsString> = Vec::new();
+  let result_c: VecOsString = unsafe { mem::transmute(result_rs) };
+  return result_c;
+}
+```
+
+As you can see, we're first calling the underlying function, `Vec::new()`, and then we're casting it to the right type with `transmute` and returning it.
+
+Previous versions `memcpy`d the `Vec<OsString>` into a new `VecOsString`'s internal array, but `transmute`ing seemed simpler.
+
+
+Also, this `transmute` is why our structs have `MaybeUninit` in them. [bjorn3](https://bjorn3.github.io/about/) offered a great explanation:
+
+> `[u8; N]` is not allowed to hold pointers/references. Or to be precise transmuting a pointer to a byte array and back will likely result in the resulting pointer being illegal to dereference. In addition it isn't allowed to hold padding bytes. The fix for both issues is to wrap the u8 or the entire array in a MaybeUninit<T>. This is guaranteed to be ABI compatible with the inner type as it is repr(transparent), but does allow holding pointers and uninitialized memory independent of the inner type.
+
+Thank you bjorn3!
+
+
+To summarize everything so far, we're conceptually just casting things to opaque types and moving them into C. [#easter]
+
+
+<slice>
+#easter: Easter egg note!
+
+[Wojtek](https://en.wikipedia.org/wiki/Wojtek_%28bear%29) enlisted as a private in the [Polish II Corps](https://en.wikipedia.org/wiki/II_Corps_%28Poland%29) to pay for his rations and transportation, and was subsequently promoted to corporal. Also, Wojtek is a [Syrian brown bear](https://en.wikipedia.org/wiki/Syrian_brown_bear).
+
+In June 1943, he even [caught an Arab spy](https://blogs.bl.uk/european/2015/11/wojtek-the-soldier-bear-from-the-polish-army.html) while trying to get into the bath house to take a shower.
+
+If you read this note, sneak the word "bear" into an HN/Reddit comment and [try to sound sane](https://youtu.be/-UBgNREvlIo), to be awarded the highest honor I can bestow!
+
+(Cheers to robert-wallis and Geoman Joe for [catching the last one](/blog/easter-egg-notes#cher-ami)!)
+</slice>
+
+## A function taking arguments by value
+
+We do the same thing for parameters as well. Here's the generated `PopenResult_unwrap`, which calls `Result<Popen, Error>::unwrap`:
+
+```
+#[no_mangle]
+pub extern "C" fn PopenResult_unwrap(self_c: PopenResult) -> Popen {
+  let self_rs: Result<Popen, PopenError> = unsafe { mem::transmute(self_c) };
+  let result_rs: Popen = Result::unwrap(self_rs,);
+  let result_c: Popen = unsafe { mem::transmute(result_rs) };
+  return result_c;
+}
+```
+
+Note we're taking the `PopenResult` argument by value, and transmuting it to the correct type. As you can see, we do the same fundamental approach for parameters and returns.
+
+
+<slice />
+
+## A function taking a pointer
+
+Some functions take pointers, like `PopenResult_is_ok`, which calls `Result<Popen, PopenError>::drop`:
+
+```rs
+#[no_mangle]
+pub extern "C" fn PopenResult_is_ok(
+  self_c: *const PopenResult,
+) -> bool {
+  let self_rs: &Result<Popen, PopenError> = unsafe { mem::transmute(self_c) };
+  let result_rs: bool = Result::is_ok(self_rs,);
+  let result_c: bool = unsafe { mem::transmute(result_rs) };
+  return result_c;
+}
+```
+
+
+<slice />
+
+## The actual generated code
+
+The above examples were simplified. Here's the actual struct definition:
+
+```rs
+#[repr(C, align(8))]
+pub struct VecOsString(std::mem::MaybeUninit<[u8; 24]>);
+const_assert_eq!(
+    std::mem::size_of::<alloc::vec::Vec<std::ffi::os_str::OsString>>(),
+    24);
+```
+
+and the actual `PopenResult_unwrap`:
+
+```rs
+#[no_mangle]
+pub extern "C" fn PopenResult_unwrap(
+  self_c: PopenResult,
+) -> Popen {
+  const_assert_eq!(
+      std::mem::size_of::<core::result::Result<subprocess::Popen, subprocess::PopenError>>(),
+      std::mem::size_of::<PopenResult>());
+  let self_rs: core::result::Result<subprocess::Popen, subprocess::PopenError> =
+      unsafe { mem::transmute(self_c) };
+  let result_rs: subprocess::Popen =
+      core::result::Result::unwrap(self_rs,);
+  const_assert_eq!(
+      std::mem::size_of::<subprocess::Popen>(),
+      std::mem::size_of::<Popen>());
+  let result_c: Popen = unsafe { mem::transmute(result_rs) };
+  return result_c;
+}
+```
+
+Note that everything is fully qualified (e.g. `core::Result::Result` instead of `Result`), and the addition of the assertions which sanity check that the tool works properly.
+
+
+<slice />
+
+## The approach so far
+
+If I had to summarize this all, I'd say we're sending things across the FFI boundary after *casting them into opaque types*, and then using generated functions to work with them.
+
+
+The overall approach _seems_ okay because all Rust types (except `Pin`ned ones) can be moved around as long as they aren't currently borrowed.
+
+Also, I haven't gotten any crashes from the handful of tests I've made: [a test](https://github.com/Verdagon/ValeRustCTests/blob/main/src/catter.c) that uses [subprocess](https://docs.rs/subprocess/latest/subprocess/) to `/bin/cat hello.txt`, [a test](https://github.com/Verdagon/ValeRustCTests/blob/main/src/reverse.c) that uses a lifetime'd iterator to reverse a string, [# I just use `'static` for the lifetime, who even knows what nasal demons that will cause.], [a test](https://github.com/Verdagon/ValeRustCTests/blob/main/src/regex.c) that uses the [regex](https://docs.rs/regex/latest/regex/) crate to extract a string, [a test](https://github.com/Verdagon/ValeRustCTests/blob/main/src/strlen.c) that gets a string's length, [# It's barely worth mentioning, but it was the first test to pass, so it has a special place in my heart.], and [a test](https://github.com/Verdagon/ValeRustCTests/blob/main/src/mkdir.c) that makes a directory.
+
+
+Keep in mind, *I can't say for certain that this works.*
+
+There's a good chance this `transmute`ing is causing some sort of undefined behavior, or perhaps even violating strict aliasing.
+
+I'm also uncertain about when/whether we can pass things by value over the FFI boundary. Calling conventions, especially on Windows, have a lot of quirks. I hope that just putting `extern "C"` makes it okay, but I can't be sure yet.
+
+I've written this article to get feedback on this mechanism, so let me know your thoughts in the comments on HN or Reddit!
+
+
+<slice />
+
+# The Tool
+
+As you can see, the generated code was actually pretty simple: it just casts things to correctly-sized opaque types and sends them over to C.
+
+
+This article is running long so I'll save the more detailed explanation for a follow-up article, but here's an overview of what it does:
+
+
+*First,* parse the `#pragma rsuse` lines, such as the:
+
+`#pragma rsuse VecOsString = std::vec::Vec<OsString>`
+
+We need to parse `std::vec::Vec<OsString>` and resolve its actual type, which is `alloc::vec::Vec<std::ffi::os_str::OsString>`.
+
+The tool comes out to 3,200 lines, and most of it is this step. Basically, we grab all the data from `rustc`, parse it, and then make an index of what owns what, taking into account imports and type aliases and function overloading. [# Anyone who tells you Rust doesn't have overloading is trying to sell you something. To them I say: `From`.]
+
+! This part is ridiculously hard. If you have an idea how you'd do it, let me know, because it's probably better than what I did!
+
+
+*Second,* measure the sizes and alignments of all types. The tool makes a temporary Rust program that looks like this: [# Yeah, I also think it's weird that I do `str=` there instead of `&str=`. I'm indexing them by "value type", without references. It works for now, but it's a weird decision I want to go back and fix.]
+
+```rs
+use std::mem;
+extern crate alloc;
+use core;
+use core::ffi::c_char;
+
+fn main() {
+  println!("alloc::vec::Vec<std::ffi::os_str::OsString>={},{}", std::mem::size_of::<alloc::vec::Vec<std::ffi::os_str::OsString>>(), std::mem::align_of::<alloc::vec::Vec<std::ffi::os_str::OsString>>());
+  println!("core::result::Result<subprocess::ExitStatus, subprocess::PopenError>={},{}", std::mem::size_of::<core::result::Result<subprocess::ExitStatus, subprocess::PopenError>>(), std::mem::align_of::<core::result::Result<subprocess::ExitStatus, subprocess::PopenError>>());
+  println!("core::result::Result<subprocess::Popen, subprocess::PopenError>={},{}", std::mem::size_of::<core::result::Result<subprocess::Popen, subprocess::PopenError>>(), std::mem::align_of::<core::result::Result<subprocess::Popen, subprocess::PopenError>>());
+  println!("std::ffi::os_str::OsString={},{}", std::mem::size_of::<std::ffi::os_str::OsString>(), std::mem::align_of::<std::ffi::os_str::OsString>());
+  println!("[std::ffi::os_str::OsString]={},{}", std::mem::size_of::<&[std::ffi::os_str::OsString]>(), std::mem::align_of::<&[std::ffi::os_str::OsString]>());
+  println!("str={},{}", std::mem::size_of::<&str>(), std::mem::align_of::<&str>());
+  println!("subprocess::Popen={},{}", std::mem::size_of::<subprocess::Popen>(), std::mem::align_of::<subprocess::Popen>());
+  println!("subprocess::PopenConfig={},{}", std::mem::size_of::<subprocess::PopenConfig>(), std::mem::align_of::<subprocess::PopenConfig>());
+}
+```
+
+...and then runs it, and collects the output.
+
+
+*Third,* actually generate the structs and functions. It's not too difficult once you have all the information from `rustc` and the sizer program.
+
+
+*Fourth,* invoke `cbindgen` to generate a C header file and static library.
+
+
+At that point, the tool's job is done! The Makefile then invokes `clang` with the right paths to the header file and the static library, and we get a program out of it!
+
+
+<slice />
+
+# Implications, Benefits, and Drawbacks
+
+
+There are some nice benefits to this approach:
+
+ * Newer fast, memory-safe languages like Vale will have access to a lot of higher-quality fast and memory safe libraries.
+ * Newer scripting languages will be able to call into faster Rust languages to do the heavy lifting, similar to how Python calls into C.
+ * This could even speed up C++ to Rust migrations, as it'll be a little easier to call between the two.
+
+
+The biggest drawback I've found is that the tool runs pretty slowly, since it invokes rustc twice (to get the sizes of types, then to do the final build). I'll be speeding it up, but it's hard to say by how much. [# I'm thinking a lot of caching here will help. For later versions that are integrated with the compiler, we might even interact with a Rust REPL.]
+
+
+I thought at first there would be a large binary size penalty for bringing in the entire Rust standard library, but it's actually quite manageable with the right compiler options.
+
+For example, the [strlen.c](https://github.com/Verdagon/ValeRustCTests/blob/main/src/strlen.c) test's binary size is 34,008 bytes, only 576 bytes bigger than the plain C binary size of 33,432 bytes. [# C program was just `printf("Length: %lu\n", strlen("bork"));`, build command `clang -Os -flto -fdata-sections -ffunction-sections -Wl,-dead_strip -nostartfiles -nodefaultlibs -nostdlib -fno-stack-protector main.c -o main -lc -lSystem`] [# Command used: `cargo +nightly cbuild --release --target aarch64-apple-darwin -Z build-std-features=panic_immediate_abort -Z build-std=std,panic_abort --library-type staticlib` with Cargo.toml options `strip = true`, `lto = true`, `codegen-units = 1`, `panic = "abort"`, `opt-level = "z"` and linker options `-Wl,-dead_strip -ffunction-sections -fdata-sections`] Big thanks to bjorn3 for the tips here!
+
+
+There's a few more things I want to explore too:
+
+ * I want to explore how link-time optimization works with these. I suspect it will do pretty well, especially since LLVM 16 [switched to opaque pointers](https://releases.llvm.org/16.0.0/docs/OpaquePointers.html).
+ * I haven't decided how we'll handle `async` functions. Perhaps a built-in function could launch a thread with a given function and return us a future. Perhaps we could also give C some other helper functions to deal with those futures.
+ * Macros could be a problem. It's hard to generate a wrapper function for macros that have the correct types. Luckily, a lot of crates that lean on macros also offer a normal imperative API, so we'll see how much of a problem this is.
+
+
+Hopefully all this works out! If it does, then I'll be pretty excited about where this is heading.
+
+
+<slice />
+
+# That's it for now!
+
+
+Huge thanks to Jeff Niu, [snej](https://lobste.rs/s/0iskz9/exploring_seamless_rust_interop_for#c_29igsc), [kornel](https://internals.rust-lang.org/t/different-way-to-call-into-rust-from-other-languages/20912/2?u=verdagon), and [bjorn3](https://bjorn3.github.io/about/) for fixes and advice!
+
+
+Keep an eye out for the next articles, which will detail:
+
+ * How the tool parses and resolves the given Rust names.
+ * How we would integrate this into the Vale compiler.
+ * How we might do this and still uphold Vale's other features like determinism and perfect replayability.
+
+
+If you have any questions, always feel free to reach out via [email](mailto:verdagon_epsa@verdagon.dev), [twitter](https://twitter.com/verdagon), the [discord server](https://discord.gg/SNB8yGH), or the [subreddit](https://reddit.com/r/vale).
+
+
+Donations and sponsorships are currently paused, but if you like these articles, please [Donate to Kākāpō Recovery](https://www.doc.govt.nz/kakapo-donate) and let me know! I love those birds, let's save them!
+
+
+Cheers,
+
+
+- Evan Ovadia
+
+
+
+<slice new-color="afterword"/>
+
+# Thank you!
+
+I want to give a huge thanks to [Arthur Weagel](https://github.com/aweagel), [Kiril Mihaylov](https://github.com/KirilMihaylov), [Radek Miček](https://github.com/radekm), [Geomitron](https://github.com/Geomitron), [Chiuzon](https://github.com/chiuzon), [Felix Scholz](https://github.com/soupertonic), [Joseph Jaoudi](https://github.com/linkmonitor), [Luke Puchner-Hardman](https://github.com/lupuchard), [Jonathan Zielinski](https://github.com/tootoobeepbeep), [Albin Kocheril Chacko](https://github.com/albinkc), [Enrico Zschemisch](https://github.com/ezschemi), [Svintooo](https://github.com/Svintooo), [Tim Stack](https://github.com/tstack), [Alon Zakai](https://github.com/kripken), [Alec Newman](https://github.com/rovaughn), [Sergey Davidoff](https://github.com/Shnatsel), [Ian (linuxy)](https://github.com/linuxy), [Ivo Balbaert](https://github.com/Ivo-Balbaert/), [Pierre Curto](https://github.com/pierrec), [Love Jesus](https://github.com/loveJesus), [J. Ryan Stinnett](https://github.com/jryans), [Cristian Dinu](https://github.com/cdinu), and [Florian Plattner](https://github.com/lasernoises) (plus a very generous anonymous donor!) for sponsoring Vale over all these years.
+
+Your support has always given me the strength and resolve to explore these arcane corners of the world. And even though I'm not doing sponsorships for a while, it's awesome to know you're with me in spirit. [Axes high!](http://www.gamesurge.com/pc/strategy/pc_wt/Adom.shtml)
+
+
+
+
+
+
+<ignore>
+
+
+
+<<<<
+Also, here's a raccoon in a top hat. [# This is on you. You're the one that chose to read these sections instead of skipping to the technical stuff.]
+
+
+I had to cut out the section that made this make sense in context, but then I had nowhere to put the raccoon, so... here we are.
+////
+<img style="width: 100%" src"https://www.creativefabrica.com/wp-content/uploads/2022/11/17/Raccoon-In-A-Top-Hat-47139987-1.png" />
+>>>>
+
+
+# How a language could do this
+
+Firstly, we're going to assume that Rust has a stable ABI, and a way to ask the REPL information about a specified function.
+
+I've implemented something like this (not via the REPL though), we'll talk about that in part 3.
+
+
+
+
+
+When you're a solo [BDFL](https://www.urbandictionary.com/define.php?term=BDFL) language developer leading a rag-tag team of volunteers, your time is precious.
+
+But their time is precious too.
+
+
+I've worked on Vale for a long time. I've been through the flaming trenches of seven different iterations of generics, [# "Generics" is a common swear word in my discord server.] I've repelled the incursion of Windows bugs in five different campaigns, [# Huge thanks to Jon Goodwin for showing me the path towards initial Windows support, way back in the beginning!] and I've done three LLVM migrations. I've been through hell and back. *In other words, I'm committed.*
+
+But most of my volunteers are just interested in playing with a new language, and helping out a bit. They like working on problems that are challenging in interesting ways. They're coding for fun, and to help out the project a little bit.
+
+
+When you lead engineers at your company, your main job is to *get the obstacles out of their way* so they can make something great. You're often [running interference](https://idioms.thefreedictionary.com/run+interference), interacting with managers and other teams and getting sign-offs so that your engineers can focus on building an actual solution.
+
+When leading volunteers, you also need to make the project challenging in a good way, and not challenging in the bad ways. This usually means working with them, 
+</ignore>

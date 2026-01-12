@@ -17,7 +17,7 @@ I use this site to blog about my endeavors. Enjoy!
 # Recent posts:
 
 
- * [The Impossible Optimization, and the Metaprogramming To Achieve It](https://verdagon.dev/blog/impossible-optimization)
+ * [The Impossible Optimization, and the Metaprogramming To Achieve It](/blog/impossible-optimization)
  * [Group Borrowing: Zero-Cost Memory Safety with Fewer Restrictions](/blog/group-borrowing)
  * [On Joining the Mojo Compiler Team](/blog/on-joining-mojo-compiler-team)
  * [Crossing the Impossible FFI Boundary, and My Gradual Descent Into Madness](/blog/exploring-seamless-rust-interop-part-2)
@@ -101,9 +101,9 @@ My biggest endeavor is Vale, a statically-typed ahead-of-time-compiled language 
 
 I'm combining the best parts of C++, Rust, and Scala (and even a tiny bit of Javascript!) with some novel innovations:
 
- * Generational Memory, an alternative to RC, GC, or borrow checking.
- * HGM, speeding up Generational Memory with "LifeCell"s.
+ * [Generational References](/blog/generational-references), an alternative to RC, GC, or borrow checking.
  * [Region Borrow Checking](/blog/zero-cost-borrowing-regions-overview), which allows us to temporarily treat all pre-existing memory as immutable, enabling optimizations and seamless structured concurrency.
+ * [Linear types](/blog/higher-raii-uses-linear-types) which enable "Higher RAII", a way to ensure that we don't forget to do a certain operation or make a certain decision in the future.
 
 Check it out at [https://vale.dev/](https://vale.dev/)!
 
@@ -123,17 +123,24 @@ Hello Mars!
 
 
 
+Development on Vale is currently on hold while I explore things like [group borrowing](/blog/group-borrowing) and new memory safety blends. Stay tuned!
+
+
 
 # Software Engineering
 
-I currently work on the [Mojo](https://www.modular.com/mojo) programming language at [Modular](https://www.modular.com/), and in the past I've worked on [Google Earth](https://earth.google.com/web), [Google Chat](https://chat.google.com/), and [Google MyMaps](https://mymaps.google.com).
+In the past, I've worked on the Modular's [Mojo](https://www.modular.com/mojo) programming language, [Google Earth](https://earth.google.com/web), [Google Chat](https://chat.google.com/), and [Google MyMaps](https://mymaps.google.com).
 
 
 #### Mojo
 
-Since mid-2024, I've been working on the [Mojo](https://www.modular.com/mojo) programming language, adding things like linear types, associated aliases, and various frontend features.
+From July 2024 to December 2025, I worked on the [Mojo](https://www.modular.com/mojo) programming language, adding things like linear types, associated aliases, struct extensions, CPU/GPU boundary type-checking, and various frontend features.
 
+<div style="overflow: hidden; width: 100%; aspect-ratio: 1.5">
 <img src="https://cdn.prod.website-files.com/63f9f100025c058594957cca/65df28c4d9ed2ae5929c129c_mojo-man_5.jpg" width="100%"/>
+</div>
+
+My favorite part was geeking out with the team about memory safety and metaprogramming, exploring things like [group borrowing](/blog/group-borrowing) and [futamura projections](/blog/impossible-optimization). Also check out my [LLVM conference talk on linear types](https://www.youtube.com/watch?v=IpuvQUVB8Cg)!
 
 
 #### Google Earth

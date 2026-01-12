@@ -1,0 +1,650 @@
+---
+title: Comparing the Benefits of Reference Counting and Borrow Checking
+author: Evan Ovadia
+date: Nov XX, 2025
+realm: blog
+path: grimoire/comparing-rc-borrowing
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+Greetings!
+
+
+This post is a companion to [The Memory Safety Holy Grail](/grimoire/grail-1).
+
+In that post, I talk about a theoretical new blend between reference counting and borrowing that I believe is possible but nobody knows how to make yet.
+
+
+One of the most important things in software architecture is *keeping complexity down* while not cutting off the option to eventually *optimize.*
+
+So, in that theoretical holy-grail language, mastering reference counting, borrowing, and knowing when to use them will be a powerful skill.
+
+
+Of course, that article begs the question, _why_ do we want to blend the two?
+
+Coming from a borrow checking world, one wonders, "why do we even want reference counting?"
+
+And coming from a reference counting (or tracing garbage collection) world, one wonders, "why go through all the hassle of borrow checking?"
+
+
+This post answers both!
+
+
+TL;DR: Code can be *faster with borrowing* and *simpler with reference counting.*
+
+
+# Simplicity and Speed
+
+Reference-counting languages (like Swift) want borrowing because it's *way faster.*
+
+Borrowing languages (like Rust) want reference counting because it's *more flexible* and enables *simpler code.* [# If you want _even simpler_, then you likely want garbage collection. I consider reference counting a big more powerful (I love weak references, and deterministic destruction) but garbage collection wins on simplicity.]
+
+
+"Doesn't Rust already have reference counting? And doesn't Swift already have borrowing?"
+
+Yes, but try not to think about those for this post, because:
+
+ * Rust's `Rc` often requires `RefCell` which causes unnecessary panics. [# Yep, I say unnecessary, and we'll see why further below. A perfectly cromulent Swift program becomes panicky when translated into borrow checking.]
+ * Swift's borrowing has the same [run-time panic](https://gist.github.com/Verdagon/257dde6f6ddc12d23dd784e6f0fdf4c7) problem, and even undefined behavior when multiple threads are involved. [# Ironic, since their biggest use case (iOS apps) basically force you into multithreaded patterns.]
+ * This post isn't about Rust's `Rc` or Swift's borrowing, because it's mainly to contextualize [The Memory Safety Holy Grail](/grimoire/grail-1), a theoretical memory safety approach that doesn't have those particular drawbacks, so Rust's `Rc` and Swift's borrowing aren't super relevant.
+
+
+That said, let's dive in! [#tlist]
+
+
+<slice>
+#tlist: Edit: Include this somewhere:
+
+ * These are, of course, not black-and-white truths. One can imagine code that's simpler with borrowing, (For example, borrowing often means your methods don't have to return defensive copies.) or faster with reference counting. (For example, borrowing often forces you to `clone` more, which can be expensive if it involves a call to `malloc`.) It also varies wildly depending on the program. (For example, real-time games love borrowing, and apps love reference counting.) Still, I think it's a reasonable approximation.
+ * Mention that not all programs will experience what we do in this article. Apps will suffer worse. Rust hasn't taken off in GUI. CLI apps will have an okay time. game engines will have a great time.
+ * fit this in: "this article is full of me holding languages to, as far as we know, impossible and unreasonable standards."
+</slice>
+
+
+## Reference counted languages want borrowing because it's faster
+
+People gravitate towards reference-counted and tracing garbage-collected languages because they're simple and flexible, but they are *much slower.*
+
+
+However, they are slower because they suffer *bookkeeping overhead*, *malloc/free costs,* and/or *cache misses.*
+
+
+I'll show you what I mean in Swift terms, since it's statically typed and uses reference-counting. [# This example had me questioning some details about how atomic reference counting works. It sent me deep down a rabbit hole. Quiz time: can you tell why [this program](https://gist.github.com/Verdagon/2c2653de41534d96bdf93454cc7aa97e) isn't thread safe? It's because of load-then-retain races! Stuff like this is why Rust has `Arc<Mutex<T>>`.]
+
+```
+// 32 bytes
+class Spaceship {
+  hp: int;
+  wingspan: int;
+  speed: int;
+  engine: Engine;
+}
+
+// 16 bytes
+class Engine {
+  fuel: int;
+  thrust: int;
+}
+
+fn accelerate(_ ship: Spaceship) {
+  // Cache miss!
+  // RC increment!
+  ship.engine.fuel -= 10;
+  // RC decrement!
+  ship.speed += 10;
+}
+```
+
+When we access ship.engine, we obtain a reference (a "strong" reference, because it keeps the object alive). When getting a reference, Swift atomically increments the `Engine`'s hidden reference counter integer, to ensure that nobody else (such as another thread!) deallocates it. After that line, Swift atomically decrements the count again. These increments and decrements are pretty expensive. [# Sometimes Swift can optimize these out, but sometimes not.]
+
+
+Tracing garbage collection has overhead as well; the program periodically scans through all live objects and discards everything else. This is also pretty expensive.
+
+
+However, the biggest source of overhead is the *cache miss.* Since the `Engine` lives in a separate memory allocation from `Spaceship` (because they're `class`es, not `struct`s which are stored inline in their containers), the CPU must fetch that data, possibly all the way from RAM which is extremely expensive.
+
+
+Swift isn't as fast as C because of things like this.
+
+
+Rust does not have this problem, because Rust can put data *inline.*
+
+```rs
+// 40 bytes (not 32)
+struct Spaceship {
+  hp: int;
+  wingspan: int;
+  speed: int;
+  engine: Engine; // Data lives inline!
+}
+
+struct Engine {
+  fuel: int;
+  thrust: int;
+}
+
+fn accelerate(ship: &mut Spaceship) {
+  // No cache miss!
+  // No RC increment!
+  ship.engine.fuel -= 10;
+  // No RC decrement!
+  ship.speed += 10;
+}
+```
+
+In Rust, data can live *inline* in the object that owns it. This `Engine` is inside the `Spaceship`'s memory allocation.
+
+
+Because of that:
+
+ * There's no cache miss, because the `Engine`'s memory lives inside the `Spaceship`'s memory
+ * It doesn't have to do bookkeeping to make sure that separate allocation stays alive while we're using it.
+ * The program doesn't have to insert expensive `malloc` and `free` calls for the `Engine`.
+
+
+To summarize, borrowing is fast because: [# Edit: is this redundant?]
+
+ * It enables accessing memory without doing any reference counting increments/decrements or garbage collection bookkeeping.
+ * Enables "inline data": data that lives inside other data (for example, a struct that lives inside another struct, or inside its parent array, etc) which reduces cache misses and avoids more `malloc`/`free` calls.
+
+
+
+## Borrow-checking languages want reference counting because it's simpler and more flexible [# Edit: drive it home. emphasize human aspect.]
+
+TL;DR: Code is often simpler with reference counting.
+
+
+With reference counting and garbage collection, you can do anything you can imagine.
+
+
+With pure borrow checking, you can't do a lot of common patterns. For example, you can't do [intrusive data structures](https://lwn.net/Articles/907876/), [observers](https://www.reddit.com/r/rust/comments/pwqju6/is_there_an_underlying_reason_that_idiomatic_rust/), [graphs](https://news.ycombinator.com/item?id=24996001), [back-references](https://users.rust-lang.org/t/back-reference-to-the-parent-struct/7413/2), [# Back-references are particularly nice for things like AVL trees. We'll also see them a lot in our below Roguelike game example.] [dependency references](https://en.wikipedia.org/wiki/Dependency_injection), [callbacks](https://news.ycombinator.com/item?id=12029238), [delegates](https://medium.com/@nimjea/delegation-pattern-in-swift-4-2-f6aca61f4bf5), etc.
+
+
+It's not just patterns. *Entire architectures become off-limits* when you use pure borrow checking.
+
+
+*Let's see an example!*
+
+We will:
+
+ 1. Start by implementing a tiny Roguelike game in Swift and Rust.
+ 1. Add a *squad* feature to the game in Swift.
+ 1. Add it to the Rust version, working around the borrow checker's limitations.
+ 1. Add an *aura* feature to the game in Swift.
+ 1. Add it to the Rust version, working around the borrow checker's limitations.
+
+
+! Note: This section isn't comparing languages. A real comparison would let Rust use `Rc` and `RefCell`. Rather, this is comparing memory safety approaches by illustrating how some code is simple with reference counting and complex with borrowing.
+
+
+These points are subtle, so these sections will be a bit longer than the last one. Here we go!
+
+
+### Step 1: A Basic Roguelike Game in Swift and Rust
+
+
+<<<<
+I have a little roguelike game, where the player has to survive in a dungeon that's filled with goblins. [# I also have a version that uses a [component-based architecture](https://www.reddit.com/r/roguelikedev/comments/i3xekn/ec_vs_ecs_for_roguelikes/), I love roguelike game dev!] [# Edit: Add a gif]
+
+
+Here is the main classes involved.
+
+
+`Level` holds all the tiles and the entities.
+
+
+There are two kinds of `Entity`s:
+
+ * The player is an `Entity`.
+ * There are a lot of goblin `Entity`s.
+
+
+The entity has a `processTurn` method, which is called every turn, to decide what this entity will do next.
+
+It's pretty simple, it just attacks an adjacent enemy, or chases after its `target` entity, or just wanders around.
+
+
+The Rust and Swift versions are similar so far.
+
+As we add more features, we'll see how they diverge.
+////
+```swift
+class Entity {
+  let id: Int
+  var isPlayer: Bool
+  weak var level: Level?
+  var loc: Location
+  var chaseTarget: ChaseTarget?
+
+  func processTurn(game: Game) {
+    if let target = getAdjacentEnemy() {
+      chaseTarget = nil
+      self.attack(target: target)
+      return
+    }
+    if let (newLoc, newTarget) = chase() {
+      let currentLoc = loc
+      chaseTarget = newTarget
+      level.entityByLocation.removeValue(
+          forKey: currentLoc)
+      loc = newLoc
+      level.entityByLocation[newLoc] =
+          WeakEntityRef(self)
+      return
+    }
+    ... // Else, wander
+  }
+}
+
+class Level {
+  var tiles: [Location: Tile]
+  var entities: Set<Entity>
+  var entityByLocation: [Location: WeakEntityRef]
+}
+```
+>>>>
+
+
+There is one main difference so far. The Swift `ChaseTarget` contains a weak reference:
+
+```
+class ChaseTarget {
+    weak var target: Entity?
+    var pathToTarget: [Location]
+}
+```
+
+But pure borrowing generally doesn't allow long-lived references in structs, [# This generally results in borrowing errors, because nobody can modify anything that someone else has a reference to.] [# One common workaround is to use Cell or RefCell, which lets others modify an object while you have a reference to it, but they're still not able to move ownership the object or delete the object.] so instead the Rust `ChaseTarget` contains an index into the central `Entity` list:
+
+```
+pub struct ChaseTarget {
+    pub target_index: generational_arena::Index,
+    pub path_to_target: Vec<Location>,
+}
+```
+
+We'll see this playing out a lot, as Swift references become Rust indices. [#splork]
+
+
+<slice>
+#splork: Other times that a weak reference in Swift became a generational_index in Rust:
+
+ * Swift `Entity.attack` takes in a `target` ref. Rust takes in an index and the game.
+ * Swift `Entity.level` is a weak ref, Rust's is an index. Same in `Totem`.
+ * Swift `Level.entities` maps location to entity-weak-ref. Rust's maps location to index.
+ * Swift `Entity.chaseTarget` is a weak ref. Rust's is an index.
+ * Swift `Squad`'s members are weak refs. Rust's are indices.
+ * Swift `Entity`'s affectors are weak refs. Rust's are indices.
+ * Swift `Entity.getNearestEnemyInSight` returns weak Entity. Rust returns index.
+
+</slice>
+
+
+### Step 2: Add Squads to the Swift Version
+
+
+Now let's add a feature to the Swift version, and afterward try to make an equivalent change to the Rust version.
+
+
+Goblins can now form "squads". When one goblin attacks, all goblins in the squad get to attack for free.
+
+
+<<<<
+We'll change `Entity` to have a `squad` field.
+
+Every goblin in a squad will point at a common `Squad` object.
+
+
+One nice part of this is that if all `Entity`s in a `Squad` die, the `Squad` is automatically deallocated, because the `Entity`s hold strong references to the `Squad`.
+
+
+This is a pretty nice pattern. People also use this pattern for e.g. files/textures/buffers/etc. that should be closed and disposed when everyone's done reading it.
+
+
+////
+```swift
+class Entity: IStrengthAffector {
+  let id: Int
+  var isPlayer: Bool
+  weak var level: Level?
+  var loc: Location
+  var chaseTarget: ChaseTarget?
+
+  var squad: Squad? // This is new
+
+  func processTurn(game: Game) { ... }
+}
+
+class Squad {
+  var members: [WeakEntityRef]
+}
+```
+>>>>
+
+
+
+
+### Step 3: Add Squads to the Rust Version
+
+
+But with the Rust version, where we're only using borrowing, we run into some trouble. Who owns the `Squad` object?
+
+
+<<<<
+The most common answer is to make a separate `Vec<Squad>` in the `Level`.
+////
+```rs
+struct Level {
+  ...
+  squads: Vec<Squad>,
+  ...
+}
+```
+>>>>
+
+
+But of course, we then need some logic to clean a `Squad` up when all of its members die. We would either:
+
+ * Periodically clean up orphaned `Squad` instances (manual garbage collection)
+ * Have a counter inside each `Squad` about how many members are still alive, and clean it up when it becomes zero (manual reference counting)
+
+There are a few other solutions too, but all of them add their own particular complexities. [# Another solution would be that units can point at their squad leader. But then if the squad leader dies, we need some logic to designate someone else in the squad as the new leader, and then update all the followers to point to them.]
+
+
+Suddenly, something simple in Swift has become something unnecessarily complex in the borrowing version.
+
+
+This situation is pretty common when using pure borrowing in Rust. The borrow checker's limitations tend to push us toward architectures that look like relational databases (notice our new `Squad` "table") or ECS, which are nice, but they sometimes [aren't the best fit for the situation](https://www.reddit.com/r/roguelikedev/comments/i3xekn/ec_vs_ecs_for_roguelikes/).
+
+
+
+### Step 4: Add Auras to the Swift Version
+
+
+Let's upgrade the Swift version.
+
+
+We'll add goblin priests and stationary goblin totems that have *auras.*
+
+An "aura" is the area within a 10-foot radius around a goblin priest (or a goblin totem) in which other goblins receive a strength boost.
+
+
+We'll add an `IStrengthAffector` protocol (similar to a Java interface) to represent "something that powers up an Entity".
+
+
+Some `Entity`s are priests, so we'll make `Entity` implement the `IStrengthAffector` protocol.
+
+We'll also change `Entity` to have:
+
+ * An `affectors` field, a list of `IStrengthAffector`s that are affecting it.
+ * An `affecteds` field, used for goblin priests, a list of `Entity`s that this priest is affecting.
+
+
+And we'll have a `Totem` class, which is also an `IStrengthAffector` because it can also strengthen goblins around it.
+
+
+<<<<
+```swift
+class Entity: IStrengthAffector {
+  let id: Int
+  var isPlayer: Bool
+  weak var level: Level?
+  var loc: Location
+  var chaseTarget: ChaseTarget?
+
+  var squad: Squad?
+
+  // These are new.
+  var isPriest: Bool
+  // Which priests+totems affect me
+  var affectors: [WeakEffectorRef]
+  // Who I'm affecting if I'm a priest
+  var affecteds: [WeakEntityRef]
+  // Strength boost if I'm a priest
+  func getStrengthBoost() -> Int32 {
+    return 5
+  }
+
+  func processTurn(game: Game) { ... }
+
+  // This is new.
+  // Update affecteds and affectors
+  func updateAffecteds(game: Game) {
+    ...
+  }
+}
+```
+////
+```swift
+class Level {
+  var tiles: [Location: Tile]
+  var entities: [Location: WeakEntityRef]
+  var totems: [Totem] // This is new
+}
+
+// This is new
+protocol IStrengthAffector {
+  func strength_boost();
+}
+
+// This is new
+class Totem: IStrengthAffector {
+  var loc: Location
+  // Who I'm affecting
+  var affecteds: [WeakEntityRef]
+
+  func getStrengthBoost() -> Int32 {
+    return 5
+  }
+  // Update affecteds and affectors
+  func updateAffecteds(game: Game) {
+    ...
+  }
+}
+```
+>>>>
+
+(For brevity I'm using an `isPriest` boolean and having all `Entity` implement `IStrengthAffector`, but normally one would usually use subclassing or components for this.)
+
+
+### Step 5: Add Auras to the Rust Version
+
+
+Things get tricky when we try and add priests, totems, and their auras to the Rust version. [# Edit: more consistent use of "rust version" and "pure borrowing version".]
+
+
+<<<<
+In the Swift version, `Entity` had a List\<weak IStrengthAffector\>.
+
+Each element pointed at either a goblin priest `Entity` or a `Totem`.
+
+
+This isn't possible with pure borrowing. Pure borrowing doesn't like having long-lived references in structs.
+
+So instead, the Rust `Entity` has a `Vec<StrengthAffectorIndex>`, where a `StrengthAffectorIndex` is an enum that has either an index into the `Entity` list or an index into the `Totem` index.
+
+
+Elsewhere in our codebase, we need a way to turn a `StrengthAffectorIndex` into an `IStrengthAffector` reference.
+
+For this, it uses this new `lookup_strength_affector` method.
+////
+```rs
+#[derive(Clone, Copy, PartialEq)]
+pub enum StrengthAffectorIndex {
+    Totem(generational_arena::Index),
+    Priest(generational_arena::Index),
+}
+
+pub fn lookup_strength_affector<'a>(
+  game: &'a Game,
+  affector_id: &EffectorIndex
+) -> Option<&'a dyn IEffector> {
+  match affector_id {
+    EffectorIndex::Priest(id) => {
+      game.entities.get(*id)
+        .map(|e| e as &dyn IEffector)
+    },
+    EffectorIndex::Totem(id) => {
+      game.totems.get(*id)
+      .map(|t| t as &dyn IEffector)
+    },
+  }
+}
+```
+>>>>
+
+
+As you can see, something simple with reference counting has become something complex in the borrowing version.
+
+
+### Borrowing Doesn't Like Some Parameters
+
+
+There was also an interesting moment when I was trying to translate the simpler roguelike into pure borrowing style.
+
+
+<<<<
+This Swift method works:
+
+```swift
+class Totem: IStrengthAffector {
+  ...
+  func updateAffecteds(game: Game) {
+    // Modify self
+    // Modify game
+  }
+}
+```
+////
+But not this equivalent Rust method:
+
+```rs
+struct Totem {
+  ...
+}
+impl Totem {
+  fn updateAffecteds(
+      &mut self, game: &mut Game) {
+    // Modify self
+    // Modify game
+  }
+}
+```
+>>>>
+
+
+The borrow checker gives us a compile error.
+
+Because of the shared-xor-mutable rule, you can't have a mutable reference to the `Game` and a mutable reference something to the `Totem` at the same time.
+
+
+The three most common solutions I've seen:
+
+ * Extract the `Totem` from the `Game`, call `totem.updateAffecteds(game)`, then reinsert the totem (careful, this can cause dangling indices [# Specifically, it changed the totem's generational index, and suddenly everyone has dangling generational indices that no longer point to this object.]).
+ * Change it to `fn updateAffecteds(&self, game: &Game) -> GameMutator`. `GameMutator` is a closure that takes in a `&mut Game` and modifies it. [# This is sometimes a good pattern, if you want to use polymorphism, or make your library extensible.]
+ * Refactor your callers, and possibly their callers as well. [# TODO: mention: would be to get a &mut Game and a TotemIndex]
+
+
+Each has its particular complexities.
+
+
+As you can see, something simple in Swift becomes complex when using pure borrow checking.
+
+
+### Borrowing Often Forces Parameters
+
+
+Here's a comparison of the two versions' `attack` methods.
+
+
+The Swift version looked like this:
+
+```swift
+func attack(target: Entity) {
+  let strengthBoost = self.affectors
+    .compactMap { $0.effector?.getStrengthBoost() }
+    .reduce(0, +)
+  let totalDamage = self.damage + strengthBoost
+  target.takeDamage(totalDamage)
+}
+```
+
+
+The Rust version had to take in the entire world mutably, as an extra `&mut Game` parameter:
+
+```rs
+pub fn attack(
+  attacker_index: generational_arena::Index,
+  target_index: generational_arena::Index,
+  game: &mut Game
+) {
+  let base_damage = game.entities[attacker_index].damage;
+  let effector_boost: i32 = game.entities[attacker_index].effector_indices.iter()
+    .filter_map(|affector_id| lookup_strength_affector(game, affector_id))
+    .map(|effector| effector.get_strength_boost())
+    .sum();
+  let total_damage = base_damage + effector_boost;
+  game.entities[target_index].take_damage(total_damage);
+}
+```
+
+The Rust `attack` needs the extra `&mut Game` because:
+
+ * It needs it to look up the target `Entity` via `game.entities[target_index]`.
+ * It calls `lookup_strength_affector(game, affector_id)` which needs `game` to look up in the Game's `entities` or `totems` array to turn the `affector_id` into a reference.
+
+In other words, the borrowing version sometimes forces you to give function more access that probably shouldn't have it. [# Sometimes this is a false comparison, because the function will still have mutable access to the entire world, through its own fields. If an object is mutating something, I do sometimes prefer it to be a method parameter instead of a field. However, if an object is only reading something, I often prefer it to be a field instead. That's the case with `Entity`'s `level` field.]
+
+
+
+## Comparison
+
+To summarize the above...
+
+
+Borrowing enables *faster code,* because:
+
+ * Less heap allocations.
+ * Less cache misses.
+ * No reference counting / tracing garbage collection overhead.
+
+
+Reference counting enables *simpler code,* because it lets you choose the simplest pattern for the situation. In the above examples:
+
+ * Swift's simple `Squad` became something more complex in pure borrowing.
+ * Swift's `List<weak IStrengthAffector>` became something more complex in pure borrowing.
+ * Borrowing doesn't allow methods that take a reference to something that indirectly contains them.
+ * Borrowing sometimes forces a function to have more access than it would otherwise.
+
+
+So, generally, code can be *faster with borrowing* and *simpler with reference counting.*
+
+
+These are, of course, not black-and-white truths. One can imagine code that's simpler with borrowing, [# For example, borrowing often means your methods don't have to return defensive copies.] or faster with reference counting. [# For example, borrowing often forces you to `clone` more, which can be expensive if it involves a call to `malloc`.] It also varies wildly depending on the program. [# For example, real-time games love borrowing, and apps love reference counting.] Still, I think it's a reasonable approximation.
+
+
+# Conclusion
+
+That's all for this post!
+
+
+Now you know why we want [The Memory Safety Holy Grail](/grimoire/grail-1).
+
+
+We want to get the benefits of both reference counting and borrowing, in a way that doesn't suffer panics, shared-xor-mutable, undefined behavior, or any of the other drawbacks that come from Rust's `Rc` or Swift's borrowing.
+
+
+Is it possible? Maybe! Take a look at the holy grail article, and see why it might be.
+
+
+Cheers!
+
+- Evan
+
+
+
+<ignore>
+ssylvan: "The cure is worse than the disease." https://www.reddit.com/r/rust/comments/369jnx/comment/crcqisq/
+</ignore>

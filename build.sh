@@ -610,6 +610,46 @@ if [ $TARGET == "mojo-memory-safety" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
+if [ $TARGET == "view-types" ] || [ $TARGET == "all" ] ; then
+  echo "Doing view-types"
+  echo $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/blog/view-types src/blog/mojo/view-types.vmd
+  eval $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/blog/view-types src/blog/mojo/view-types.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
+if [ $TARGET == "grail-1" ] || [ $TARGET == "all" ] ; then
+  echo "Doing grail-1"
+  echo $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/grimoire/grail-1 src/grimoire/grail-1.vmd
+  eval $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/grimoire/grail-1 src/grimoire/grail-1.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
+if [ $TARGET == "grail-challenge" ] || [ $TARGET == "all" ] ; then
+  echo "Doing grail-challenge"
+  echo $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/grimoire/grail-challenge src/grimoire/grail-challenge.vmd
+  eval $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/grimoire/grail-challenge src/grimoire/grail-challenge.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
+if [ $TARGET == "comparing-rc-borrowing" ] || [ $TARGET == "all" ] ; then
+  echo "Doing comparing-rc-borrowing"
+  echo $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/grimoire/comparing-rc-borrowing src/grimoire/comparing-rc-borrowing.vmd
+  eval $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/grimoire/comparing-rc-borrowing src/grimoire/comparing-rc-borrowing.vmd
+  if [ $? != 0 ]; then
+    echo "Failed!"
+    exit 1
+  fi
+fi
+
 
 
 

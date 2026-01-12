@@ -1,0 +1,145 @@
+---
+title: Grail Challenge (NOTES)
+subtitle: Reference counting, borrowing, and an impossible quest
+author: Evan Ovadia
+date: Nov XX, 2025
+realm: blog
+path: grimoire/grail-1
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+The memory safety holy grail is a way to *simply and seamlessly combine borrowing with reference counting* without the usual problems and symptoms: panics, deadlocks, undefined behavior, complexity, and various kinds of extra run-time overhead (cloning, hashing, extra RC adjustments, tracing, etc).
+
+
+As far we we know, it's impossible to blend those two approaches without those problems. [# TODO: Some note here]
+
+
+For example, we can't compile [this Swift program](https://swiftfiddle.com/3xo46ohjl5gbbgthivf5tylvty?c=H4sIAAAAAAAAA4VUTW%2FbMAz9K5wvSwDPxXbYwUDbQxBgBYqeAuzQFIUiM7FQRQokOalRZL99lOQPOekwH2xJJB%2Bpx0d%2FZDwrM%2BtMwx08as6c0KqEX8zWbCMRPtYK6DkyA%2B8lPCg37ttuf16rteKSWQuPeESZxqBywgm0JTwv%2FbJ9GW1OyGAYs67opHOIb6GEm11j5P%2BKnfe5%2FWNRbos%2BGG6HWi48AhSZwzfawo38YtsoDjUzR7TuibnG4FKh2bWz1%2BAes%2BbwGrGJkFjgHL7deW7SarbMMbk0RpvZOmuU2B8k7ikMq3U2H9ImXHroCHBzA0VRTIwxT48v0YGoLtojNS%2BHjo7HvGYWV8zs0JWwGDf3V7x3iPkUKZ8icK1ssxdqN8G67oOoiGJRXZwSMh3T%2B%2BI8SUH2ZDclqpPtIi3oz0If2lS6J2RvUW%2BdR%2BTufqTkwFy90j3AoKmXLksQAWeSN5I5fMJ313uQDCZkbDT193RBhpeHPSBGNoM0%2Bvi%2BxP9oI6lCU%2B2qwQA%2Fk37ayjh0%2BZUEA7Y9CcfrzjahtUvN6QQKq%2FcezqXXmZdeeA9bIvCrwWDxN%2FOuWmHfMLFNY4rIMXy5BSXoR9AhuBpbj2FpaCQwKY44NpwQfGY%2FT14L%2FjJxJp%2B7qkkeL6mewkD8NsLR2Gol2xCaw6ZxYJBVtrstMFWBptTU%2BZoqtymCzxiaMqT8bMojcISbp%2BFjZV6en0qDpwoIqRKEc78cFhsq%2FS1tiSKSyyurV36WZ0f6Z%2F8sfhTfs%2FNf7JUfd8EFAAA%3D) without extra run-time overhead or odd symptoms: [#grailgoal] [# The "extra overhead" in this program happens in the `switch entity.chaseTarget` part, which is trying to obtain a lock to borrow the contents, similar to Rust's RefCell. See [this](https://www.swift.org/blog/swift-5-exclusivity/) for the concept and [Exclusivity.cpp](https://github.com/swiftlang/swift/blob/main/stdlib/public/runtime/Exclusivity.cpp#L161) for how it works under the hood. It's actually O(n) checking at run-time. One user even reported a [25% overhead](https://mjtsai.com/blog/2019/02/05/swift-5-exclusivity-enforcement/#comment-3815897) for a section of their code.]
+
+```swift
+func continueChase(level: Level, entity: Entity) {
+  // Run-time overhead here to get an exclusive lock
+  switch entity.chaseTarget {
+    // Get borrow reference to contained ChaseTarget
+    case .some(let chaseTarget):
+      if chaseTarget.target != nil { // If they're still alive
+        if let tile = level.tiles[entity.loc] {
+          // Writes only tile, but reads entity and other things
+          let speed = level.harvestNatureEnergy(tile, entity)
+          entity.loc = calculateNextLocation(chaseTarget, speed)
+        }
+      }
+      break
+    case .none:
+      break
+  }
+  // Run-time overhead here to release exclusive lock
+}
+```
+
+`let chaseTarget` is a borrow reference (similar to Rust), so Swift inserts an implicit lock (similar to `RefCell`) and unlock, mostly because it can't guarantee that `level.harvestNatureEnergy` doesn't modify the `entity`.
+
+
+That run-time check is the only way Swift knows how to protect against cases like in [this other program](https://gist.github.com/Verdagon/5772534141c20ac36c67704b7de115b0) that halts at run-time:
+
+```swift
+func maintenance(_ ship: Spaceship) {
+  // Invalid attempt to change ship.v, program halts
+  ship.v = Variant.navigation(Navigation(antenna: true))
+}
+func foo(_ ship: Spaceship) {
+  switch ship.v { // Locks and borrows ship.v
+    case .navigation(let navigation):
+      break
+    case .engine(let engine): // engine is a borrow reference
+      maintenance(ship)
+      let warp_coils = engine.warp_coils // Invalid read
+      print("Warp coils:", warp_coils)
+  }
+}
+```
+
+...because it doesn't know how to detect this problem at compile time.
+
+
+Like I said, whenever a language tries to make reference counting work with borrowing, it inevitably encounters problems, like the overhead and run-time crashes here, or other symptoms depending on the language.
+
+Other languages fare no better. Even my very own Vale hasn't succeeded here!
+
+
+To this day, nobody knows how to make a compiler smart enough to avoid the overhead and catch the failures at compile-time.
+
+
+On first glance, these may seem like trivial snippets in a trivial corner of language design. But I have reason to believe that if someone can solve these, then they've actually solved *an entire class of problems,* 
+
+
+For example, if we could figure this out, then I believe [this Rust program](https://play.rust-lang.org/?version=stable&mode=debug&edition=2024&gist=00064b022025b7ab2ba3b165c9bee5e3) (equivalent to the first Swift one):
+
+```rs
+fn continue_chase(level: &Rc<RefCell<Level>>, entity: &Rc<RefCell<Entity>>) -> bool {
+  let entity_read = entity.borrow();
+  if let Some(ref chase_target_ref_1) = entity_read.chase_target {
+    if chase_target_ref_1.target.upgrade().is_some() {
+      let level_mut = level.borrow_mut();
+      if let Some(tile) = level_mut.tiles.get(&entity_read.loc) {
+        drop(entity_read);
+        let speed = level_mut.harvest_nature_energy(tile, entity); // Modifies only tile
+        let mut entity_mut = entity.borrow_mut(); // Re-fetch entity ref
+        if let Some(ref chase_target_ref_2) = entity_mut.chase_target { // Re-check
+          entity_mut.loc = calculate_next_location(chase_target_ref_2, speed);
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+```
+
+...could be reduced to something like this:
+
+```rs
+fn continue_chase(level: &Rc<Level>, entity: &Rc<Entity>) -> bool {
+  if let Some(ref chase_target) = entity.chase_target {
+    if chase_target.target.upgrade().is_some() {
+      if let Some(tile) = level.tiles.get(&entity.loc) {
+        let speed = level.harvest_nature_energy(tile, entity); // Modifies only tile
+        entity.loc = calculate_next_location(chase_target, speed);
+        return true;
+      }
+    }
+  }
+  return false;
+}
+```
+
+...which is faster, doesn't risk run-time crashes anymore, and is (in my opinion) simpler than the other usual workarounds. [# The main workarounds are [cloning](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=16679b086ea71ae631816359fd0788ab) (risking heap allocation, defeating the purpose) or [hashing/IDs](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=cf2c253d948f6502d6991027dfc500aa) (which has unnecessary hashing/checks and often violates encapsulation).]
+
+
+If we could figure this out, we would be one step closer to the ever-mythical language that has the ever-unreachable trio of safety, speed, and simplicity. [# As someone who designs memory safety approaches for fun, this has been haunting my dreams for _years._] High-level languages (Swift, C#, etc.) could be faster, and borrowing languages (Rust, Mojo, etc.) could better handle intrusive data structures, observers, graphs, back-references, dependency references, delegates, any all sorts of patterns that borrowing has trouble with today.
+
+
+<slice>
+#grailgoal: NOTES:
+
+Holy grail:
+
+ * [original Swift](https://swiftfiddle.com/3xo46ohjl5gbbgthivf5tylvty?c=H4sIAAAAAAAAA4VUTW%2FbMAz9K5wvSwDPxXbYwUDbQxBgBYqeAuzQFIUiM7FQRQokOalRZL99lOQPOekwH2xJJB%2Bpx0d%2FZDwrM%2BtMwx08as6c0KqEX8zWbCMRPtYK6DkyA%2B8lPCg37ttuf16rteKSWQuPeESZxqBywgm0JTwv%2FbJ9GW1OyGAYs67opHOIb6GEm11j5P%2BKnfe5%2FWNRbos%2BGG6HWi48AhSZwzfawo38YtsoDjUzR7TuibnG4FKh2bWz1%2BAes%2BbwGrGJkFjgHL7deW7SarbMMbk0RpvZOmuU2B8k7ikMq3U2H9ImXHroCHBzA0VRTIwxT48v0YGoLtojNS%2BHjo7HvGYWV8zs0JWwGDf3V7x3iPkUKZ8icK1ssxdqN8G67oOoiGJRXZwSMh3T%2B%2BI8SUH2ZDclqpPtIi3oz0If2lS6J2RvUW%2BdR%2BTufqTkwFy90j3AoKmXLksQAWeSN5I5fMJ313uQDCZkbDT193RBhpeHPSBGNoM0%2Bvi%2BxP9oI6lCU%2B2qwQA%2Fk37ayjh0%2BZUEA7Y9CcfrzjahtUvN6QQKq%2FcezqXXmZdeeA9bIvCrwWDxN%2FOuWmHfMLFNY4rIMXy5BSXoR9AhuBpbj2FpaCQwKY44NpwQfGY%2FT14L%2FjJxJp%2B7qkkeL6mewkD8NsLR2Gol2xCaw6ZxYJBVtrstMFWBptTU%2BZoqtymCzxiaMqT8bMojcISbp%2BFjZV6en0qDpwoIqRKEc78cFhsq%2FS1tiSKSyyurV36WZ0f6Z%2F8sfhTfs%2FNf7JUfd8EFAAA%3D) which uses switch on noncopyable
+ * Swift [autocopying ChaseTarget](https://swiftfiddle.com/p7p77xs43bfinbzhucz4kglnm4?c=H4sIAAAAAAAAA4VUTY%2BbMBD9K1MuTSTKqj30gNTuoY3UlVZ7itTDEq28MASrjolsQxdF%2Be8dfwAm2agcCJ6PN%2BP3ZnJKyiRP7u7gJ9ZcIjy2JTO8lWCGIxZSG9WVZrLm8Ivphr0KhFMhgZ6eKXjL4UGa%2BTyE87mQhSwF0xoesUcR56A03HDUOTxv7Oewm32GC%2BeYq27JEgL8m0tuVtcY6a3c9VjbPhpFnY3J8G3q5SLCQZHb%2FXqfu5H9qDtZQsNUj9o8MdMp3EhU%2B2H14sJ91RRePDYR4htcw6fvlpu4m5oZJjZKtWpVJJ3kh6PAA6VhVSTrqWzEpYX2ACRblmULp68z4gs0wKsLeURb5pOis7lsmMYtU3s0OfyYD%2FdXvAfEdImU3kYgEiUX1xrwijy8urASKpnpfWGP4MkfnZYkhZGN6o91%2FyL74wcs9OjJup85ODLTbNvxCtMQ7QK0U71kouwEM%2FiEb2aMIN1v3d5OgT4ietLcBExLFhr7zwhEtVvqWHbo4FfCLlXudyu9mjSHzWs3A0vqfOSCz5OdpYeaKPqo0IVzuQfdHrCVGKSvY5jMcwgfnLRTvmlwsAiatkAAE7zHUcXQil0PK69t2q%2FYc%2BiHFN%2FFI2KjHXFT%2BHsLZ9yiYbg0dfFbcYPgzQpZFXzAZAUt9UfyN3S5aNvn%2Bnau3pW3jPV0Ta3H%2FPM0fn4GkzTp6S%2F1a%2FYl%2B5yc%2FwFL5hATYAUAAA%3D%3D) would still cause 4 RC ops 
+    * TODO doublecheck that
+ * Rust [Original Rc/RefCell](https://play.rust-lang.org/?version=stable&mode=debug&edition=2024&gist=db093b2239828441faa38b75a4376ed7), [nirvana](https://play.rust-lang.org/?version=stable&mode=debug&edition=2024&gist=de2bbe933f3421354ad5dda841b1ed85), [Cloning](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=16679b086ea71ae631816359fd0788ab),more [hashing/checks](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=cf2c253d948f6502d6991027dfc500aa)
+ * Mojo wouldn't work for same reason. Can't handle level or entity being mut because one owns the other
+ * Lobster has to copy chaseTarget I think?
+ * RC+borrows, IOW just taking a ref to chaseTarget, won't work because it risks circuitous shapeshifts
+ * SYO: would need Level to be mut, first get a mut tile, then a mut entity.
+ * SYO+Deferred: Would still need to get that mut entity
+ * Grail: Should work because level.harvestNatureEnergy says it only modifies tile
+
+Circuitous shapeshift:
+
+ * [Swift](https://gist.github.com/Verdagon/5772534141c20ac36c67704b7de115b0)
+ * C++: [one ship ref](https://gist.github.com/Verdagon/4102fecf6dadb7a4802131789b6cc792), [two ship refs](https://gist.github.com/Verdagon/b5579e1b57d3942c8d049063b84991ee)
+
+</slice>

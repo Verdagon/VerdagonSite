@@ -1,0 +1,1245 @@
+---
+title: The Memory Safety Holy Grail, Part 1 (DRAFT)
+subtitle: Reference counting, borrowing, and an impossible quest
+author: Evan Ovadia
+date: Nov XX, 2025
+realm: blog
+path: grimoire/grail-1
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+<ignore>
+TODOs:
+
+Talk to jon:
+
+ * ask Jon, been searching for this ever since this paper: https://jondgoodwin.com/pling/gmm.pdf
+
+Before posting:
+
+ * there's a problem. people dont relate to this first swift example. what they do relate to is:
+    * it's hard to optimize swift code.
+    * swift code is slow. literally the worst.
+    * they're trying to close that gap but not really succeeding.
+    * possible framing:
+
+ * maybe add an example showing us doing a compile time refcell? or not
+ * also link to people trying to figure out the holy grail, like https://www.reddit.com/r/rust/s/Aw0oqhdeY0
+ * consider flipping so the rust snippet is first, so it becomes more positive
+ * split out cone/inko/ante/lobster into another article?
+ * definitely need to mention allocators up front. that 2 peoples' minds went there is a sign.
+ * yorick / inko: https://yorickpeterse.com/articles/the-inevitability-of-the-borrow-checker/
+    * incorporate his stuff at https://discord.com/channels/@me/1442383707204878357/1445423417238224997
+    * inko has recover? fn / fn mut? uni?
+ * get some deep research fact checking on this
+ * better conclusion
+ * `struct` like c# and swift dont work well because if they copy e.g. a vec, it causes a malloc call. WAIT not true. they just alias the backing array.
+ * say more that rust and swift run into panicking problems when they try this. say that it doesnt have to be that way.
+ * mention that the mojo team was interested in it, so i wrote it into the roadmap.
+ * ask r/pl if there's anyone attempting to combine RC and borrowing
+ * The code examples of implementations really help solidify things in my head (it's basically a visualization of the theory), but you may benefit from using a more pseudo code approach rather than C++, where you can loosely model the internals of pointer types to strengthen your point in the internal working differences. It's been a second since I've studied the internals of unique_ptr and shared_ptr and have to go through an internal process of remembering which one works which way. So modeling out a loose/incomplete version of their internals in your examples would be beneficial for inline reading so I don't wind up in another tab Googling the differences for the 50th time (but that is a me problem).
+
+editing phase:
+
+ * remove all comments from swift and rust, rewrite them.
+
+Maybe:
+
+ * ask for their help.
+    * when i post a thing, i'll need help redteaming it and solving holes.
+    * ask for tiny examples
+ * mention somewhere that concurrency isnt solved. structured concurrency is a possibility. regions help.
+ * it checks more. it also checks less. (not sure what i mean)
+
+Edit:
+
+ * really need to nail the tone of exploratory and hopeful. not bashing languages. need to be super clear that we're holding languages to an unreasonable standard here. because we have to, if we want to look forward.
+
+Later:
+
+ * add to shared-yet-owned: an RC object that contains linear types or so'd stuff can contain a strong reference to somewhere its destructor can put them.
+ * we should post to r/programminglanguages
+ * in next group borrowing one, talk about the c++ style abstraction, broader contents refs
+ * if we started with the rc/region-borrowing blend, what steps would be needed towards the holy grail?
+</ignore>
+
+
+
+As you always do before starting a project, you stand in the ethereal Language Halls, where there is a beautiful door for every single language.
+
+You come with a certain quest in mind. You're making a turn-based roguelike this time, so you want to keep things simple. You also want speed, and flexibility too.
+
+Your feet take you to an unusual door: Swift, which has things like "simplicity" and "easy memory management" and "weak references" carved onto it.
+
+But of course, you want speed. So you turn to another familiar door, the one for Rust, whose door is carved with phrases like "fast" and "borrow checking" and "allocators", things that you like.
+
+You open their doors, and see the different universes within, and you see the raw potential sprawling out before you.
+
+You stand before both, wishing you could get both. But you have to make a choice.
+
+The software architect in you says to reach for simplicity. The craftsman in you says to reach for speed.
+
+But alas, you need to choose one. 
+
+And then you notice, a third option. A door that is phantasmal. Not real... yet? One that seems to blend Rust and Swift and... something else? Something we haven't seen before. You try to open it, but your hand fades through the handle. What is this?
+
+"Not many can see that door..." says a voice from somewhere.
+
+
+
+# From the mists of possibility
+
+
+The memory safety holy grail is the vague belief that there is _something more_ somewhere between reference counting and borrow checking. The vague belief that we _haven't figured it out yet_ and there's something more to be discovered.
+
+
+If I was to try and fit it into English, I'd say the memory safety holy grail is a way to get the *benefits of both reference counting and borrowing,* (simplicity, flexibility, speed, etc.) without the usual problems like panics, deadlocks, undefined behavior, complexity, nor various kinds of extra run-time overhead (cloning, hashing, extra RC adjustments, tracing, etc).
+
+
+Nobody knows how to blend those two approaches without those problems. [# TODO: Some note here]
+
+
+The holy grail is elusive. Like [Heisenberg](https://en.wikipedia.org/wiki/Uncertainty_principle) felt, whenever one tries to clarify and converse about it in concrete terms, it feels like it moves just a little further, barely out of reach. So as I try to explain, try to see _past_ my words and my examples, to the as-yet-undiscovered possibility just beyond them.
+
+
+My favorite example is [this Swift program](https://swiftfiddle.com/3xo46ohjl5gbbgthivf5tylvty?c=H4sIAAAAAAAAA4VUTW%2FbMAz9K5wvSwDPxXbYwUDbQxBgBYqeAuzQFIUiM7FQRQokOalRZL99lOQPOekwH2xJJB%2Bpx0d%2FZDwrM%2BtMwx08as6c0KqEX8zWbCMRPtYK6DkyA%2B8lPCg37ttuf16rteKSWQuPeESZxqBywgm0JTwv%2FbJ9GW1OyGAYs67opHOIb6GEm11j5P%2BKnfe5%2FWNRbos%2BGG6HWi48AhSZwzfawo38YtsoDjUzR7TuibnG4FKh2bWz1%2BAes%2BbwGrGJkFjgHL7deW7SarbMMbk0RpvZOmuU2B8k7ikMq3U2H9ImXHroCHBzA0VRTIwxT48v0YGoLtojNS%2BHjo7HvGYWV8zs0JWwGDf3V7x3iPkUKZ8icK1ssxdqN8G67oOoiGJRXZwSMh3T%2B%2BI8SUH2ZDclqpPtIi3oz0If2lS6J2RvUW%2BdR%2BTufqTkwFy90j3AoKmXLksQAWeSN5I5fMJ313uQDCZkbDT193RBhpeHPSBGNoM0%2Bvi%2BxP9oI6lCU%2B2qwQA%2Fk37ayjh0%2BZUEA7Y9CcfrzjahtUvN6QQKq%2FcezqXXmZdeeA9bIvCrwWDxN%2FOuWmHfMLFNY4rIMXy5BSXoR9AhuBpbj2FpaCQwKY44NpwQfGY%2FT14L%2FjJxJp%2B7qkkeL6mewkD8NsLR2Gol2xCaw6ZxYJBVtrstMFWBptTU%2BZoqtymCzxiaMqT8bMojcISbp%2BFjZV6en0qDpwoIqRKEc78cFhsq%2FS1tiSKSyyurV36WZ0f6Z%2F8sfhTfs%2FNf7JUfd8EFAAA%3D) that tries to take a borrow reference to a `class Entity`'s field `chaseTarget: ChaseTarget`, which surprisingly introduces extra run-time overhead and some other odd symptoms. [#grailgoal] [# The "extra overhead" in this program happens in the `switch entity.chaseTarget` part, which is trying to obtain a lock to borrow the contents, similar to Rust's RefCell. See [this](https://www.swift.org/blog/swift-5-exclusivity/) for the concept and [Exclusivity.cpp](https://github.com/swiftlang/swift/blob/main/stdlib/public/runtime/Exclusivity.cpp#L161) for how it works under the hood. It's actually O(n) checking at run-time. One user even reported a [25% overhead](https://mjtsai.com/blog/2019/02/05/swift-5-exclusivity-enforcement/#comment-3815897) for a section of their code.]
+
+```swift
+func continueChase(level: Level, entity: Entity) {
+  // Run-time overhead here to get an exclusive lock
+  switch entity.chaseTarget {
+    // Get borrow reference to contained ChaseTarget
+    case .some(let chaseTarget):
+      if chaseTarget.target != nil { // If they're still alive
+        if let tile = level.tiles[entity.loc] {
+          // Writes only tile, but reads entity and other things
+          let speed = level.harvestNatureEnergy(tile, entity)
+          entity.loc = calculateNextLocation(chaseTarget, speed)
+        }
+      }
+      break
+    case .none:
+      break
+  }
+  // Run-time overhead here to release exclusive lock
+}
+```
+
+Why? Because to take a borrow reference, Swift inserts an implicit run-time locking and unlocking operations. [# TODO: reference swift borrowing thing here] This is like an automatic version of Rust's `Rc<RefCell<T>>`.
+
+
+That run-time check is necessary. Without it, Swift couldn't protect against memory safety problems like in [this other program](https://gist.github.com/Verdagon/5772534141c20ac36c67704b7de115b0):
+
+```swift
+func maintenance(_ ship: Spaceship) {
+  // Invalid attempt to change ship.v, program halts
+  ship.v = Variant.navigation(Navigation(antenna: true))
+}
+func foo(_ ship: Spaceship) {
+  switch ship.v { // Locks and borrows ship.v
+    case .navigation(let navigation):
+      break
+    case .engine(let engine): // engine is a borrow reference
+      maintenance(ship)
+      let warp_coils = engine.warp_coils // Invalid read
+      print("Warp coils:", warp_coils)
+  }
+}
+```
+
+This program [halts at run-time](https://gist.github.com/Verdagon/5772534141c20ac36c67704b7de115b0), because Swift can't detect this problem at compile time.
+
+
+This isn't just a problem with inline enums, it's also a problem with pointers to the heap (array lists, hash maps, any sort of `class`es). In Swift or any other reference-counted language, one can't implement an e.g. mutable AST (or other hierarchy) without some sort of run-time locking or reference counting or cloning overhead or unsafe operations. [#heapproblems]
+
+
+<slice>
+#heapproblems: Swift has run-time effects no matter what type a `class`'s field is.
+
+ * If the field's type is a `Copyable` struct/enum, it's conceptually surrounded in a `Cell<T>`. If `T` contains a reference to a class, then copying it causes increments.
+ * If the field's type is a non-`Copyable` struct/enum, it's conceptually surrounded in a `RefCell<T>` which risks run-time panics.
+ * If the field's type is a `class`, then accessing it will cause a refcount increment. Adding something like a `Box<T>` would partially help, but not solve this, and might cause expensive implicit deep clones.
+
+Yet we see none of these problems when we implement e.g. a B-tree in Rust, because Rust has a tree-like structure that play nicely with borrowing.
+
+TODO: maybe move this into the body?
+
+TODO: theoretically we can avoid the lock if we copy the inline enum out, then switch on the tag?
+</slice>
+
+
+Like I said, whenever a language tries to make reference counting work with borrowing, it inevitably encounters problems, like the overhead and run-time crashes here, or other symptoms depending on the language.
+
+Other languages fare no better. Even my very own Vale hasn't succeeded here!
+
+
+To this day, nobody knows how to make a compiler smart enough to avoid the overhead and catch the failures at compile-time.
+
+
+
+On first glance, these may seem like unimportant snippets in a trivial corner of language design. But I have reason to believe that if someone can solve these, then they've actually solved *an entire class of problems.*
+
+For example, if we could figure this out, then I believe [this Rust program](https://play.rust-lang.org/?version=stable&mode=debug&edition=2024&gist=00064b022025b7ab2ba3b165c9bee5e3) (equivalent to the first Swift one)...
+
+```rs
+fn continue_chase(level: &mut Level, entity_id: u64) -> bool {
+  if let Some(entity_read_ref_1) = level.entities.get(&entity_id) {
+    let current_loc = entity_read_ref_1.loc;
+    if let Some(chase_target_read_ref_1) = entity_read_ref_1.chase_target.as_ref() {
+      if level.entities.get(&chase_target_read_ref_1.target_id).is_some() {
+        let speed = level.harvest_nature_energy(current_loc, entity_id as u64);
+        if let Some(entity_write_ref) = level.entities.get_mut(&entity_id) { // Re-lookup
+          if let Some(chase_target_read_ref_2) = entity_write_ref.chase_target.as_ref() { // Re-check
+            let new_loc = calculate_next_location(chase_target_read_ref_2, speed);
+            entity_write_ref.loc = new_loc;
+            return true;
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+```
+
+...could be reduced to something like this:
+
+```rs
+fn continue_chase(level: &Rc<Level>, entity: &Rc<Entity>) -> bool {
+  if let Some(ref chase_target) = entity.chase_target {
+    if chase_target.target.upgrade().is_some() {
+      if let Some(tile) = level.tiles.get(&entity.loc) {
+        let speed = level.harvest_nature_energy(tile, entity); // Modifies only tile
+        entity.loc = calculate_next_location(chase_target, speed);
+        return true;
+      }
+    }
+  }
+  return false;
+}
+```
+
+...which is much simpler in my opinion. [# Contrary to popular belief, ECS isn't always better for games. Sometimes something [more flexible](https://www.reddit.com/r/roguelikedev/comments/i3xekn/ec_vs_ecs_for_roguelikes/) is better. See also the [borrowing vs refcounting comparison article](/grimoire/comparing-rc-borrowing). ] [# The main alternatives are [RefCell-based](https://play.rust-lang.org/?version=stable&mode=debug&edition=2024&gist=00064b022025b7ab2ba3b165c9bee5e3) (error prone), [cloning](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=16679b086ea71ae631816359fd0788ab) (expensive because unhelpful heap allocations) or [hashing/IDs](https://play.rust-lang.org/?version=stable&mode=debug&edition=2024&gist=5e2f961578d10a4fb0468664831cd80c) (which has unnecessary hashing/checks and often violates encapsulation).] 
+
+
+It's not just these Swift and Rust programs. There is something general hidden here... something reaching out to us. I have the vague sense that we're just _looking at the problem from the wrong angle._
+
+
+If we could figure this out, I think high-level languages (Swift, C#, etc.) could be _much_ faster [# I don't just mean a tiny improvement either. This would allow them to use inline data much better, which lets them avoid very costly cache misses.] and use [less energy](https://thenewstack.io/which-programming-languages-use-the-least-electricity/), and borrowing languages (Rust, Mojo, etc.) could generally be simpler and could better handle intrusive data structures, observers, graphs, back-references, dependency references, delegates, weak references, and all sorts of patterns that borrowing has trouble with today.
+
+
+In fact, figuring this out wouldn't just solve this for reference counting. Languages using generational references (like Vale) and tracing garbage collection (Java, etc.) would likely also benefit, since they all think in terms of "mutable aliasing" [# Mutable aliasing is how we can have multiple references to an object, and still be able to modify it freely.] under the hood.
+
+
+If we could figure this out, we would be one step closer to the ever-mythical language with the ever-unreachable trio of safety, speed, and simplicity. [# As someone who designs memory safety approaches for fun, this goal has been haunting my dreams for _years._]
+
+
+If you look carefully, many languages have tried to figure this out: Rust, [# Rust started with borrowing then added `Rc`, but it doesn't blend well, often requiring `RefCell` which risks run-time panics.] Swift, [# Swift started with RC and added borrowing, but it [also has panics](https://gist.github.com/Verdagon/257dde6f6ddc12d23dd784e6f0fdf4c7) and even undefined behavior when multiple threads are involved. # Ironic, since their biggest use case (iOS apps) basically force you into multithreaded patterns.] D, V, Cone, Vale, [# Vale is based on generational references rather than reference counting, but I did have an experimental [reference-counting/region-borrowing blend](https://github.com/verdagon/RegionsRCCellularAutomataBenchmark) which has some vital clues. Alas, it doesn't support inline data well.] Lobster, Ante, and a lot more.
+
+
+But none of them have really blended reference counting and borrowing as well as I think it it can be. They all suffer various symptoms (panics, deadlocks, undefined behavior, unnecessary copies, unnecessary complexity, etc.) from the same hidden common problem (something I call the "circuitous shapeshift" which I'll explain further below).
+
+
+Now that I've laid out the problem, let's look at what we have.
+
+
+A lot of recent developments from Nick Smith ([Group Borrowing](https://verdagon.dev/blog/group-borrowing)), Jake Fecher ([Ante](https://antelang.org)), Josh Levenberg ([Carbon](https://github.com/carbon-language/carbon-lang)), and myself ([Vale](https://vale.dev/)) are showing _interesting clues_ that suggest that *this problem might be solvable*. I'll talk about these clues, and what we'll do with them, further below.
+
+
+That said, I want to be super clear: *we don't have the solution yet.* And even though we have promising pieces, it's uncertain whether any of them will work. I write this post so early because *I want your thoughts and comments and ideas!* [# Maybe you'll see options we don't, and maybe you'll help us find and fix any holes in what we come up with.]
+
+
+I am eternally optimistic, [# One needs a _lot_ of optimism and faith to get anywhere in memory safety design.] so take my thoughts with a grain of salt. Regard my beliefs as having reliability somewhere inbetween [tarot](https://en.wikipedia.org/wiki/Tarot) and [tasseography](https://en.wikipedia.org/wiki/Tasseography)... or maybe astrology. [# In writing this article, I had to look up the name for "reading tea leaves". Computer science blogging is weird.]
+
+
+This is a vast topic, so this post is mostly about the motivation and the problem, and we'll explore the possible solutions in future posts (subscribe to the [RSS feed](https://verdagon.dev/rss.xml)!)
+
+This post will explain:
+
+ * Why borrowing languages want reference counting (hint: simplicity) and why reference counting languages want borrowing (hint: speed).
+ * What we _really_ want in a reference counting / borrowing blend.
+ * Why it's been impossible to do this well: the circuitous shapeshift.
+ * Hints about how we might assemble the pieces from Group Borrowing, Shared-Yet-Owned, Ante, Vale, and Carbon to solve the problem.
+ * Why this might be a fundamentally impossible quest, and whether reference counting and borrowing seem to _inherently_ conflict.
+ * How we might divide the quest into two: blending the two models at a fundamental level, or seamless interop between the two worlds.
+ * How this might interact with (or enable!) better data-oriented design or allocators.
+
+
+Welcome, ladies and gentlemen, to my post on *the memory safety holy grail.*
+
+
+<slice>
+#grailgoal: NOTES:
+
+Holy grail:
+
+ * [original Swift](https://swiftfiddle.com/3xo46ohjl5gbbgthivf5tylvty?c=H4sIAAAAAAAAA4VUTW%2FbMAz9K5wvSwDPxXbYwUDbQxBgBYqeAuzQFIUiM7FQRQokOalRZL99lOQPOekwH2xJJB%2Bpx0d%2FZDwrM%2BtMwx08as6c0KqEX8zWbCMRPtYK6DkyA%2B8lPCg37ttuf16rteKSWQuPeESZxqBywgm0JTwv%2FbJ9GW1OyGAYs67opHOIb6GEm11j5P%2BKnfe5%2FWNRbos%2BGG6HWi48AhSZwzfawo38YtsoDjUzR7TuibnG4FKh2bWz1%2BAes%2BbwGrGJkFjgHL7deW7SarbMMbk0RpvZOmuU2B8k7ikMq3U2H9ImXHroCHBzA0VRTIwxT48v0YGoLtojNS%2BHjo7HvGYWV8zs0JWwGDf3V7x3iPkUKZ8icK1ssxdqN8G67oOoiGJRXZwSMh3T%2B%2BI8SUH2ZDclqpPtIi3oz0If2lS6J2RvUW%2BdR%2BTufqTkwFy90j3AoKmXLksQAWeSN5I5fMJ313uQDCZkbDT193RBhpeHPSBGNoM0%2Bvi%2BxP9oI6lCU%2B2qwQA%2Fk37ayjh0%2BZUEA7Y9CcfrzjahtUvN6QQKq%2FcezqXXmZdeeA9bIvCrwWDxN%2FOuWmHfMLFNY4rIMXy5BSXoR9AhuBpbj2FpaCQwKY44NpwQfGY%2FT14L%2FjJxJp%2B7qkkeL6mewkD8NsLR2Gol2xCaw6ZxYJBVtrstMFWBptTU%2BZoqtymCzxiaMqT8bMojcISbp%2BFjZV6en0qDpwoIqRKEc78cFhsq%2FS1tiSKSyyurV36WZ0f6Z%2F8sfhTfs%2FNf7JUfd8EFAAA%3D) which uses switch on noncopyable
+ * Swift [autocopying ChaseTarget](https://swiftfiddle.com/p7p77xs43bfinbzhucz4kglnm4?c=H4sIAAAAAAAAA4VUTY%2BbMBD9K1MuTSTKqj30gNTuoY3UlVZ7itTDEq28MASrjolsQxdF%2Be8dfwAm2agcCJ6PN%2BP3ZnJKyiRP7u7gJ9ZcIjy2JTO8lWCGIxZSG9WVZrLm8Ivphr0KhFMhgZ6eKXjL4UGa%2BTyE87mQhSwF0xoesUcR56A03HDUOTxv7Oewm32GC%2BeYq27JEgL8m0tuVtcY6a3c9VjbPhpFnY3J8G3q5SLCQZHb%2FXqfu5H9qDtZQsNUj9o8MdMp3EhU%2B2H14sJ91RRePDYR4htcw6fvlpu4m5oZJjZKtWpVJJ3kh6PAA6VhVSTrqWzEpYX2ACRblmULp68z4gs0wKsLeURb5pOis7lsmMYtU3s0OfyYD%2FdXvAfEdImU3kYgEiUX1xrwijy8urASKpnpfWGP4MkfnZYkhZGN6o91%2FyL74wcs9OjJup85ODLTbNvxCtMQ7QK0U71kouwEM%2FiEb2aMIN1v3d5OgT4ietLcBExLFhr7zwhEtVvqWHbo4FfCLlXudyu9mjSHzWs3A0vqfOSCz5OdpYeaKPqo0IVzuQfdHrCVGKSvY5jMcwgfnLRTvmlwsAiatkAAE7zHUcXQil0PK69t2q%2FYc%2BiHFN%2FFI2KjHXFT%2BHsLZ9yiYbg0dfFbcYPgzQpZFXzAZAUt9UfyN3S5aNvn%2Bnau3pW3jPV0Ta3H%2FPM0fn4GkzTp6S%2F1a%2FYl%2B5yc%2FwFL5hATYAUAAA%3D%3D) would still cause 4 RC ops 
+    * TODO doublecheck that
+ * Rust [full Original Rc/RefCell](https://play.rust-lang.org/?version=stable&mode=debug&edition=2024&gist=db093b2239828441faa38b75a4376ed7), [full nirvana](https://play.rust-lang.org/?version=stable&mode=debug&edition=2024&gist=de2bbe933f3421354ad5dda841b1ed85), [Cloning](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=16679b086ea71ae631816359fd0788ab),[full hashing/checks](https://play.rust-lang.org/?version=stable&mode=debug&edition=2024&gist=7d515267917ff3e3b99692854b92bf9b), [trimmed hashing/checks](https://play.rust-lang.org/?version=stable&mode=debug&edition=2024&gist=5e2f961578d10a4fb0468664831cd80c)
+ * Mojo wouldn't work for same reason. Can't handle level or entity being mut because one owns the other
+ * Lobster has to copy chaseTarget I think?
+ * RC+borrows, IOW just taking a ref to chaseTarget, won't work because it risks circuitous shapeshifts
+ * SYO: would need Level to be mut, first get a mut tile, then a mut entity.
+ * SYO+Deferred: Would still need to get that mut entity
+ * Grail: Should work because level.harvestNatureEnergy says it only modifies tile
+
+Circuitous shapeshift:
+
+ * [Swift](https://gist.github.com/Verdagon/5772534141c20ac36c67704b7de115b0)
+ * C++: [one ship ref](https://gist.github.com/Verdagon/4102fecf6dadb7a4802131789b6cc792), [two ship refs](https://gist.github.com/Verdagon/b5579e1b57d3942c8d049063b84991ee)
+
+</slice>
+
+
+# Why we want it
+
+Basically, RC languages (like Swift) want borrowing because it's *way faster.* Borrowing languages (like Rust) want RC because it's *more flexible* and enables *simpler code.* [# If you want _even simpler_, then you likely want garbage collection. I consider reference counting a big more powerful (I love weak references, and deterministic destruction) but garbage collection wins on simplicity.]
+
+This section of the post actually got so long that I split it out into its own article: [Comparing the Benefits of Reference Counting and Borrow Checking](/grimoire/comparing-rc-borrowing)
+
+I'll TL;DR it here, but if you want details give it a read!
+
+
+*Borrowing enables faster code* than reference counting, because borrowing enables inline data (data that lives directly in the stack or its containing struct/array), which causes less heap allocations, less cache misses, and no counting / tracing overhead.
+
+In other words, reference counting is _slow._
+
+A reference-counted object _must_ go on the heap. This means it must be allocated with `malloc`, and freed with `free`. These are _very expensive_ functions to call... especially `free`.
+
+On top of that, since it's on the heap, and not somewhere closer (like the stack), we need to dereference a pointer to read its contents. This means costly *cache misses,* where the CPU needs to find it (in cache or in RAM) and possibly fetch it all the way from RAM which is _really, really slow._
+
+Lastly, every time you make a new reference to an object, you need to increment the object's reference counter. And every time you discard a reference, you need to decrement it. These are pretty expensive, especially if they're atomic instructions like in Swift. [# Certain kinds of hardware have made this faster (like ARM) but it's still pretty slow.]
+
+Borrowing has none of these problems, because it enables "inline data"; one object's memory can live _inside_ another object's memory.
+
+
+*Reference counting enables simpler code* than borrowing, because reference counting lets you choose the simplest pattern for the situation.
+
+For example, borrowing can't do [intrusive data structures](https://lwn.net/Articles/907876/), [observers](https://www.reddit.com/r/rust/comments/pwqju6/is_there_an_underlying_reason_that_idiomatic_rust/), [graphs](https://news.ycombinator.com/item?id=24996001), [back-references](https://users.rust-lang.org/t/back-reference-to-the-parent-struct/7413/2), [# Back-references are particularly nice for things like AVL trees. We'll also see them a lot in our below Roguelike game example.] [dependency references](https://en.wikipedia.org/wiki/Dependency_injection), [callbacks](https://news.ycombinator.com/item?id=12029238), [delegates](https://medium.com/@nimjea/delegation-pattern-in-swift-4-2-f6aca61f4bf5), etc.
+
+In the example from the [comparison article](/grimoire/comparing-rc-borrowing):
+
+ * A simple Swift class became something more complex when using pure borrow checking.
+ * A simple Swift list of protocol references `List<weak IStrengthAffector>` became something more complex in pure borrow checking, where we had to reimplement upcasting.
+ * Borrowing doesn't allow methods that take a reference to something that indirectly contains them, sometimes forcing complex workarounds.
+ * Borrowing sometimes forces a function to have more access than it would otherwise, sometimes forcing complex workarounds.
+
+
+So, generally, code can be *faster with borrowing* and *simpler with reference counting.*
+
+These are, of course, not black-and-white truths. One can imagine code that's simpler with borrowing [# For example, borrowing often means your methods don't have to return defensive copies.] or faster with reference counting [# For example, borrowing often forces you to `clone` more, which can be expensive if it involves a call to `malloc`. TODO clarify] if you stretch. It also varies wildly depending on the program; some domains fit borrow checking better, and some domains fit reference counting better. [# For example, real-time games love borrowing, and apps love reference counting.]
+
+
+# What we want
+
+We want the benefits of both, at the same time where possible, and a gradual transition between the two everywhere else.
+
+
+In my abstract terms, I'd say we want *full architectural freedom* while also having *zero-overhead access to borrowing* without the *usual side effects.*
+
+ * When I say "full architectural freedom," I mean we can use whatever patterns we want in our codebase. If we want to use observers, we can! For example, if you want to use observers, or arbitrary object graphs (like the `Squad` in the [other article](/grimoire/comparing-rc-borrowing)), or back-references (like AVL trees), we can.
+ * We also want zero-overhead access to borrowing. This means we don't have to lock a `RefCell` or do a potentially-O(n) locking operation like Swift does.
+ * We also want an approach without the usual side effects, such as run-time panics (with Swift and Rust's `Rc<RefCell<T>>`), deadlocks (with Rust's `Arc<Mutex<T>>`), or undefined behavior (Swift when multi-threading).
+
+
+But more concretely, we want a blend that:
+
+ * Enables both reference counting and borrowing, in the same language.
+ * Lets us gradually transition between them.
+ * Enables inline data, including inline structs and inline unions.
+ * Is guaranteed safe at compile time.
+
+
+And we don't want:
+
+ * Shared-xor-mutable or any forced complexity.
+ * Panics, deadlocks, or undefined behavior.
+ * Extra overhead such as cloning, hashing, reference counting, tracing, generation checks, or forcing objects onto the heap.
+
+
+Reference counting and borrowing both benefit from compile-time guarantees. Yet their boundary doesn't yet. We should fix that!
+
+
+If we can nail this, I foresee see a lot of patterns emerging. For example: [# This is one of those things where we can foresee a lot of use cases, but you know it's just the tip of the iceberg compared to what users will discover when they get their hands on it.]
+
+ * In a roguelike game, we could do all the complex game logic (enemy AI, using items, combat, etc.) with reference counting, and we can drop down to borrowing for the compute-heavy stuff (vision, pathfinding, level generation, etc.)
+ * We could also have an `Entity` be reference-counted while all of its components are inline and borrowed.
+ * In servers, we could have separate actors that have fast access to their inline contents and also use borrowing to guarantee their contents don't accidentally escape (in other words, they wouldn't need defensive copies).
+ * In an app, we could have multiple references to a common dependency (a `GraphicsLayer`) which internally uses borrowing to handle the computation-heavy graphics calculations. (True story from when I worked on [Google Earth](https://earth.google.com/web/)!)
+ * And so on. [# Blending these two well would also open the door for linear types in an interesting way. An object could contain a strong reference to an RC'd object, and when the first object dies, its destructor can deliver its linear types to the second object which would be responsible for eventually handling/destroying them.] [#earthexample]
+
+It would be amazing if an approach could do these, and check _at compile time_ whether it's correct.
+
+Current approaches unfortunately impose the shared-xor-mutable restriction and have to panic at run-time when it's violated. Because of that, we tend to shy away from using `Rc` in Rust, and the same probably happens to some extent in Swift as well.
+
+If this could be checked at compile time and not force exclusivity checking overhead, we could use these patterns much more fully and see what they're capable of.
+
+
+There would be a lot of other minor benefits as well, such as:
+
+ * You could strategically use reference counting to decouple parts of your codebase, and use borrowing where you can afford a little more coupling.
+ * Avoiding premature optimization. Most code doesn't benefit noticeably from the borrow checker's optimizations.
+ * Prototyping would be easier. Explore the space with reference counting, and then optimize afterward with borrowing. [# This is particularly a problem in the machine learning space. Researchers like to prototype in Python, and then hand it off to performance ninjas who code super optimized versions in C++. Blending reference counting and borrowing seamlessly would let those be in the same language. Coincidentally, this is what Mojo is trying to do for the machine learning space.]
+ * Learning curve. Some people just don't have the time to learn the nuances of borrowing.
+
+
+Lots of languages see the value in this. D, Swift, Rust, Vale, and many others try to have _something_ like this blend. [# Vale is actually based on generational references, not reference counting, but it's going for the same ultimate goal: simplicity, speed, safety.]
+
+Unfortunately, it's *difficult-to-impossible* to do this well.
+
+
+<slice>
+#earthexample: Another example from Earth: We had a Document class that multiple views could modify via `AddPoint`, `AddLine`, `AddPolygon` methods.
+
+Under the hood, there were actually three kinds of Document: `LocalFileSystem` document, `InMemory` document, and a new kind, a `Cloud` document.
+
+Borrow checking would force one of two choices:
+
+ 1. Make all those methods take in a `&mut NetworkRequester` (and their callers, and their callers' callers, virally through the program).
+ 2. Make all those methods take in a global-ish `&mut World` (and their callers, and their callers' callers, virally through the program).
+
+But with the holy grail, the `Document` would just have a reference to `NetworkRequester`. Easy!
+</slice>
+
+
+# Previous Attempts
+
+
+<ignore>
+"Doesn't Rust already have reference counting?"
+
+Rust has `Rc`, which goes pretty far, but it really doesn't solve the fundamental problem. Because of the Circuitous Shapeshift, Rust's `Rc`/`Arc` often needs `RefCell` or `Mutex`, which introduce unnecessary panics or deadlocks into a program.
+
+
+"Doesn't Swift already have borrowing?"
+
+It has the same sort of run-time enforcement as Rust's `Rc<RefCell<T>>`. If the same thread tries to borrow a class's contents twice at the same time, you get a [run-time panic](https://gist.github.com/Verdagon/257dde6f6ddc12d23dd784e6f0fdf4c7). If _multiple_ threads, you get undefined behavior. [# TIL that Swift is just generally not safe when multithreading. Ironic, since their biggest use case (iOS apps) basically force you into multithreaded patterns.]
+
+
+But we'll get to all that later! Before I talk about that problem and ways we might solve it, I want to clarify what I mean when I say *borrowing is faster* and *reference counting is simpler.*
+</ignore>
+
+
+Could a language blend borrowing and either reference counting or garbage collection?
+
+
+Historically, no language has ever done it well.
+
+ * D tried to add borrowing with [DIP 1000](https://dlang.org/blog/2023/01/05/memory-safety-in-a-systems-programming-language-part-3/), but it [can't enforce memory safety](https://atilaoncode.blog/2019/03/13/issues-dip1000-cant-yet-catch/) unfortunately.
+ * Rust has `Rc<RefCell<T>>`, but it risks run-time panics.
+ * Swift has a form of borrowing, but it's slow, risks run-time panics, and is thread-unsafe.
+ * VLang famously promised reference counting with borrowing with its "autofree" system, but it never materialized.
+
+
+Why is this so hard? Why has nobody succeeded here? It would seem pretty simple: a strong reference keeps an object alive, so you can borrow its contents... right?
+
+
+Unfortunately no, because they all run into something I call the *"Circuitous Shapeshift"* problem, which manifests as undefined behavior, panics, deadlocks, or other symptoms. This problem even contributed to one rising language's ultimate demise, so I sometimes even call the problem "the language killer".
+
+
+<ignore>
+I see two ways to get this:
+
+ * pure borrowing for avoiding rc increments
+ * group borrowing to let us look into 
+
+generally, we want this stuff to be checked at compile time.
+where rust made a leap forward from so->AxM, we want to make that same leap forward for RC->holygrail
+</ignore>
+
+
+## The Circuitous Shapeshift Problem
+
+
+One might assume that if you have a reference to a reference-counted object, you can "borrow" that to get a borrow reference.
+
+
+The *Circuitous Shapeshift* is situation that breaks that assumption. [# I hope some of you regard the below problem with as much burning vengeance as I do. The Circuitous Shapeshift has claimed many explorer's sanity, as well as my own. Tread carefully my friends, for _this_ is the Final Enemy of memory safety design.]
+
+
+TL;DR: If you have a borrow reference to a reference-counted object's union's contents, and someone else uses another reference to change the union, your reference becomes dangling and unsafe to dereference.
+
+
+I'll explain the problem more thoroughly below in C++ terms, but if you know Rust, this is why `RefCell` is so commonly needed in `Rc`. It enforces shared-xor-mutable at run-time, to avoid this exact problem. One could even say that the Circuitous Shapeshift is the classic "iterator invalidation problem" but on top of reference counting.
+
+
+In the [below program](https://gist.github.com/Verdagon/4102fecf6dadb7a4802131789b6cc792), we have `foo` that holds a reference while `maintenance` modifies the memory it's pointing at: [# See also [this similar circuitous shapeshift program](https://gist.github.com/Verdagon/b5579e1b57d3942c8d049063b84991ee) which gives foo two `shared_ptr` that point to the same Spaceship.]
+
+
+```c++
+struct Engine {
+    int fuel;
+    ...
+};
+
+struct Spaceship {
+    std::variant<bool, std::unique_ptr<Engine>> v;
+    ...
+};
+
+void maintenance(std::shared_ptr<Spaceship> ship) {
+    // Circuitous shapeshift: changes ship->v to hold Engine pointer
+    ship->v = std::make_unique<Engine>(Engine{100});
+}
+
+void foo(std::shared_ptr<Spaceship> ship) {
+    if (std::holds_alternative<bool>(ship->v)) {
+        bool& boolRef = std::get<bool>(ship->v);  // Reference, not pointer!
+        maintenance(ship);  // Changes ship->v to hold Engine pointer
+        boolRef = true;  // Writes to invalid memory through the reference
+    }
+}
+```
+
+
+If you look at each function, it looks reasonable in isolation.
+
+ * `foo` modifies the boolean in the ship. It also calls `fooC` somewhere in there. Easy.
+ * `maintenance` puts an engine into the ship. Easy.
+
+
+However, the problem is in how they interact with that boolean.
+
+ * `foo` is holding a reference to `ship`'s boolean.
+ * `maintenance` changes that memory to be a pointer to an Engine.
+ * `foo` thinks it's writing a `true` to a boolean... uh oh, that `Engine` pointer is now pointing at address 0x1.
+
+When someone later dereferences that address 0x1, they get [undefined behavior and a crash](https://gist.github.com/Verdagon/4102fecf6dadb7a4802131789b6cc792).
+
+
+*This is why reference counting and borrow references haven't worked well together.* [# Note that this doesn't even involve concurrency. The problem appears even in single-threaded programs, as the above example shows.]
+
+This is why you can't simply rely on an incremented reference counter to keep all of an object's contents alive.
+
+
+Many know this problem by different names. I also know it as the "language killer" because it has defeated a _lot_ of promising mechanisms:
+
+ * It took down Vale's entire second memory safety model ([hybrid-generational memory](https://verdagon.dev/blog/hybrid-generational-memory)). After 30 attempts to adjust the design, I had to give up on the entire approach. Fortunately, a year later I discovered region borrowing. [# This seriously took a toll on my sanity. This fight I have with the language killer is _personal._]
+ * It took down one iteration of [Cone](https://cone.jondgoodwin.com/), and Jon had to change the language around it.
+ * I'm fairly certain that this is what killed VLang's "autofree" system, which promised to blend borrowing and reference counting.
+
+
+<ignore>
+ * Inko ran into complications when trying to [make borrow references to structs' inline data fields](https://yorickpeterse.com/articles/the-inevitability-of-the-borrow-checker/), so they avoided the problem by making inline data fields immutable.
+ * Something happened to this language: https://www.reddit.com/r/ProgrammingLanguages/comments/1jb8up7/memory_management_combining_reference_counting/
+ * Koka had to be immutable
+ * C# refs: https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/ref#a-ref-returns-and-ref-locals-example [# Fun fact: C# `ref struct`s can't be anywhere in the heap.]
+</ignore>
+
+
+This is the terror that is spoken of by battle-weary language designers in hushed tones, with a wary look over the shoulder. It has reared its head in countless conversations on r/programminglanguages, and it's the biggest unanswered question in memory safety design, in my opinion.
+
+
+## Vale
+
+I got pretty close to solving this with Vale. As many of you know, Vale has a blend of [generational references and "region" borrowing](https://verdagon.dev/blog/generational-references), which allows inline data and borrowing. 
+
+
+It solves the Circuitous Shapeshift for generational references, because it allows us to take borrow references (via `pure` functions/blocks) to entire "regions" that contain any number of (previously mutable) generational references to it that freely alias each other.
+
+
+But I wouldn't consider Vale's approach "the holy grail" because:
+
+ * Every object in Vale has a single owner; it's not as simple as reference counting or garbage collection.
+ * Unless you code in [a style that blends own-lending and region borrowing](https://verdagon.dev/blog/linear-types-borrowing#matches-made-in-heaven), your program will risk halts if you mishandle memory.
+
+These are unfortunate drawbacks of generational references.
+
+
+But then I realized that Vale's debug mode, which swaps out generational references for reference counting, actually solved both of those problems. It's a [blend of reference counting and region borrowing](https://github.com/verdagon/RegionsRCCellularAutomataBenchmark).
+
+
+However, it was pretty slow, because it didn't support inline data well... it had to move everything to the heap so it could be reference-counted. But I noticed that there were a _lot_ of cases where inline data _could_ work in theory. [# That's when I _knew_ something more had to be possible. And so I joined the quest for the holy grail, like many language designers before me.] Since then, it's been in the back of my brain, poking me to work on it more.
+
+
+To summarize why Vale's explorations didn't solve the holy grail:
+
+ * The generational-reference/region-borrowing blend still risks halting the program at run-time.
+ * The reference-counting/region-borrowing blend moves things to the heap and therefore is slow.
+
+
+So close!
+
+
+The holy grail is elusive indeed.
+
+
+## Rust
+
+Vale's generational-references-based answer wasn't a solution to the holy grail, because it risked run-time halts.
+
+
+The same is unfortunately true of Rust's approach, but Rust gets pretty close.
+
+
+With Rust, when you want to make a `Spaceship` reference-counted, you use a `Rc<RefCell<Spaceship>>`, which is like a safer version of `std::shared_ptr<Spaceship>`.
+
+
+I say "safer" because `RefCell` acts kind of like a mutex: you must lock the `RefCell` before you can access the `Spaceship` within.
+
+This technically prevents the Circuitous Shapeshift! If those `std::shared_ptr<Spaceship>` were `Rc<RefCell<T>>`, there would be no memory unsafety.
+
+However, it wouldn't be caught at compile time. The program would halt at run-time in `fooC` when it tried to gain access to the `Engine`.
+
+
+On top of that, `RefCell` doesn't save us from the shared-xor-mutable, it only delays it.
+
+
+So, because it still has run-time halts and shared-xor-mutable, Rust hasn't quite found the solution to the holy grail.
+
+
+## Swift
+
+Swift is also tangling with this problem.
+
+
+As of Swift 5, [run-time exclusivity checking](https://www.swift.org/blog/swift-5-exclusivity/) is on by default. This basically gives a Rust `RefCell` to any Swift object. [# Not just Swift objects, any mutable piece of data, IIUC.] Whenever you have a "long-term" reference to a variable (passing it as an `inout` parameter, calling a `mutating` method, etc.) Swift checks the shared-xor-mutable rule at run-time (no simultaneous read+write or write+write references to the same object). If you are, the program halts.
+
+
+If you want to see this exclusivity check in action, here's a [Circuitous Shapeshift program](https://gist.github.com/Verdagon/257dde6f6ddc12d23dd784e6f0fdf4c7).
+
+
+Don't get me wrong, this is a big improvement to Swift.
+
+However, it has some drawbacks:
+
+ * It has [run-time overhead](https://www.swift.org/blog/swift-5-exclusivity/): O(n) checking at run-time, looking at [Exclusivity.cpp](https://github.com/swiftlang/swift/blob/main/stdlib/public/runtime/Exclusivity.cpp#L161). [# One user even reported a [25% overhead](https://mjtsai.com/blog/2019/02/05/swift-5-exclusivity-enforcement/#comment-3815897) for a section of their code.] [# It makes me wonder what would have happened if they put a `RefCell` into the object's side table. My guess is they didn't want to change their side-table layout, but I'm not sure. If anyone knows, please comment!]
+ * It risks run-time panics, just like Rust's.
+ * It makes us think in terms of shared-xor-mutable.
+ * It's thread-unsafe, and therefore not memory safe in multi-threaded programs. [# Specifically, the ownership system is [not required to detect concurrent conflicting accesses](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0176-enforce-exclusive-access-to-memory.md) and therefore risks data races, which risks memory unsafety in Swift. See also [Gankra's take](https://gist.github.com/Gankra/1f79fbf2a9776302a9d4c8c0097cc40e)]
+
+
+So unfortunately, it's not a solution to the holy grail.
+
+
+<ignore>
+Borrowing switch proposal: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0432-noncopyable-switch.md?ref=fline.dev
+
+"Swift 5.9 introduced non-copyable types with the ~Copyable syntax for modeling resources with unique ownership, and writing performance-conscious code by eliminating the runtime overhead associated with copying. Swift 6 now supports these types with the generics system, making it possible to write generic code that works with both copyable and non-copyable types." (https://www.swift.org/blog/announcing-swift-6/)
+</ignore>
+
+
+## Lobster
+
+[Lobster](https://strlen.com/lobster/) is probably one of the closest languages to the holy grail today. It starts with reference counting, and then uses a very aggressive [algorithm](https://aardappel.github.io/lobster/memory_management.html) to automatically add borrowing where it can, to remove the vast majority of refcount incrementing/decrementing. [# I've always liked Lobster because it actually values simplicity, as opposed to most languages that just say they do. Lobster intentionally chose to not have lifetime annotations, which put it in a sweet spot on the simplicity-vs-speed spectrum.]
+
+
+There is only one big thing the holy grail would want, past what Lobster offers: Inline enums. Instead of having any types whose inner shape can change (inline enums), Lobster uses classes, which are reference counted. With inline enums, less objects would need to go on the heap, which means less cache misses.
+
+
+I should also note, as Wouter (Lobster's creator) explained to me, Lobster has not proven that its borrowing algorithm is sound in all possible combinations of aliasing data structures. Still, if one is looking for the holy grail, Lobster is a stellar place to start.
+
+
+## Ante
+
+ * incorporate jake's feedback: https://discord.com/channels/@me/922690224163786796/1445418030531084513:
+    * ante is rust plus good refcounting. its shared-mut reference helps a lot with that. gets us pretty far.
+ * borrow sets? which have names not lifetimes?
+
+
+
+# A solution on the horizon?
+
+
+There is hope!
+
+
+There has been a _lot_ of progress recently.
+
+
+This will be a super brief overview, because I want to write a _lot_ of followup articles on all of these.
+
+And that works well, because *if you want to take a swing at solving the holy grail, stop reading here* to ponder for a while, and then a few days later, keep reading! The version of yourself _before_ reading this section might have different ideas than the version of yourself _after_ reading these ideas.
+
+
+Okay, ready? Has it been a few days? Excellent!
+
+
+Let's start with Jake Fecher's [Ante](https://antelang.org) which has a very interesting take in its [stable, mutable references](https://antelang.org/blog/stable_mutable_refs/). The key insight is that we can have multiple references to an object, and we can even call mutating methods through those references, as long as we can't obtain any references to the interior of that object. I think there are some interesting patterns hidden in his model. [#antevale] [# TODO: doublecheck this, read the ante article again https://antelang.org/blog/stable_mutable_refs/]
+
+
+Nick Smith invented [Group Borrowing](https://verdagon.dev/blog/group-borrowing), which brings a few ideas into the world:
+
+ * An object can be thought of as in a group, and containing a hierarchy of child groups.
+ * When you give a mutable reference to a function, we "invalidate" every reference that was pointing at that object's group's child groups.
+ * Multiple objects can be in the same group.
+
+
+Both of these are incredibly exciting to me because they suggest that shared-xor-mutable aren't actually necessary for borrowing to work.
+
+
+[Carbon](https://github.com/carbon-language/carbon-lang)'s Josh Levenberg been designing a [new memory safety system inspired by Group Borrowing](https://github.com/carbon-language/carbon-lang/discussions/6397) which generalizes it into a full effect system. It also gives the user more precise control over which groups are invalidated: a function expresses directly which groups should have references into it invalidated, rather than expressing directly which groups are mutated. [# TODO: more here]
+
+
+Ever since discovering that we can [temporarily immutably borrow an entire arbitrarily-aliasing graph of objects](https://verdagon.dev/blog/zero-cost-borrowing-regions-part-1-immutable-borrowing) in Vale, and accidentally discovering the [reference-counting/region-borrowing blend](https://github.com/verdagon/RegionsRCCellularAutomataBenchmark), I've also been exporing the problem from my side, and have a few interesting leads.
+
+
+I'll start with the least promising one: a mechanism called [write_back_copy](https://docs.google.com/document/d/1RvxPrwm1MZ3SumEOKlOdw3aXKLWJgRo_k8cz0StPvpc/edit?tab=t.0). It relies a little too much on copying for my tastes, losing the speed benefits we're after, so it isn't really close to the holy grail. Still, it showed that we could in theory rely on copies to reconcile the circuitous shapeshift. [# Fun fact: I actually originaly designed this one for Mojo, but since the Mojo isn't going to think about memory safety until long after the language is stabilized, it never really evolved into anything.]
+
+
+The next one is much more promising: [Shared-Yet-Owned](https://docs.google.com/document/d/1Q5G4qk2YO-owzqZ_-COP-rPeIxNO55VE3N3d0ulPLlk/edit?tab=t.0), which lets us have multiple "readonly references" (like C++'s const pointers) and one mutable reference, at the same time. One can then use Vale-like region borrowing (`pure` blocks/functions) to turn a readonly reference into a truly immutable borrow reference. It's not _quite_ the holy grail, but it's a step forward because it's another step away from shared-xor-mutable: it lets us modify an object while readonly references to it exist.
+
+
+The most promising one is the [RC + Group Borrowing blend](https://docs.google.com/document/d/1v-fik69UfTp4ZLyhCPNixStxwgX2CE596cqQzCjvqSA/edit?tab=t.0) that I'm designing for Vale which fits reference counting into Nick's [Group Borrowing](https://verdagon.dev/blog/group-borrowing) model. This required some additional steps:
+
+ * A distinction between a "many-typed group" and a "single-typed group".
+ * Viewing a "many-typed group" as a (potentially infinite) collection of "single-typed group"s.
+ * A distinction between the group that "owns" the RC objects and a group of the RC objects' contents.
+ * Expressing a "path" to a field of a struct starting from a many-typed group of RC'd objects.
+ * Also (undoubtedly inspired by talks with Josh!) it talks about how effects could help too.
+
+_This looks like it could work._ Of course, it's too early to say for sure. It's not fully designed. [# For example, how do we return references? Do we use Vale-style [one-way isolates](https://verdagon.dev/blog/zero-cost-borrowing-regions-part-3-one-way-isolation) for that? No idea!] We'll undoubtedly find holes in it, and maybe we'll find fixes, or maybe it'll all fall apart, who knows!
+
+
+Like I said, this was just a super brief overview. *I'll be writing articles on all of these approaches soon* (subscribe to the [RSS feed](https://verdagon.dev/rss.xml)) to give you more details on all of these.
+
+
+<slice>
+#antevale: In his [first post](https://antelang.org/blog/safe_shared_mutability/) he mentions that a common pattern would be to get copies of the contents, since we can't get references. But I think there are more options in that direction. As I say in [regions part 3](https://verdagon.dev/blog/zero-cost-borrowing-regions-part-3-one-way-isolation):
+
+> "A lot of real-world code can fit easily with one-way isolation. Most languages have a notion of "private" data, that's not exposed via an object's API. Those objects can be in the object's isolate, yet they can still point outside."
+
+It makes me wonder if there's a unifying theory somewhere between Ante and Vale.
+</slice>
+
+
+# Why this might seem fundamentally impossible
+
+WIP
+
+Talk about whether reference counting and borrowing seem to _inherently_ conflict.
+
+
+this conflict might be a bunch of inherent complexity that we cant get away from. if thats the case, then maybe there's a way to truly give the programmer better ways to express all this and handle it. i very much doubt that RefCell is the actual best solution. that would be pretty ridiculous IMO.
+
+
+# Dividing the quest into two
+
+WIP
+
+blending the two models at a fundamental level, or seamless interop between the two worlds?
+
+
+ * add a section near the end about how there are two goals
+    * emphasize that the holy grail is about two things: enabling RC/borrowing blends, and also enabling a more fluid boundary between them so we can more easily migrate between the two. this will help us go from easy (RC) to data-oriented (ECS)
+    * segue into a section about DOD
+
+
+# Leading to data-oriented design
+
+WIP
+
+How this might interact with (or enable!) better data-oriented design.
+
+ * talk about arenas and data-oriented design.
+    * this is a step away from data-oriented design, but it would let people gradually lower into data-oriented design. by bridging the gap, we'd offer a gradual migration path.
+    * this still could make sense for something like graphics though. we can get unique refs to the underlying buffers. no reason we cant toss them around with refcounting.
+    * one might think that the solution is to put reference counted things into an arena or something. thats not the direction im going. and besides, that's _not_ as simple as just reference counting. reference counting's beauty is that people can use it without thinking about memory.
+    * could a reference counted object hold a pointer to the array, plus an owning index into it? then its destructor could remove it from the array. that way we could remove it from the array automatically.
+
+how this might work with allocators.
+
+ * allocators are a big part of speeding up reference counting, but i kind of consider that a solved problem. this is one step past that.
+ * even if you have allocators... how do you do shared ownership with them?
+    * lifetimes. now youre doing complicated stuff.
+    * single ownership, like clasps. but now you have single ownership.
+   so really, this is orthogonal. how do we better offer shared ownership on top of these more complicated models?
+   also, however you expose the shared ownership, how do you offer inline enums? you dont really.
+
+# Join the quest [# And [sponsor Nick Smith](https://github.com/sponsors/nmsmith)!]
+
+
+If you have any weird ideas about memory safety, post them to [r/programminglanguages](https://www.reddit.com/r/ProgrammingLanguages/) and [email me](mailto:grail1@verdagon.dev) or message me on the [Vale discord](https://discord.gg/SNB8yGH)!
+
+
+The next big memory safety approach will come from the most unlikely of places. Heck, Vale's approach literally came from looking at databases and game engines. For all we know, the next one will come from blending [stack arenas](https://verdagon.dev/grimoire/grimoire#the-list) and [linear types](https://verdagon.dev/blog/higher-raii-uses-linear-types) or something equally insane.
+
+
+We don't have the answer yet. But with all these advancements and interesting mechanisms, I feel that the tide is turning against the Circuitous Shapeshift. If we keep our eyes and ears open, we might find the holy grail!
+
+
+# Conclusion
+
+
+This is only the beginning! I'll be writing a lot more on this topic, including:
+
+ * Jake Fecher's [Ante](https://antelang.org), which uses [stable, mutable references](https://antelang.org/blog/stable_mutable_refs/) in very interesting ways.
+ * Carbon's approach to memory safety, which builds out Nick's approach with an effect system.
+ * How linear types blend with borrowing to uphold more guarantees at compile time (and even enable a sort of compile-time reference counting!)
+ * My (work-in-progress) [Shared-Yet-Owned](https://docs.google.com/document/d/1Q5G4qk2YO-owzqZ_-COP-rPeIxNO55VE3N3d0ulPLlk/edit?tab=t.0) and [RC-and-Group-Borrowing blend](https://docs.google.com/document/d/1DSfOQdBDasXwfnsn9m4_sWjPIDZmGioCWj3tPnZYNyQ/edit?tab=t.0).
+ * Mojo's approach! Mojo isn't a real memory-safe language yet (and won't be any time soon), but it's got some rather interesting pieces.
+ * V2 of the [Memory Safety Grimoire](https://verdagon.dev/grimoire/grimoire) which will capture all the new memory safety models I've seen in the wild.
+
+
+Cheers!
+
+- Evan
+
+
+
+
+
+
+
+
+
+<ignore>
+
+# Specifics
+
+
+
+But let me be a little more specific, since "fast, safe, and simple" is very vague and subjective:
+
+ * By "fast", I mean it doesn't force any overhead on you.
+    * Zig, Rust, Mojo, C, C++, etc. are fast.
+    * Python, Swift, Java, etc. are slow.
+    * Common causes of slowness: tracing garbage collection, atomic refcount updates, forcing objects onto the heap thereby causing cache misses, etc.
+ * By "safe", I mean:
+    * Data-race safe, such as Java and Rust.
+    * Memory-safe, such as Java. I'd count Rust here too, since you _can_ use it without `unsafe`. [# I wouldn't count Go here though, because its data races _lead_ to memory unsafety.]
+    * Doesn't cause panics/halts (this unfortunately eliminates Vale)
+    * Bonus: resource-safe (such as via linear types) such as Vale, Mojo, or Austral.
+ * By "simple", I mean in an architectural sense. For example:
+    * Java, at its core, is simple in my opinion. Garbage collection abstracts away the complexity of memory management and memory safety.
+    * Swift, at its core, is simple in my opinion. It's mostly just reference counting.
+    * C++ is not simple in my opinion, because of its single ownership.
+    * Rust is not simple in my opinion, because of its single ownership and shared-xor-mutable rules. [# It may _seem_ simple because it's just one rule (one unique reference or many shared references) but that simplicity causes a lot of complexity as second-order effects.]
+
+
+And unfortunately, the above criteria eliminates every programming language I've ever heard of.
+
+
+Needless to say, it's an _incredibly_ elusive goal.
+
+
+# What would it look like?
+
+I can see it taking a few forms:
+
+ * Some sort of super-smart algorithm that can look at a whole program and verify memory safety, similar to how Haskell can statically type a whole program without the user specifying function parameters' types.
+ * Something that builds on global memory pools like [MMM++](/grimoire/grimoire) perhaps. This one is tricky because it's hard to embed unions/enums in other objects, which is important for speed.
+ * Some sort of blend of reference counting (or tracing garbage collection) and borrowing. This one is tricky because mutable aliasing usually requires some sort of RefCell-like substance, which causes panics/halts.
+
+
+I can see two "tiers" of holy grail.
+
+ * Holy Grail: Be able to prototype in a safe and simple way, and then drop down into safe and fast.
+ * Holy Grail++: Get all three, all the time.
+
+
+I have faith that both of them are eventually possible.
+
+
+I'm not sure if I'll see the former in my lifetime, but I think the latter is getting closer. I'll tell you why in the next section.
+
+
+# Recent Progress
+
+
+I've pursued this goal for almost a decade now, scribbling in the dark candle-lit hours, with quill and parchment. [# Not really, but that would be pretty cool.]
+
+ * Long ago, the first iteration of Vale was using [constraint references](https://verdagon.dev/blog/raii-next-steps), trying to get memory-safe mutable aliasing with single ownership. [# TODO: define]
+ * [Hybrid Generational Memory](https://verdagon.dev/blog/hybrid-generational-memory) was my attempt to add a sort of "automatic borrowing" to generational references. This unfortunately failed. [# It failed in the same way that VLang failed, actually. Nobody else knows why VLang's autofree failed, but I know why.]
+ * Vale's current [generational references / region borrowing](https://verdagon.dev/blog/generational-references) blend.
+
+But alas, I have not found it.
+
+
+This much progress in just 1-2 years is pretty inspiring!
+
+
+I don't usually make predictions, but given all this progress, *I predict that the memory safety holy grail will be found sometime in the next ten years.*
+
+
+# More Difficult Than One Would Think
+
+D did ... [# TODO: explain]
+
+
+Swift has a form of borrowing, but [doesn't protect from data races](https://gist.github.com/Gankra/1f79fbf2a9776302a9d4c8c0097cc40e). [# TODO: cite that these aren't thread safe]
+
+
+V tried with its autofree, but failed and had to fall back to pure reference counting.
+
+
+
+# More Specifics
+
+I know there's a 
+
+
+This is a very high bar. I'll make it more specific:
+
+ * No panics or halts or crashes.
+ * No shared-xor-mutable.
+ * Must be safe from data races.
+ * Must use something simple, like reference counting or garbage collection.
+ * Must not boot things to the heap unnecessarily.
+ * Must be pragmatic and useful for general purpose use-cases.
+ * Must reclaim memory before the program ends. [# I'm looking at you, [Neverfree](https://verdagon.dev/grimoire/grimoire).]
+
+
+
+! I'll be adding to this list of specifics as weird cases arise that I don't think truly achieve the spirit of the Holy Grail.
+
+
+
+# The Holy Grail
+
+As most of you know, I [dabble in memory safety](https://verdagon.dev/grimoire/grimoire), to say the least.
+
+Heck, Vale's original purpose was to find "the next way to do memory safety", because I was unsatisfied with garbage collection, reference counting, and borrow checking.
+
+That quest led to one of my favorite achievements, Vale's [region borrowing and generational references blend](https://verdagon.dev/blog/generational-references).
+
+It's a really nice sweet-spot of usability, memory safety, and performance. But it always kind of irked me that a generational reference would still sometimes halt your program. One could eliminate this risk with [linear style](https://verdagon.dev/blog/linear-types-borrowing) [# A way of programming with no references, and instead moving everything around. It's like how we interact with the real world.] and maybe someday transactional regions [# Don't know if I've written about this anywhere, but theoretically there's a way to keep a log of "reversed changes" to memory in a region, that can be applied as part of a "rollback" if there's a panic. Pretty neat, though it can get rather memory intensive.], but those are both opt-in practices.
+
+
+While I was implementing that, I had a "debug mode" which helped me doublecheck that generational references were implemented correctly. It used reference counting under the hood.
+
+And it occurred to me, "wait a minute, could region borrowing eliminate reference count increments and decrements?" and just like that, I discovered a [region borrowing and reference counting blend](https://github.com/verdagon/RegionsRCCellularAutomataBenchmark) which eliminated most reference counting overhead.
+
+It made me wonder. What would happen if we used [the grimoire](https://verdagon.dev/grimoire/grimoire) to design a new memory safety model centered around reference counting and borrowing?
+
+That's what was going on in my mind when I read Nick Smith's new memory safety approach.
+
+
+# Borrow checking is the only answer so far, and the Holy Grail is impossible
+
+
+In Manish's [The Problem With Single-threaded Shared Mutability](https://manishearth.github.io/blog/2015/05/17/the-problem-with-shared-mutability/), he says:
+
+> ...
+
+
+
+In Niko's [On the connection between memory management and data-race freedom](https://smallcultfollowing.com/babysteps/blog/2013/06/11/on-the-connection-between-memory-management-and-data-race-freedom/), he says:
+
+> ...
+
+
+
+"Iterator Invalidation".
+
+
+
+
+all this applies to GC as well. if you dont get rid of any references, then you can freely borrow things without risking the GC noticing and killing an unreferenced object and its innards.
+
+
+
+
+
+"Doesn't Rust have `Rc` and `Arc`?"
+
+It does! But the Circuitous Shapeshift isn't so easily defeated. It just changes the symptoms: these mechanisms cause panics and thread deadlocks.
+
+
+"Doesn't Swift have some sort of ownership?"
+
+It does! But it has data-race problems which risk memory unsafety in Swift code.
+
+
+Both Swift and Rust took fundamentally the same approach: use run-time checking to guarantee exclusivity. It's the best they could do against the Circuitous Shapeshift.
+
+
+
+
+could there be a counter that just reacts when it hits 0? doesnt need to be destroyed. just reacts in some way. could hook into the same RC mechanism too. "reactive counter"
+
+If RC wasn't better in some situations, Rust wouldn't have Arc. The fact that Arc exists is a hint that we do see value in it. But let's explore _where_ it's better...
+
+
+ * good error messages? better than rust? "this is what a human would try"?
+
+*Reference counting and garbage collection are simple* for the user because:
+
+ * They don't need single ownership. In other words, a pointer doesn't need to care whether it's owning (like C++'s `std::unique_ptr<MyStruct>` or Rust's `Box<MyStruct>`) or non-owning (like C++'s `MyStruct*` or Rust's `&MyStruct`).
+ * They allow mutable aliasing; there's no borrow checking enforcing any Rust-like shared-xor-mutable rule. In other words, the program can have two simultaneous pointers to an object, and both can be used to modify it.
+
+
+
+
+
+ * Better for encapsulation.
+    * If your RC'd class wants to have a reference to some longer-lived subsystem, just do it. In Rust, you better be prepared to either:
+       * Have a generic lifetime parameter. Avoid this, it just leads to pain and it very tightly couples a lot of things.
+          * In a way, RC is healthier for your codebase because it doesnt suffer from refactor shockwaves.
+       * Have IDs and probably put everything inside a god object.
+          * RC is healthier than this because you dont have to virally expose everything to everything.
+
+
+That last one is particularly important for large codebases. This aspect of borrow checking would have been pretty earth-shattering for Google Earth.
+
+In Google Earth, we had a Document class. Multiple people could modify it via `AddPoint`, `AddLine`, `AddPolygon` methods.
+
+Under the hood, there were actually three kinds of Document: `LocalFileSystem` document, `InMemory` document, and a new kind, `UserMapService` document.
+
+To add that last one, we had three choices:
+
+ 1. Put a `NetworkRequester*` in Document.
+ 2. Make all those methods take in a `&mut NetworkRequester` (and their callers, and their callers' callers, virally through the program).
+ 3. Make all those methods take in a global-ish `&mut World` (and their callers, and their callers' callers, virally through the program).
+
+Borrow checking forces you into #2 and #3, even when #1 might be the best choice.
+
+In reality, sacrifices are made elsewhere, to make #2 and #3 more palatable. This shapes Rust programs.
+
+
+
+
+C++ thread racing: https://gist.github.com/Verdagon/6fb618b3a01e932dd4a42ac77e252606
+
+Swift thread racing: https://gist.github.com/Verdagon/2c2653de41534d96bdf93454cc7aa97e
+
+
+
+[# The unfortunate problem with `Rc` is that it often must come with `RefCell`, which panics. In some cases you can use `Rc<Cell<SomeStruct>>`, or put `Cell`s _inside_ the `SomeStruct`, but not always.]
+
+
+
+
+ * The choice often *depends on the program you're making.* For example, real-time games fit with borrowing more, apps fit with reference counting more. [# Heck, there's variation even in the roguelike genre. Real-time roguelikes like borrowing because of the inherent parallelism and iteration, while turn-based roguelikes fit more with reference counting because of the simplicity and inherent random access patterns. Check out [this thread](https://www.reddit.com/r/roguelikedev/comments/i3xekn/ec_vs_ecs_for_roguelikes/) for more on that!]
+ * The choice even *depends on where you are in the same program.* For example, a turn-based roguelike might generally want reference counting, but might want borrowing for the more compute-intensive parts (vision, pathfinding, level generation).
+
+
+
+
+BENEFITS
+
+Using my favorite examples:
+
+ * In a Roguelike like the above one, fields (or EC-ish components!) could have weak references at other entities, and we can drop down into a faster borrowing style for level generation, pathfinding, and visibility. Imagine a team where you had five people on game logic, and one person who knew how to drop down into borrowing to optimize the systems.
+ * In Google earth, you could use reference counting for the documents, the network requesting, etc. But for the graphics layer (Mirth) you could drop down into borrowing. This would have been nice; the existence of Mirth forced us all into C++ where we made heavy use of shared_ptr which has... problems.
+ * A server that processes climate data. It could use reference counting for all the server-ish stuff, and then drop down into borrowing for data processing speed.
+
+We want:
+
+ * Gradual memory management.
+
+    * we want gradual memory management. cone was big on this. want to start with rc then slowly make things faster. migration plan:
+       * rc graph -> rc DAG
+       * rc DAG -> rc tree
+       * rc tree -> single ownership tree
+       * single ownership tree -> only mutate through borrowing
+       * only mutate through borrowing -> only read+mutate through borrowing
+       * that -> inline a bunch of data.
+
+It would have a few more benefits as well:
+
+ * strengthen that the holy grail is about gradually moving from refcounting to borrowing
+ * say why we want it:
+    * we want gradual memory management. cone was big on this. want to start with rc then slowly make things faster. migration plan:
+       * rc graph -> rc DAG
+       * rc DAG -> rc tree
+       * rc tree -> single ownership tree
+       * single ownership tree -> only mutate through borrowing
+       * only mutate through borrowing -> only read+mutate through borrowing
+       * that -> inline a bunch of data.
+    * "scripting phase helps you understand the problem space, validate assumptions, and iterate quickly on approaches before committing to the engineering effort required for optimization. This reduces the risk of building the wrong thing efficiently."
+    * sometimes you want that extra flexibility, so you can do [intrusive data structures](https://lwn.net/Articles/907876/), [observers](https://www.reddit.com/r/rust/comments/pwqju6/is_there_an_underlying_reason_that_idiomatic_rust/) and [graphs](https://news.ycombinator.com/item?id=24996001), [observers](https://www.reddit.com/r/rust/comments/pwqju6/is_there_an_underlying_reason_that_idiomatic_rust/), [back-references](https://users.rust-lang.org/t/back-reference-to-the-parent-struct/7413/2), [dependency references](https://en.wikipedia.org/wiki/Dependency_injection), [callbacks](https://news.ycombinator.com/item?id=12029238), [delegates](https://medium.com/@nimjea/delegation-pattern-in-swift-4-2-f6aca61f4bf5), etc. On top of all the normal RC-ish cases such as a read-only file that should be closed when everyone's done with it. Hell, flexibility _should_ be the default.
+    * RC is actually slightly more efficient for memory, since you release it sooner.
+    * AVL trees, which have parent pointers, are easier with RC. (weak)
+    * RC isnt just easy, borrowing is sometimes weirdly hard.
+    * Rust pushes you towards ECS. if you weren't planning on using ECS... you're gonna have to change your mind.
+    * Better for encapsulation. If your RC'd class wants to have a reference to some longer-lived subsystem, just do it. In Rust, you better be prepared to have a generic lifetime parameter, and probably put everything inside a god object. In a way, RC is healthier for your codebase because it doesnt suffer from refactor shockwaves.
+    * If RC wasn't better in some situations, Rust wouldn't have Arc. The fact that Arc exists is a hint that we do see value in it. But let's explore _where_ it's better...
+    * "Reference counting lets you defer crucial architectural decisions. You can start with a simple object graph and later introduce dependency injection, facades, or mediators without rewriting memory management. Rust's borrow checker often forces you to decide on architectural patterns early—choosing between single ownership, interior mutability, or arena allocation has cascading effects that are expensive to change later."
+    * "Reference counting naturally extends to non-memory resources. A file handle stays open while any component holds a reference, closing automatically when the last reference drops."
+    * "Graphics APIs like Metal use reference counting extensively—textures, buffers, and command queues are reference counted. Multiple render passes can reference the same resources without complex lifetime tracking. Rust graphics code often wraps these APIs in Arc anyway, adding an extra layer of reference counting"
+    * Sometimes, borrow checking simply _isnt_ an option. You'll have a lot of programmers that won't learn borrowing. And they shouldn't have to.
+
+ * cases:
+    * roguelike, components point at entities. but level generation, pathfinding, and visibility wants to be fast.
+    * google earth documents for shared-yet-owned. Mirth layer, subsystems/docs layer, presenters layer, view layer. but mirth itself is a graphics engine and wants to be fast.
+    * image processing, data processing, analytics, servers, scientific computing, 
+
+ * good error messages? better than rust? "this is what a human would try"?
+
+coalesce all the above. drive it home. go hard on the human aspect.
+
+also go hard on why an RC'd program would want borrow checking. maybe that first.
+
+
+
+benefits of group borrowing:
+
+ * get to immutably borrow the world. though rust does let you do 
+ * structured concurrency, via borrowing previously-nonatomic-refcounted data as immutable
+
+
+
+
+
+
+the middle ground would be to change pathToTarget to direction.
+in that case, we can rely on the fact that we hold a reference to it.
+
+https://swiftfiddle.com/y7he4sh4s5dkjb5e7bzevtfll4
+
+```
+class Level {
+    var entities: [Entity]
+    var tiles: [Location: Tile]
+}
+class Tile { ... }
+class Entity {
+    let id: Int
+    var loc: Location
+    var chaseTarget: ChaseTarget?
+}
+struct ChaseTarget {
+    weak var target: Entity?
+    var direction: Double
+}
+func continueChase(level: Level, entity: Entity) {
+  if let chaseTarget = entity.chaseTarget { // If we're chasing someone
+    if chaseTarget.target != nil { // If they're still alive
+      let speed = calculateSpeed(level, entity) // Doesn't change entity.chaseTarget
+      entity.loc = level.getLocationInDirection(entity.loc, chaseTarget, speed)
+    }
+  }
+}
+```
+
+Rust: fail?
+Lobster: fail, copies chaseTarget
+SYO: pass, i think?
+SYO + deferred:
+Grail: pass, knows calculate
+
+no, this middle ground doesnt really work, because the thing is inside an optional.
+</ignore>
+
+
+
+
+
+
+<ignore>
+we definitely go ambitious. but lay out the pure one as a stepping stone.
+
+swift has a problem with this because it sucks at borrowing
+rust has a problem with this because we're modifying Entity while holding the world
+- what if world wasnt involved though? this would be easy.
+  - "i dont want to think about this. why isnt world allowed? i dont get it."
+  - that we need to get rid of world is a symptom.
+
+this is generally expressing a desire to blend borrowing and reference counting.
+...which is generally foiled by the language killer.
+otherwise one would assume that this is a totally safe thing to do.
+</ignore>
+
+
+<ignore>
+However, whenever we try and express this in any memory-safe language, we encounter some sort of run-time overhead or panic or other harmful side effect.
+
+ * In the above Swift code, the `if let chaseTarget =` line makes a copy, and does two RC increments.
+ * If we were to translate that to Rust, we would either do a similar clone (which clones `ChaseTarget`'s `Vec<Location>`), or we'd use some sort of slotmap or hashing.
+
+
+Unfortunate!
+
+
+And this isn't an isolated problem with just that program. This is a pattern that plays out across entire languages. It doesn't matter if you're in Swift, C#, Rust, or any other mainstream language... you'll encounter run-time costs (extra cache misses, heap allocations, hashing, cloning, etc.) and often needless complexity as well.
+
+
+We're used to this. This is just a fact of life to us. [# some note here] But I don't think it has to be.
+
+
+And I think that if a language can solve this, then it solves an entire class of problems, and gets one step closer to the ever-mythical, ever-unreachable trio of *safe, fast, and simple*.
+
+
+
+The fact is, you are a fish, and you never really left the water. You carry the ocean with you ever where you go.
+
+
+
+ * need an example that the user would want.
+    * method takes also takes in a reference to world. but in a way that wants RC.
+       * considerPursue(game Game, level Level, pursue mut Entity.components*.pursue)
+       * need something that deals with enums. and maybe inside the enum is a vec. yes, thats perfect. pathToTarget.
+          * if there's no pathToTarget, desire goes down.
+          * if we did the pure rust version, would that require an extra heap allocation if we did it pure? to hold the path?
+    * function takes in a unit that has readonly access to the world, so therefore doesnt need it itself
+       * users might not resonate with this. OOish
+    * maybe implement benchmarkRL in grail...
+    * maybe look through benchmarkrl for a function
+</ignore>
+
+
+
+<ignore>
+This happens with pure functions too:
+
+https://swiftfiddle.com/x6vga5m4ezgs7gtldze4bya3zi
+
+```
+class Level {
+    var entities: [Entity]
+}
+class Entity {
+    let id: Int
+    var loc: Location
+    var chaseTarget: ChaseTarget?
+}
+struct ChaseTarget {
+    weak var target: Entity?
+    var pathToTarget: [Location]
+}
+func continueChase(level: Level, entity: Entity) {
+    if let chaseTarget = entity.chaseTarget { // If we're chasing someone
+        if chaseTarget.target != nil { // If they're still alive
+            let speed = calculateSpeed(level, entity) // Doesn't change entity.chaseTarget
+            entity.loc = calculateNextLocation(chaseTarget, speed)
+        }
+    }
+}
+```
+
+Need to re-fetch the unit and do another lookup:
+
+https://play.rust-lang.org/?version=stable&mode=debug&edition=2024&gist=496292f848f628026afb08886a4a9f6d
+
+Rust: fail, need copy or extra lookup
+Lobster: fail, it copies chaseTarget
+SYO: pass, because we can say entity.chaseTarget knowing it wasn't modified i think?
+- if we say `level: read&Level, entity: mut&Entity`, then we would need to add `entity.` to re-get the chaseTarget:
+```
+func continueChase(level: Level, entity: Entity) {
+    if let chaseTarget = entity.chaseTarget { // If we're chasing someone
+        if chaseTarget.target != nil { // If they're still alive
+            let speed = calculateSpeed(level, entity) // Doesn't change entity.chaseTarget
+            entity.loc = calculateNextLocation(entity.chaseTarget, speed)
+        }
+    }
+}
+```
+- if we say `level: mut&Level, entity: read&Entity` then we would need to extract the mut&Entity from the level first, and then do the above
+- re-getting it seems like it kind of doesn't meet the spirit of what we're doing... kind of. maybe. probably not.
+
+SYO + deferred: pass? suspicious that it's only intra-function though.
+Grail: pass, it borrows chaseTarget and knows that its group wasnt modified, because calculateSpeed is pure.
+</ignore>
+
+
+
+<ignore>
+Ladies and gentlemen, welcome to my favorite topic!
+
+
+This is a topic spoken in hushed whispers in dark taverns, in arcane towers on tall mountains, and by the most eccentric of programmers with long flowing beards and a flagrant disregard for the bounds of reality. [# TODO: change it from a "revealing a secret" vibe to a "exploring and illuminating the path" vibe]
+
+
+And today, I am bringing it from those outer reaches back down to our mortal plane. _May the gods forgive my sins._
+
+
+I'm going to explain the *memory safety holy grail*, a theoretical memory safety model that nobody yet knows how to implement. It's something that my and a few others' languages have been working on for many years, and we've made some _huge_ jumps forward recently.
+
+
+If you want a peek into where the future of memory safety might be going, read on!
+</ignore>

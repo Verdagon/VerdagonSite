@@ -1,0 +1,109 @@
+---
+title: Exploring Seamless Rust Interop for Newer Languages, Part 3
+subtitle: Some more memory safety mixed martial arts
+author: Evan Ovadia
+date: May 24, 2024
+realm: blog
+path: blog/exploring-seamless-rust-interop-part-3
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+it's about the cones.
+
+
+
+"what would anden3 do?"
+
+so i searched, couldnt find anything, then asked chatgpt, it pointed me at https://docs.rs/cargo_metadata/latest/cargo_metadata/
+
+huzzah!
+
+
+
+
+
+rust things need to be on the stack. thats the tricky part.
+
+
+how would we put them in structs?
+we'd need something to say we cant alias them. we'd basically be implementing iso members.
+
+its funny, its like imaginary numbers. its something that's surprisingly recurrent.
+
+
+```
+use OsString = rust.std.ffi.OsString;
+use VecOsString = rust.std.vec.Vec<OsString>;
+use PopenConfig = rust.subprocess.PopenConfig;
+use Popen = rust.subprocess.Popen;
+use PopenResult = rust.subprocess.Result<Popen>;
+use ExitStatusResult = rust.subprocess.Result<subprocess.ExitStatus>;
+
+fn main() {
+  argv 'Vec<OsString> = rust.Vec.new();
+
+  set argv = (argv).push(OsString.from("/bin/cat"));
+  set argv = (argv).push(OsString.from("hello.txt"));
+
+  create_result 'Popen = Popen.create(argv, PopenConfig.default());
+
+  // if (set create_result).is_err() {
+  [set create_result, create_failed] = (create_result).is_err();
+  process =
+    if create_failed {
+      panic("Failed to open subprocess!");
+    } else {
+      unwrap(create_result)
+    };
+
+  wait_result 'ExitStatusResult = process.wait();
+  [set wait_result, wait_failed] = (wait_result).is_err();
+  process =
+    if wait_failed {
+      panic("Failed to open subprocess!");
+    } else {
+      wait_result.unwrap()
+    };
+
+  println!("Success!");
+}
+```
+
+
+we'd like to get here eventually:
+
+```
+use OsString = rust.std.ffi.OsString;
+use VecOsString = rust.std.vec.Vec<OsString>;
+use PopenConfig = rust.subprocess.PopenConfig;
+use Popen = rust.subprocess.Popen;
+use PopenResult = rust.subprocess.Result<Popen>;
+use ExitStatusResult = rust.subprocess.Result<subprocess.ExitStatus>;
+
+fn main() {
+  argv 'Vec<OsString> = rust.Vec.new();
+
+  argv.push(OsString.from("/bin/cat"));
+  argv.push(OsString.from("hello.txt"));
+
+  create_result 'Popen = Popen.create(&argv, PopenConfig.default());
+  process =
+    if create_result.is_err() {
+      panic("Failed to open subprocess!");
+    } else {
+      create_result.unwrap()
+    };
+
+  wait_result 'ExitStatusResult = process.wait();
+  process =
+    if wait_result.is_err() {
+      panic("Failed to open subprocess!");
+    } else {
+      wait_result.unwrap()
+    };
+
+  println!("Success!");
+}
+```

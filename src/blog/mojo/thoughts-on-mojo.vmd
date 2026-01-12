@@ -435,3 +435,23 @@ this is more of a long term benefit, but we're already seeing it: we brought up 
 there doesnt seem to be a strong culture here of *design* yet. i see too many people who want to incrementally interleave building and designing. that works well in most cases, but it often leads one into local maxima. This is happening right now with our memory safety strategy, which I think will fail.
 
 
+
+
+
+
+
+
+
+
+There's not much of that for Mojo. There is no long-term plan for Mojo besides "make the AI programmers happy". We barely know what features we'll implement next quarter, and we barely know how they'll fit together. It feels a bit like this programming language is being designed by a startup.
+
+It's something I've been wanting to fix, but it's tricky to regain that lost planning when you're pushing through startup-caliber tech debt to implement some obscure feature for some AI programmer somewhere else in the company.
+
+If I could wave a magic wand, I would freeze time for three months, kidnap a few of our standard library folks, kidnap Nick, and actually _design_ our memory safety model, so that python programmers won't slam into Mojo's complexity and bounce off of it like birds hitting a window. I'd do some user studies to actually _observe_ a python programmer do something complex in Mojo. I'd reach out to all the other domains that could benefit from a truly high-performance language, like climate modeling, DNA analysis, cryptography, all the good stuff. Alas.
+
+
+Still, despite the lack of magic wands, I do have a lot of hope for Mojo. Everyone on the team wants it to be a true systems programming language. They have hopes and dreams for it, and with that, I'd bet on Mojo any day.
+
+
+
+

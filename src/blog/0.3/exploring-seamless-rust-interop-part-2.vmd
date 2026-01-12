@@ -1,0 +1,1086 @@
+---
+title: Crossing the Impossible FFI Boundary, and My Gradual Descent Into Madness
+subtitle: Committing language interop sins for science
+author: Evan Ovadia
+date: June 17, 2024
+realm: blog
+path: blog/exploring-seamless-rust-interop-part-2
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+Anyone trying to make a new mainstream language is *completely insane,* unless they're backed by a large corporation. [# Of course, being insane is a prerequisite for being a language geek, so that's not really a problem for most of us.]
+
+
+<ignore>
+This counts for Vale, and every other language that we in [r/programminglanguages](https://www.reddit.com/r/ProgrammingLanguages/) are creating.
+</ignore>
+
+
+There are only two exceptions in the last 25 years that come close: Scala and Kotlin. [# Though it could be said that Kotlin didn't reach mainstream until Google came in and adopted it for Android. A fair point!] [#langstats] They did this by *seamlessly building on an existing ecosystem,* specifically Java's.
+
+
+But what if you're a low-level, memory-safe language like Vale, Austral, or Ante? There's no existing ecosystem of fast, memory-safe code to use.
+
+
+And unfortunately, *seamlessly building on Rust's ecosystem is impossible...*
+
+
+...or so we thought!
+
+
+# The impossible task
+
+
+<ignore>
+It's really hard for Java code to call C code. One has to use JNI or Swig, both of which are notoriously difficult.
+
+It's really hard for Python code to call Javascript code. Despite being conceptually similar, their slight differences make interop _so complicated_ that it's easier to just throw your hands up in the air, say "fuck it", and set up a microservice instead.
+
+It's really hard for C code to call Python code. One has to know all the intimate details of CPython, and handle reference counting correctly.
+
+
+It's as if there's a massive wall between languages, 
+</ignore>
+
+
+Anyone who has tried to make Java call C, or Python call Javascript, or C call Rust, can tell you that it's *really difficult to call functions from other languages.*
+
+
+Heroes throughout the ages have created tools like [SWIG](https://www.swig.org/Doc1.3/Java.html), [CXX](https://cxx.rs/), etc. which at least make it _possible_ for a user to reach across the Foreign Function Interface (FFI) boundary, if they can figure out the correct incantations. [# And even with the correct incantations, one has to reconcile fundamental differences between languages' memory models. If your C code forgets to call [Py_INCREF](https://docs.python.org/3/c-api/refcounting.html), you might accidentally summon some demons from the fourth eldritch plane.]
+
+
+But even with these tools, it's so difficult that we often just give up and call a microservice instead. [# Calling a microservice instead, as is tradition!]
+
+
+Calling into Rust is even harder; you can't just slap an `extern` onto your function, because Rust [doesn't have a stable ABI](https://www.reddit.com/r/rust/comments/ss2p6c/what_does_it_mean_when_people_say_that_rust_does/); `rustc`-compiled functions don't have a predictable signature that the linker can recognize.
+
+On top of that, we can't send normal Rust objects to C. We instead have to make new structs with `#[repr(C)]`, which have rather restrictive rules about what they can contain.
+
+
+And there are even more challenges here!
+
+ 1. Rust has generics. If our language defines `OurStruct`, how would Rust create a `Vec<OurStruct>` when `rustc` doesn't know anything about `OurStruct`, like how big it is?
+ 1. If calling from a language without a borrow checker, how do we uphold the Rust code's memory safety guarantees?
+ 1. In the case of Vale, how do we uphold other guarantees that Rust doesn't respect, like [higher RAII](/blog/higher-raii-uses-linear-types), [fearless FFI](https://verdagon.dev/blog/fearless-ffi), determinism, and [perfect replayability](https://verdagon.dev/blog/perfect-replayability-prototyped)?
+
+
+It's a no-man's land that we dare not tread on, an uncrossable chasm, a mountain-sized wall of ice that we dare not scale. [#impossible]
+
+
+But before we talk about how it could be done, what would it even look like?
+
+
+
+<slice>
+#langstats: Using stats from [GitHut](https://madnight.github.io/githut/#/pull_requests/2024/1), [PYPL](https://pypl.github.io/PYPL.html), and [IEEE](https://spectrum.ieee.org/the-top-programming-languages-2023).
+
+More than 25 years old: Java, JS, C, C++, Python, Java, Perl, PHP, Ruby, C#, SQL, Lua.
+
+Newer, but backed by a large corporation: Go, Rust, Swift, Dart, TS.
+
+Nix, Bash, Groovy, Matlab, SAS, and HTML are also high in some rankings.
+
+#impossible: Actual conversation:
+
+*Madness:* "The universe says it's impossible."
+
+*Evan:* "Yeah it's usually right about this stuff, and--"
+
+*Madness:* "The universe also called you a sissy little bitch."
+
+*Evan:* "--it isn't this time, the universe can shut the hell up and watch me!"
+</slice>
+
+
+
+<ignore>
+More than 25 years old:
+
+ * Java (1996)
+ * JS (1995)
+ * C++ (1985)
+ * Python (1991)
+ * Java: 1996
+ * Lua: 1993
+ * Perl: 1987
+ * JavaScript   
+ * PHP (1994)
+ * Ruby (1995)
+ * C (1972)
+ * C# (1999)
+ * SQL (1974)
+
+
+Backed by a megacorp:
+
+ * Go (2007)
+ * Rust (2015)
+ * Swift (2014)
+ * Dart (2010)
+ * TypeScript (2012)
+
+Built on an existing ecosystem:
+
+ * Scala (2004)
+ * Kotlin (2010)
+
+Found a niche:
+
+ * Lua (1993)
+
+???
+11  Nix   
+12  Shell   
+Groovy
+Matlab
+SAS
+HTML
+
+R 4.75 %  +0.3 %
+Objective-C 2.39 %  +0.3 %
+Matlab  1.47 %  -0.2 %
+VBA 0.96 %  +0.0 %
+Powershell  0.88 %  -0.1 %
+Ada 0.87 %  -0.3 %
+Scala 0.61 %  -0.1 %
+
+</ignore>
+
+
+<slice />
+
+
+# What would it look like?
+
+
+Our ultimate goal is to write this Vale code:
+
+```vale
+import rust.std.vec.Vec;
+
+exported func main() {
+  vec = Vec<int>.with_capacity(42);
+  println("Length: " + vec.capacity());
+}
+```stdout
+Length: 42
+```
+
+...which would successfully make a Rust `Vec` and call `capacity` on it. [#valeworks]
+
+
+But first thing's first: a proof-of-concept for C!
+
+
+In [the last post](https://verdagon.dev/blog/exploring-seamless-rust-interop-part-1), we talked about how C can treat Rust objects as *opaque types*, basically blobs of raw bytes that cannot be read directly.
+
+TL;DR: By treating them as opaque, our C code was able to *receive normal Rust objects* (without `repr(C)`) from normal Rust functions (without `no_mangle`). We then hand this unreadable data *back to other Rust functions* to manipulate it, extract data from it, or do other useful things with it.
+
+
+That was all under the hood, of course. With the proof-of-concept tool, the coder sees something more like this:
+
+
+```c
+#pragma rsuse VecInt = std::vec::Vec<u64>
+#pragma rsfn VecInt_with_capacity = VecInt::with_capacity
+#pragma rsfn VecInt_capacity = VecInt::capacity
+#pragma rsfn VecInt_drop = VecInt::drop
+#include "rust_deps/rust_deps.h"
+#include <stdio.h>
+
+int main() {
+  VecInt argv = VecInt_with_capacity(42);
+  printf("Capacity: %lu\n", VecInt_capacity(&argv));
+  VecInt_drop(argv);
+  return 0;
+}
+```stdout
+Capacity: 42
+```
+
+
+Under the hood, the tool automatically generates some Rust code, such as this definition for `VecInt`:
+
+```rust
+#[repr(C, align(8))]
+pub struct VecInt([u8; 24]);
+```
+
+and this definition for `VecInt_with_capacity`:
+
+```rust
+#[no_mangle]
+pub extern "C" fn VecInt_with_capacity(param_0_c: usize) -> VecInt {
+  let param_0_rs: usize = unsafe { mem::transmute(param_0_c) };
+  let result_rs: alloc::vec::Vec::<u64> =
+      alloc::vec::Vec::<u64>::with_capacity(param_0_rs);
+  let result_c: VecInt = unsafe { mem::transmute(result_rs) };
+  return result_c;
+}
+```
+
+...and then uses cbindgen to generate an equivalent C header into `"rust_deps/rust_deps.h"`.
+
+
+If you want to know more about that, check out [the last post](https://verdagon.dev/blog/exploring-seamless-rust-interop-part-1) that describes it a little more.
+
+
+However, the post very mysteriously left out the hardest part...
+
+
+How does the tool get the correct information from:
+
+```c
+#pragma rsuse VecInt = std::vec::Vec<u64>
+#pragma rsfn VecInt_with_capacity = VecInt::with_capacity
+```
+
+to be able to generate the above Rust code?
+
+
+<slice>
+#valeworks: We're actually surprisingly close to being able to do this today. Stay tuned!
+</slice>
+
+
+# Gathering type information
+
+Let's look at this line first:
+
+```c
+#pragma rsuse VecInt = std::vec::Vec<u64>
+```
+
+The tool needs to somehow generate this Rust code:
+
+```rust
+#[repr(C, align(8))]
+pub struct VecInt([u8; 24]);
+```
+
+
+It needs three pieces of information about `std::vec::Vec`:
+
+ * Its size: 24 bytes.
+ * Its alignment: 8 bytes. [#alignment] [# No matter where the object is, even across the FFI boundary, Rust should never see it at an address that doesn't line up with its alignment. Otherwise, we get bus errors and segmentation faults and other lovely phenomena.]
+ * Its real name: `alloc::vec::Vec` (we'll use this later).
+
+
+The tool gathers this information by running a small Rust program ([playground link](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=bc8bdf99d4c9dd67e4c1d2168bc491ae)) and reading the output:
+
+```rust
+fn main() {
+  println!(
+    "{} {} {}",
+    std::mem::size_of::<std::vec::Vec::<u64>>(),
+    std::mem::align_of::<std::vec::Vec::<u64>>(),
+    std::any::type_name::<std::vec::Vec::<u64>>());
+}
+```stdout
+24 8 alloc::vec::Vec<u64>
+```
+
+(That's actually a simplified version, here's a [more accurate example](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=72417e829aa73c67b3ef47bb9d817177))
+
+
+In other words, to be able to *build* our C program, our tool will first *run* this temporary Rust program. [# This is pretty slow. I'm hoping to speed it up with some nice caching, and maybe communicating directly to a subprocess running some sort of Rust REPL.]
+
+
+A little weird, but straightforward!
+
+
+Now, how does it generate the `VecInt_with_capacity` function we saw above?
+
+
+<slice>
+#alignment: "Alignment" describes some restrictions on where the type can be in memory.
+
+Most types need to be at an address that's a multiple of 8, like this one. 
+
+Some types can be at any address, like `char` or even `char[50]`.
+</slice>
+
+
+# Gathering function information
+
+Given this line:
+
+```
+#pragma rsfn VecInt_with_capacity = VecInt::with_capacity
+```
+
+The tool needs to generate this Rust code:
+
+```rust
+#[no_mangle]
+pub extern "C" fn VecInt_with_capacity(param_0_c: usize) -> VecInt {
+  let param_0_rs: usize = unsafe { mem::transmute(param_0_c) };
+  let result_rs: alloc::vec::Vec::<u64> =
+      alloc::vec::Vec::<u64>::with_capacity(param_0_rs);
+  let result_c: VecInt = unsafe { mem::transmute(result_rs) };
+  return result_c;
+}
+```
+
+
+To do that, it needs to know:
+
+ * The real name: `alloc::vec::Vec::<u64>::with_capacity`
+ * The return type: `alloc::vec::Vec::<u64>`
+ * The parameter types: `usize`
+
+
+These are actually pretty tricky to determine.
+
+
+I was hoping that I could just use `std::any::type_name` ([playground link](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=45f9de3596aea6b1658a655cb04e95e9)) or say this:
+
+```rust
+println!("fn {}", std::signature_of::<Vec<int>::with_capacity>());
+```
+
+But there is no `signature_of`, I just made that up.
+
+
+This is the part I left out of [the last post](/blog/exploring-seamless-rust-interop-part-1) because the path from here becomes treacherous... and the only way forward is too arcane, too terrible to consider.
+
+
+# A horrifying idea
+
+(Or, [skip to the final approach](#wisdom-prevails)!)
+
+
+I considered a few other options, such as using macros to search through functions, or using the [syn](https://docs.rs/syn/latest/syn/) crate... but neither of those approaches has access to the information we need.
+
+
+If we could just see all the functions for a given type, then perhaps we could search them for the correct overload, and print out their parameters.
+
+
+So I thought, *let's read rustc's MIR!*
+
+
+[MIR](https://rustc-dev-guide.rust-lang.org/mir/index.html) is `rustc`'s "Mid-level Intermediate Representation". `rustc` turns Rust source code into HIR, then MIR, then eventually, LLVM IR, which later gets turned into assembly code.
+
+
+If we could search through the Rust libraries' MIR, maybe we could find the right function and print its parameters out!
+
+
+<ignore>
+Like a more advanced version of our little temporary Rust program, we're going to make our tool:
+
+ * Figure out all the functions in a given crate.
+ * Choose the right one.
+ * Print out its arguments and return types.
+
+
+A worthy endeavor indeed!
+
+
+# Thus begins the descent into madness
+</ignore>
+
+
+# An even better horrifying idea
+
+But first, I [asked on the Rust discord server](https://discord.com/channels/273534239310479360/1120124565591425034/1226564863812305028) if that really was the best way to get all the structs and functions for a target crate.
+
+
+Luckily, *Helix/noop_noob* and *anden3* arrived and told me a much better solution: get rustdoc's JSON output and read it with [rustdoc_types](https://discord.com/channels/273534239310479360/1120124565591425034/1226573914256441455)!
+
+That's probably _way, way easier_ than reading MIR. To this day, I don't know if using MIR would have worked well.
+
+Bless these two heroes, and may their names ever live on in glory.
+
+
+Of course, I was then met with horrified reactions when I explained what I'd use it for.
+
+I hope they never learn of the dark sorcery they helped me unleash on this world.
+
+
+Let's be clear: `rustdoc` was *not made for this.* It was made to generate lovely HTML pages [like this one](https://doc.rust-lang.org/std/vec/struct.Vec.html). And even though it has JSON output, it's [not even stabilized](https://rust-lang.github.io/rfcs/2963-rustdoc-json.html), and organizes its information for, you know, _making documentation._
+
+What could go wrong?
+
+
+Anyway, I made the tool invoke `rustdoc` [# The command is something like `cargo rustdoc -Zunstable-options --output-format=json --package (crate_name)` but the process is a bit different to get the standard library's json.] and load the resulting JSON in with [rustdoc_types](https://discord.com/channels/273534239310479360/1120124565591425034/1226573914256441455) and serde.
+
+
+Then, the tool reads every single `fn`, `struct`, `impl`, `trait`, `type`, and `use` in every crate, and collects their relationships into a bunch of hash maps. [# `rustdoc`'s JSON output is nice and hierarchical, and the items often refer to each other by ID. The hash maps were more useful for the inverse relationships, and to figure out the best name to access a given type (for example, `regex::regex::string::Regex` is inaccessible; one must refer to it as `regex::Regex`.)] [# This was really slow, and I hope to find a way to skip this step, or cache the information, or generally make it faster.]
+
+
+<ignore>
+! *Bonus:* We'll also use this information later to integrate this with the Vale compiler!
+</ignore>
+
+
+# The quest begins!
+
+
+At first, things were pretty easy. [rustdoc_types::Function](https://docs.rs/rustdoc-types/latest/rustdoc_types/struct.Function.html) has pretty straightforward information:
+
+```rust
+pub struct Function {
+    pub decl: FnDecl, // Parameters, return types
+    pub generics: Generics, // <T>, where, etc.
+    pub header: Header, // const, unsafe, async, etc.
+    pub has_body: bool,
+}
+```
+
+
+It wasn't terribly hard to loop through all the functions and compare their types to the ones supplied by the user.
+
+
+Though, there were some tricky parts:
+
+ * To find a struct's method, we need to find all `impl`s for that struct, and look through all of them.
+ * Sometimes, a struct's method is defined in a different crate entirely. [# Such as when a third-party `trait` has an `impl` for a pre-existing struct, and defines methods in that `impl` block.]
+ * Types often didn't know that they were using the [default drop method](https://doc.rust-lang.org/std/ops/trait.Drop.html).
+ * `_Unwind_Reason_Code` and some things in `std::detect` are referenced but somehow don't exist.
+
+
+But it all worked! [# Well, not entirely, I'm taking some creative liberties to make the story more understandable. Below, I talk about how the tool later needs to evaluate some generics. Right here is where we _actually_ started evaluating generics.]
+
+
+At least, until I tried this line:
+
+`#pragma rsfn OsString_from_str = std::ffi::OsString::from`
+
+...which made the program burst into flames.
+
+
+Why's that?
+
+Because there are multiple overloads for the `OsString::from` function!
+
+The tool couldn't figure out which to use.
+
+
+
+# Rust Function Overloads
+
+Some already know about [function overloading in Rust](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=3881a0e70cea011977196420fb6ffd14), but for those unfamiliar with the term, [Wikipedia](https://en.wikipedia.org/wiki/Function_overloading) says:
+
+> Function overloading is the ability to create multiple functions of the same name with different implementations. Calls to an overloaded function will run a specific implementation of that function appropriate to the context of the call, allowing one function call to perform different tasks depending on context. 
+
+
+And unfortunately for us, that's exactly what's happening here with the `from` method.
+
+
+You see, *we actually want to call this* `from` method at [os_str.rs:1595](https://github.com/rust-lang/rust/blob/f1586001ace26df7cafeb6534eaf76fb2c5513e5/library/std/src/ffi/os_str.rs#L1595):
+
+```rust
+impl<T: ?Sized + AsRef<OsStr>> From<&T> for OsString {
+    fn from(s: &T) -> OsString {
+        s.as_ref().to_os_string()
+    }
+}
+```
+
+...because our `&str` is a kind of `AsRef<OsStr>`, as specified by [os_str.rs:574](https://github.com/rust-lang/rust/blob/f1586001ace26df7cafeb6534eaf76fb2c5513e5/library/std/src/ffi/os_str.rs#L574):
+
+```rust
+impl AsRef<OsStr> for str {
+    ...
+}
+```
+
+
+*However, we _don't_ want to call this* `from` function at [os_str.rs:563](https://github.com/rust-lang/rust/blob/f1586001ace26df7cafeb6534eaf76fb2c5513e5/library/std/src/ffi/os_str.rs#L563) which makes an `OsString` from a `String`:
+
+```rust
+impl From<String> for OsString {
+  fn from(s: String) -> OsString {
+    OsString { inner: Buf::from_string(s) }
+  }
+}
+```
+
+
+*And we also don't want to call this* `from` function at [convert/mod.rs:765](https://github.com/rust-lang/rust/blob/f1586001ace26df7cafeb6534eaf76fb2c5513e5/library/core/src/convert/mod.rs#L765), which can turn any `T` into itself:
+
+```rust
+impl<T> From<T> for T {
+  fn from(t: T) -> T {
+    t
+  }
+}
+```
+
+For clarity, here's that last one again, but replacing `T` with `OsString`:
+
+```rust
+impl From<OsString> for OsString {
+  fn from(t: OsString) -> OsString {
+    t
+  }
+}
+```
+
+
+In other words, there are three overloads:
+
+ * `OsString::from(t: OsString)`
+ * `OsString::from(s: String)`
+ * `OsString::from(s: T) where T: ?Sized + AsRef<OsStr>`
+
+
+
+I concluded that when there are multiple overloads, the user *can't say this anymore:*
+
+`#pragma rsfn OsString_from_str = std::ffi::OsString::from`
+
+They must be *more specific:* [# Instead of `From<&str>::from`, we could have the user say `from(&str)`. I eventually did make that switch, but at the time `From<&str>::from` made more sense since it was easier for the generics substitution code.]
+
+`#pragma rsfn OsString_from_str = std::ffi::OsString::From<&str>::from`
+
+...and then our tool can narrow down the right overload somehow.
+
+
+<slice/>
+
+
+# The descent into madness
+
+It looked impossible. But I had an idea... an insane idea.
+
+
+Sometimes, when the universe tells you something is too crazy to work, you just can't resist the urge to call its bluff.
+
+And sometimes, you know that [if you make a solution horrifying enough](https://meta.wikimedia.org/wiki/Cunningham%27s_Law), it will inspire a legion of internet-goers to come up with something better.
+
+So now here we stand, on the edge of sanity, knowing that the only path forward is through a forest of madness and a fiery chasm of _sheer and utter folly._
+
+
+*Let's implement some Rust overload resolution logic!*
+
+And to do that, let's evaluate some generics too!
+
+You'll see what I mean below.
+
+
+# Implementing overload resolution and generics
+
+Remember, the tool has access to a lot of information. It knows about every `struct`, `fn`, `trait`, `impl`, and so on.
+
+So why not use that information to narrow down which function we're calling?
+
+
+For example, when the tool encounters this line:
+
+`#pragma rsfn OsString_from_str = std::ffi::OsString::From<&str>::from`
+
+Let's make it figure out which `impl` we're referring to as `From<&str>`.
+
+
+To do that, the tool loops through all the `impl`s for `std::ffi::OsString`. [# It could theoretically use the [rustdoc_types::Struct](https://docs.rs/rustdoc-types/latest/rustdoc_types/struct.Struct.html)s' `.impls` and [rustdoc_types::Trait](https://docs.rs/rustdoc-types/latest/rustdoc_types/struct.Trait.html)s' `.implementations` lists, but sometimes this didn't actually work, so I had to loop through all `impl`s in all crates. I'm pretty sure that I could get it working without that looping, but it's all moot now, luckily.]
+
+
+It encounters [os_str.rs:1595](https://github.com/rust-lang/rust/blob/f1586001ace26df7cafeb6534eaf76fb2c5513e5/library/std/src/ffi/os_str.rs#L1595)'s `impl`, repeated here:
+
+```rust
+impl<T: ?Sized + AsRef<OsStr>> From<&T> for OsString {
+    fn from(s: &T) -> OsString {
+        s.as_ref().to_os_string()
+    }
+}
+```
+
+
+First, it *attempts to match* the user's `From<&str>` against the impl's `From<&T>`.
+
+
+It succeeds, and along the way it *figured out the impl's generic parameters*, specifically that `T` = `str`.
+
+
+Finally, it *figures out the function's parameters.* With `T` = `str`, it becomes:
+
+```
+    fn from(s: &str) -> OsString {
+```
+
+It then adds this to the final list of "eligible functions", hoping that we'll end up with only one.
+
+
+Continuing on, the tool sees the next `impl` from [os_str.rs:563](https://github.com/rust-lang/rust/blob/f1586001ace26df7cafeb6534eaf76fb2c5513e5/library/std/src/ffi/os_str.rs#L563):
+
+```rust
+impl From<String> for OsString {
+  fn from(s: String) -> OsString {
+    OsString { inner: Buf::from_string(s) }
+  }
+}
+```
+
+And it properly rejects it because the user's `From<&str>` doesn't match this `From<String>`.
+
+
+Continuing on, the tool sees the next `impl` from [convert/mod.rs:765](https://github.com/rust-lang/rust/blob/f1586001ace26df7cafeb6534eaf76fb2c5513e5/library/core/src/convert/mod.rs#L765):
+
+```rust
+impl<T> From<T> for T {
+  fn from(t: T) -> T {
+    t
+  }
+}
+```
+
+And with some clever logic, [#adjustments] our process can properly reject this one too.
+
+
+We're left with one surviving overload. Success!
+
+
+<slice>
+#adjustments: It worked, but my implementation here was pretty bad. It actually approved this overload, and then I had some tiebreaker logic to choose which overload "matched better".
+
+It worked, but I knew even then that this was somewhat incorrect and definitely wouldn't scale to Rust's full complexity.
+
+The actual good approach I leave as an exercise to the reader!
+</slice>
+
+
+<ignore>
+And I came across the _weirdest_ cases!
+
+
+Did you know that you can convert a `!` type to anything? [# This is a "never" type, and it's the type of a `throw` statement in Scala or a `panic` in Vale or Rust.]
+
+Behold [line 782 of convert/mod.rs!](https://github.com/rust-lang/rust/blob/f1586001ace26df7cafeb6534eaf76fb2c5513e5/library/core/src/convert/mod.rs#L782)
+
+```
+impl<T> From<!> for T {
+    fn from(t: !) -> T {
+        t
+    }
+}
+```
+</ignore>
+
+
+<ignore>
+Also, for a while, I thought I could ignore the `&` and `&mut` on the types, and overload them based on just their ultimate "pointed at" type (e.g. `String` instead of `&String`). Then I discovered [alloc/src/vec/mod.rs](https://github.com/rust-lang/rust/blob/f1586001ace26df7cafeb6534eaf76fb2c5513e5/library/alloc/src/vec/mod.rs#L3334) which had:
+
+```
+impl<T: Clone> From<&mut [T]> for Vec<T> {
+    fn from(s: &mut [T]) -> Vec<T> {
+        s.to_vec()
+    }
+}
+
+impl<T: Clone> From<&[T]> for Vec<T> {
+    fn from(s: &[T]) -> Vec<T> {
+        s.to_vec()
+    }
+}
+```
+
+
+Oh, and by the way, there are sometimes functions that have the _exact same signature;_ there's a normal `fn from(s: &[T]) -> Vec<T>` with `#[cfg(not(test))]` and another one for testing (`#[cfg(test)]`).
+</ignore>
+
+
+But let's take a step back, and recognize just how _cursed_ this whole thing is.
+
+It's complex: the generics and overload resolution logic, and all of their supporting infrastructure, is something like 1,700 lines of rather intricate code.
+
+To make it solid enough to merge into the main branch, it could end up anywhere between 12,000 [# After I finished handling all the weird edge cases, I'd still have to optimize, and then add tests, comments, and documentation.] and [1,000,000 lines](https://users.rust-lang.org/t/build-from-actual-source/84277/12), depending on the temperaments of various deities.
+
+
+<img src="https://i.imgflip.com/8twhkv.jpg" style="max-width: 400px; width: 100%; margin: auto; display: block;"/>
+
+
+And handling generics is a lot more perilous than I made it sound.
+
+If you don't believe me, know that above, we didn't even check to see if our `&str` matched the predicate `?Sized + AsRef<OsStr>`. We also didn't deal with [conditionally compiled functions](https://github.com/rust-lang/rust/blob/f1586001ace26df7cafeb6534eaf76fb2c5513e5/library/alloc/src/vec/mod.rs#L3354) or [whatever the heck this thing is](https://github.com/rust-lang/rust/blob/f1586001ace26df7cafeb6534eaf76fb2c5513e5/library/core/src/convert/mod.rs#L782). [#never]
+
+
+Plus, as I got it working for more and more test cases, the number of `unimplemented!()` markers in the code didn't lessen... it only grew larger and larger.
+
+
+So, despite all the fun I was having, I was getting _slightly worried_ about this endeavor.
+
+
+<slice>
+#never: I'm kidding, this is a *bottom type* like Scala's [Nothing](https://www.scala-lang.org/api/2.13.3/scala/Nothing.html) or Vale's `Never`.
+
+Like an imaginary number, no instances of this ever exist.
+
+It's a type that can be converted to anything.
+
+Interesting things happen when you consider a `throw`, `return`, `break`, or `continue` to result in this type.
+</slice>
+
+
+# Wisdom prevails
+
+Let's travel back in time a bit.
+
+Before I even started with this overload resolution, I knew what I was getting into.
+
+After all, I've implemented seven different iterations of generics and overload resolution for Vale, each larger and more powerful than the last.
+
+
+Back then, I _knew in my bones_ that I was standing on the edge of sanity, and the only path forward was through that forest of madness and that fiery chasm of sheer and utter folly and so on. [#withstyle]
+
+
+So before I started implementing it, I also [lit the beacons](https://www.reddit.com/r/AskHistorians/comments/rzi7go/were_fire_signals_actually_used_like_in_lord_of/) and *called for aid.*
+
+
+In other words, I [posted on the Rust internals forum](https://internals.rust-lang.org/t/different-way-to-call-into-rust-from-other-languages/20912), sent a couple emails, and even tried baiting a better solution out of everyone in [the last post](https://verdagon.dev/blog/exploring-seamless-rust-interop-part-1):
+
+> "The tool comes out to 3,200 lines, and most of it is this step. ... This part is ridiculously hard. If you have an idea how you'd do it, let me know, because it's probably better than what I did!"
+
+
+Unfortunately, nobody had a better approach, which meant using `rustdoc` was the only way forward.
+
+
+Eventually, I'd gotten the overload resolution working for over half the test cases.
+
+
+Then, I got a reply to one of my emails!
+
+
+# A better solution: Rust sorcery!
+
+The reply was from Alex Kladov, also known as [matklad](https://matklad.github.io/), the author of rust-analyzer and IntelliJ Rust. He's also working on TigerBeetle (a Zig database which has a [really cool approach to handling memory](https://tigerbeetle.com/blog/a-database-without-dynamic-memory) by the way), and he's the MVP of this post. [# I really want to call him "matklad the madlad", but he's probably heard that a hundred times already.]
+
+
+He suggested that I do the following magic ([playground link](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=d594a4ddd8e9d233c02d4a7742617055)):
+
+```rust
+trait Reflect<Args> {
+    fn reflect();
+}
+
+fn reflect<T: Reflect<Args>, Args>(_: T) {
+    T::reflect()
+}
+
+impl <F, T> Reflect<(T,)> for F where F: Fn(T) {
+    fn reflect() {
+        println!("1 {}", std::mem::size_of::<T>())
+    }
+}
+
+impl <F, T, U> Reflect<(T, U, )> for F where F: Fn(T, U) {
+    fn reflect() {
+        println!("1 {} {}", std::mem::size_of::<T>(), std::mem::size_of::<U>())
+    }
+}
+
+fn main() {
+    reflect(Vec::<std::ffi::OsString>::clear);
+    reflect(Vec::<std::ffi::OsString>::push);
+}
+```stdout
+1 8
+1 8 24
+```
+
+
+This code takes a function (such as `Vec<OsString>::push`) and figures out what kind of `Fn` trait it implements and what kind of arguments it takes.
+
+
+I then expanded it to [this code](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=c3c8f5500ab688ec281f45befdee32bd) which also prints out the function's real name and return type too.
+
+
+And it worked! By the time this Rust-based solution passed the fourth test case, I was celebrating.
+
+
+# More function overloading troubles
+
+Unfortunately, this approach _also_ had trouble with overloaded functions.
+
+
+Remember this line?
+
+`#pragma rsfn OsString_from_str = std::ffi::OsString::from`
+
+This is the line that originally caused the `rustdoc`-based solution to have overload resolution and generics-resolving logic.
+
+
+Our new Rust-based solution generates this line, which [Rust doesn't like](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=04df849f3431ef6e6dee77c116e538a5):
+
+`reflect(std::ffi::OsString::from);`
+
+
+
+I tried all sorts of things:
+
+```rust
+reflect(std::ffi::OsString::From<&str>::from);`
+
+reflect(std::ffi::OsString::from::<&str>);`
+
+type FromStrToOsString = fn(&str) -> OsString;
+let thing: FromStrToOsString = OsString::from;
+reflect(thing);
+```
+
+...but nothing worked.
+
+
+So, hope dashed, I resumed the `rustdoc`-based solution, with all its complex overload-resolution and generics-resolving logic.
+
+
+<slice>
+#withstyle: A beginner engineer will do stupid things.
+
+A master engineer will do those same stupid things, but consciously and with _style._
+</slice>
+
+# Persistence
+
+But a good engineer never gives up on finding a simpler solution!
+
+
+So, in parallel with finishing the `rustdoc`-based solution, I was still trying to make the Rust-based solution work for overloaded functions.
+
+
+Finally, on the fourth day of this whole quest, I was able to make a function that *selects the correct overload* for a given function ([playground link](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=47ae6b706dbd46efa338dbf3ce761915)).
+
+```rust
+fn select_overload_1<R, P1>(thing: impl Fn(P1) -> R + PrintFn<(R, P1, )>)
+-> impl Fn(P1) -> R + PrintFn<(R, P1,)> {
+    thing
+}
+```
+
+It could be called like this:
+
+```rust
+print_fn(select_overload_1::<_, &str>(std::ffi::OsString::from));
+```
+
+
+That's it! A mere few lines, to do what my 3,200 line prototype struggled with.
+
+Truly, it is a strange fate that we should suffer so much over so small a thing.
+
+
+Huge thanks to Alex for providing the foundation for this eventual solution!
+
+
+*Moral of the story:* always be searching for a simpler approach than the one you're currently implementing. [#bettermoral]
+
+
+Luckily, this meant that I could delete all of the complex overload resolution and generics logic in the tool.
+
+I have never been so relieved to delete thousands of lines!
+
+
+And as it turns out, a lot of the `rustdoc` infrastructure will actually come back for some of the Vale integration, so this cursed endeavor wasn't _completely_ fruitless.
+
+On top of that, it's good to know just _how far_ we can take this `rustdoc` information. The implications for code generation are pretty huge. I could imagine some of you will read all this and think of some equally insane uses for this kind of power.
+
+
+<slice>
+#bettermoral: Or a better moral: once you call for aid, wait a while before giving up and diving into an insane solution!
+
+If I had just worked on something else for a week, that would have saved me this ridiculous side quest (which I admit was actually quite fun).
+</slice>
+
+# Update: An even better solution!
+
+And then, after reading this very post, *literallyvoid* found a simple one-line solution:
+
+```rust
+print_fn(<std::ffi::OsString as From<&str>>::from);
+```
+
+
+Is that even valid Rust syntax? Apparently! [# If you're interested in this syntax's purpose, check out [this post](https://www.reddit.com/r/Compilers/comments/1di0con/comment/l90x89j/) by u/matthieum!]
+
+
+And I bet a few you already know about this, and you've been _dying_ this entire time, reading about this cursed side-quest! That makes me chuckle.
+
+
+Huge thanks to literallyvoid, for seeing the solution that so many of us didn't!
+
+
+
+<ignore>
+# Indirectly Public Types
+
+I have a test case which uses the [regex crate](https://docs.rs/regex/latest/regex/).
+
+TODO: ADD TEST CASE LINK
+
+It has a line like this:
+
+```
+#pragma rsuse Regex = regex::Regex
+```
+
+The tool generates some code:
+
+```
+print_type::<regex::Regex>();
+```
+
+and it prints this out:
+
+```
+32 8 regex::regex::string::Regex
+```
+
+Interesting... it seems the regex crate is structured to publicly re-export everything inside the `regex::regex::string` crate, so that we can use it more directly, like `regex::Regex`.
+
+
+The tool then generates some functions, such as `Regex::drop`:
+
+```
+#[no_mangle]
+pub extern "C" fn Regex_drop(param_0_c: Regex) {
+  let param_0_rs: regex::regex::string::Regex =
+      unsafe { mem::transmute(param_0_c) };
+  ...
+}
+```
+
+Unfortunately, `rustc` gives an error saying module `regex::regex` is private, and that I should change `regex::regex::string::Regex` to its public name, `regex::Regex`.
+
+
+"Just use the public name like a normal person!", says rustc.
+
+"I CAN'T! I DON'T KNOW THE PUBLIC NAME!" [I calmly say back.](https://i.imgflip.com/8tt2zf.jpg)
+
+"You do! The user literally typed in `regex::Regex`!", it says.
+
+
+Unfortunately, there are times when we need to generate code for types the user doesn't mention.
+
+
+So now, the tool reads rustdoc JSON again, to figure out the public name for any given type. Luckily, that part isn't too complex.
+
+
+! If anyone knows an easy way to get the public name for something, let me know! I'd love to remove this rustdoc JSON processing logic.
+</ignore>
+
+
+<slice />
+
+
+# The final approach
+
+I emerge, battered and bloody, not sure what curséd arcana I've wrought. 
+
+But it works! And it does it without _too_ much complexity. [# Well, it's still a lot of moving parts. But at least it's not as complex as it was.]
+
+
+In the end, it:
+
+ * Reads all the `#pragma rsuse` lines from a given C file.
+ * Generates a temporary Rust program [which looks like this](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=08edd0c16bd7dffb60b1cdd3d873801e) to print types' names and sizes and alignments, and functions' names and parameters and returns.
+ * Invokes `cargo run` on the temporary program to gather its output.
+ * Until I can remove it, still uses information from `cargo rustdoc` to correct some user-given type names. [# Specifically, it needs to [figure out the correct public names](https://i.imgflip.com/8tt2zf.jpg) (e.g. `regex::Regex`) for private types (`regex::regex::string::Regex`). I think we can get rid of it if we require the user to specifically mention the public name for every private type they indirectly use, but that might not be good UX.]
+ * Generates a Rust library that will allow C to call into the Rust functions, using the technique from [the last post](https://verdagon.dev/blog/exploring-seamless-rust-interop-part-1).
+
+
+That's it! You now know the tool's secret rituals for crossing the impossible boundary between Rust and C.
+
+
+If you're curious, the [code is here](https://github.com/Verdagon/Vale/tree/iso/ValeRuster) (but be warned, it's not cleaned up yet). [# There's also some vestiges of the old overload resolution and generics logic in there, though I've managed to remove most of it.] [# The `src` folder contains the canonical code, but I moved the old approach to `original` because I'll be reusing some of it for the next steps.]
+
+
+I don't have any specific plans to turn this C proof-of-concept into a production-quality tool that would enable calling Rust from C, but if anyone wants to take it from here, I'd be happy to assist!
+
+
+From here, the next step is to finish integrating this tool into Vale, so that we can accomplish the original goal:
+
+```vale
+import rust.std.vec.Vec;
+
+exported func main() {
+  vec = Vec<int>.with_capacity(42);
+  println("Length: " + vec.capacity());
+}
+```stdout
+Length: 42
+```
+
+
+We're closer than you might think! [#closer]
+
+
+<slice>
+#closer: Only two pieces remain!
+
+ * Generating the right Vale `extern struct` and `extern func` declarations, the ones in the current Vale test cases were made manually.
+ * We can call `Vec<int>.with_capacity(42)`, and also `Vec<int>.capacity(vec)`, but not `vec.capacity()` yet.
+</slice>
+
+
+# A veil, a ritual, and a leather-bound tome
+
+
+[The last post](https://verdagon.dev/blog/exploring-seamless-rust-interop-part-1) showed how we use opaque types to "directly" call into Rust functions.
+
+
+And then this post talked about how we used some arcane Rust generics to select the correct functions and structs, and gather information about them.
+
+
+However, there are still *some unanswered questions:*
+
+ 1. If our language defines `OurStruct`, how would Rust create a `Vec<OurStruct>` when `rustc` doesn't know anything about `OurStruct`, like how big it is?
+ 1. If calling from a language without a borrow checker, how do we uphold the Rust code's memory safety guarantees?
+ 1. In the case of Vale, how do we uphold other guarantees that Rust doesn't respect, like [higher RAII](/blog/higher-raii-uses-linear-types), [fearless FFI](https://verdagon.dev/blog/fearless-ffi), determinism, and [perfect replayability](https://verdagon.dev/blog/perfect-replayability-prototyped)?
+
+
+The keys to these questions lie deep in [the grimoire](/grimoire/grimoire), hidden to the untrained eye.
+
+
+We'll talk about them in the next post!
+
+
+<slice />
+
+
+# Thank you!
+
+
+A lot of people helped make this happen:
+
+ * Huge thanks to *Alex Kladov* ([matklad](https://matklad.github.io/)), who showed me the basic Rust sorcery that let us print out functions' arguments and return types. Without Alex's help, this would still be a complex beast!
+ * Thank you to *Helix/noop_noob* and *anden3* from the Rust discord server, for telling me about rustdoc's JSON output!
+ * And another big thanks to Jeff Niu, [snej](https://lobste.rs/s/0iskz9/exploring_seamless_rust_interop_for#c_29igsc), [kornel](https://internals.rust-lang.org/t/different-way-to-call-into-rust-from-other-languages/20912/2?u=verdagon), and [bjorn3](https://bjorn3.github.io/about/) for fixes and advice on how to correctly use these opaque types with FFI!
+
+
+With all our powers combined, we might cross this impossible FFI boundary, and make it so languages worldwide can call into Rust code much more easily.
+
+
+That's all!
+
+
+If you have any questions, always feel free to reach out via [email](mailto:verdagon_epsa@verdagon.dev), [twitter](https://twitter.com/verdagon), the [discord server](https://discord.gg/SNB8yGH), or the [subreddit](https://reddit.com/r/vale).
+
+
+Onward!
+
+
+*- Evan Ovadia*
+
+
+PS. If you enjoyed reading this, consider [buying an adorable snow bird plushie](https://www.etsy.com/listing/1722406930/snowbird-keychain-with-wings?click_key=5ca56adea54d4b16c3141eb85099d05e7d95e3d9%3A1722406930&click_sum=be0cebdf&ref=shop_home_active_1&frs=1&crt=1) from my partner's [etsy store](https://www.etsy.com/shop/SnowForestStudio)!
+
+<<<<
+<img src="/images/snow-bird-2.jpeg" style="width: 100%; display: inline-block;"/>
+////
+<img src="/images/snow-bird-1.jpeg" style="width: 100%; display: inline-block;"/>
+>>>>
+
+She broke free from big tech to chase her dream of sharing cute birds with the world, so I'd love it if her little shop takes off!
+
+
+
+
+<slice new-color="afterword"/>
+
+# Thank you!
+
+I want to give a huge thanks to [Arthur Weagel](https://github.com/aweagel), [Kiril Mihaylov](https://github.com/KirilMihaylov), [Radek Miček](https://github.com/radekm), [Geomitron](https://github.com/Geomitron), [Chiuzon](https://github.com/chiuzon), [Felix Scholz](https://github.com/soupertonic), [Joseph Jaoudi](https://github.com/linkmonitor), [Luke Puchner-Hardman](https://github.com/lupuchard), [Jonathan Zielinski](https://github.com/tootoobeepbeep), [Albin Kocheril Chacko](https://github.com/albinkc), [Enrico Zschemisch](https://github.com/ezschemi), [Svintooo](https://github.com/Svintooo), [Tim Stack](https://github.com/tstack), [Alon Zakai](https://github.com/kripken), [Alec Newman](https://github.com/rovaughn), [Sergey Davidoff](https://github.com/Shnatsel), [Ian (linuxy)](https://github.com/linuxy), [Ivo Balbaert](https://github.com/Ivo-Balbaert/), [Pierre Curto](https://github.com/pierrec), [Love Jesus](https://github.com/loveJesus), [J. Ryan Stinnett](https://github.com/jryans), [Cristian Dinu](https://github.com/cdinu), and [Florian Plattner](https://github.com/lasernoises) (plus a very generous anonymous donor!) for sponsoring Vale over all these years.
+
+Your support has always given me the strength and resolve to explore these arcane corners of the world. And even though I'm not doing sponsorships for a while, it's awesome to know you're with me in spirit. [Axes high!](http://www.gamesurge.com/pc/strategy/pc_wt/Adom.shtml)

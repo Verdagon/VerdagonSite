@@ -1,0 +1,1027 @@
+---
+title: Argument Ref Paths / View Types (DRAFT)
+author: Evan Ovadia
+date: November 51, 2025
+realm: blog
+path: blog/impossible-optimization
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+(this was extracted from [this post draft](/blog/mojo-memory-safety))
+
+
+# Where this could go: Argument Paths
+
+There are still problems to solve, of course.
+
+
+We've enabled local mutable aliasing, and we have return ref origin paths to help us with local mutable aliasing, but there's a gap: we aren't able to extract out helper functions anymore.
+
+
+For example, if we start with this:
+
+
+<ignore>
+```mojo
+@fieldwise_init
+struct Wing(Copyable, Movable):
+    var span: Int
+
+@fieldwise_init
+struct Tail(Copyable, Movable):
+    var length: Int
+
+@fieldwise_init
+struct Bird:
+    var left: Wing
+    var right: Wing
+    var tail: Tail
+
+    fn get_weight(self):
+        return left.span + right.span + tail.length
+
+fn main():
+    var bird = Bird(Wing(10), Wing(20), Tail(15))
+    ref tail_ref = bird.tail
+    tail_ref.length += bird.get_weight()
+```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #c9d1d9">@</span><span style="color: #d2a8ff">fieldwise&#95;init</span>
+<span style="color: #ff7b72">struct</span><span style="color: #c9d1d9"> </span><span style="color: #ffa657">Wing</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">Copyable</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Movable</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">span</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span>
+<span></span>
+<span style="color: #c9d1d9">@</span><span style="color: #d2a8ff">fieldwise&#95;init</span>
+<span style="color: #ff7b72">struct</span><span style="color: #c9d1d9"> </span><span style="color: #ffa657">Tail</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">Copyable</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Movable</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">length</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span>
+<span></span>
+<span style="color: #c9d1d9">@</span><span style="color: #d2a8ff">fieldwise&#95;init</span>
+<span style="color: #ff7b72">struct</span><span style="color: #c9d1d9"> </span><span style="color: #ffa657">Bird</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">left</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Wing</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">right</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Wing</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">tail</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Tail</span>
+<span></span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">get&#95;weight</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">self</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">return</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">left</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">span</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">+</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">right</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">span</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">+</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">tail</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">length</span>
+<span></span>
+<span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">main</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">Bird</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">Wing</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">10</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">Wing</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">20</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">Tail</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">15</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">ref</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">tail&#95;ref</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">tail</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">tail&#95;ref</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">length</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">+=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">get&#95;weight</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span></code></pre>
+
+
+...and we try to split the `main` into two functions:
+
+
+<ignore>
+```mojo
+fn main():
+    var bird = Bird(Wing(10), Wing(20), Tail(15))
+    ref tail_ref = bird.tail
+    evolve(bird, tail_ref)
+
+fn evolve(bird: Bird, mut tail_ref: Tail):
+    tail_ref.length += bird.get_weight()
+```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">main</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">Bird</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">Wing</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">10</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">Wing</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">20</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">Tail</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">15</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">ref</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">tail&#95;ref</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">tail</span>
+<span style="color: #c9d1d9">    </span><span style="color: #d2a8ff">evolve</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">bird</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">tail&#95;ref</span><span style="color: #c9d1d9">)</span>
+<span></span>
+<span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">evolve</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">bird</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Bird</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> mut </span><span style="color: #79c0ff">tail&#95;ref</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Tail</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">tail&#95;ref</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">length</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">+=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">get&#95;weight</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span></code></pre>
+
+
+we unfortunately get this error:
+
+
+<ignore>
+```mojo
+fn main():
+    var bird = Bird(Wing(10), Wing(20), Tail(15))
+    ref tail_ref = bird.tail
+
+    # error: argument of 'evolve' call allows writing a memory location previously readable through another aliased argument
+    evolve(bird, tail_ref)
+    #     ^~~~~  ~~~~~~~~
+    # note: 'bird.tail' value is passed through aliasing 'mut' argument
+
+fn evolve(bird: Bird, mut tail_ref: Tail):
+    tail_ref.length += bird.get_weight()
+```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">main</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">Bird</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">Wing</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">10</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">Wing</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">20</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">Tail</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">15</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">ref</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">tail&#95;ref</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">tail</span>
+<span></span>
+<span style="color: #c9d1d9">    </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> error: argument of &#039;evolve&#039; call allows writing a memory location previously readable through another aliased argument</span>
+<span style="color: #c9d1d9">    </span><span style="color: #d2a8ff">evolve</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">bird</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">tail&#95;ref</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">    </span><span style="color: #8b949e">#</span><span style="color: #8b949e">     ^~~~~  ~~~~~~~~</span>
+<span style="color: #c9d1d9">    </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> note: &#039;bird.tail&#039; value is passed through aliasing &#039;mut&#039; argument</span>
+<span></span>
+<span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">evolve</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">bird</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Bird</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> mut </span><span style="color: #79c0ff">tail&#95;ref</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Tail</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">tail&#95;ref</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">length</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">+=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">get&#95;weight</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span></code></pre>
+
+
+As far as I know, this is the only time we can't extract a local scope into a helper function.
+
+
+In this way, Mojo _code_ can have mutable aliasing, but Mojo _programs_ do not. Mojo programs will largely be shaped like Rust programs, because this benefit is foiled at function call boundaries.
+
+
+Luckily, there is a way we can express this to the compiler nicely.
+
+
+"Aha! Is the answer that we make `evolve` take in a single argument `mut bird: Bird`?"
+
+Good question! But no, that's not what I'm talking about. That does work in simple cases, but it doesn't scale well: when we try that workaround on anything larger than a simple function, we incur extra complexity, performance problems, and architectural risks.
+
+
+Before I explain the real solution, I'll show you those scaling problems with a couple examples: one from a simple game, and one from Google Earth.
+
+
+Buckle up, because this blog is about to live up to its name!
+
+
+(Or you can [skip to the real solution](#argument-paths))
+
+
+## Example: A Simple Game
+
+Let's take this example.
+
+In a little roguelike game, we might have a `plan` method that is purely for the `Entity` to re-orient themselves, and figure out what they want to do (but not actually do it yet).
+
+
+Here's the `plan` method, plus the structs it interacts with.
+
+There's a certain problem with it, which I'll explain below.
+
+
+<ignore>
+```mojo
+struct PursueDirective:
+    enemy_id: Int
+    enemy_last_seen_loc: Location
+    path: List[Location]
+
+struct LoiterDirective: pass  # empty
+
+alias Directive = Variant[LoiterDirective, PursueDirective]
+
+struct Entity:
+    loc: Location
+    is_blinded: Bool
+    directive: Directive
+
+struct World:
+    entities: List[Entity]
+    tiles: List[List[Entity]]
+
+
+# Entity looks around and thinks and decides their objective
+fn plan(read world: World, mut entity: Entity):
+    # If there's an existing directive, check it and see if it even makes sense anymore.
+    # In which case, set to loiter.
+    match entity.directive:
+        case LoiterDirective as walk:
+            pass
+        case PursueDirective as pursue:
+            enemy_loc = world.entities[enemy_id].loc
+
+            if can_see_loc(world, entity, enemy_loc):
+                pursue.enemy_last_seen_at = enemy_loc
+                # Store the path to the enemy. Keep the path around so we
+                # have something to follow if we lose sight of the enemy.
+                pursue.path = find_path(entity.loc, enemy_loc)
+                if len(pursue.path) == 0:
+                    # We see them but can't get to them, abort.
+                    entity.directive = LoiterDirective()
+                if not world.tiles[pursue.path[0]].walkable:
+                    # Next step is unwalkable for some reason, abort.
+                    entity.directive = LoiterDirective()
+                else: # There's a path to the enemy!
+                    pass # Keep pursuing!
+            else: # Can't see the player.
+                if entity.loc == pursue.enemy_last_seen_at:
+                    # We reached where we last saw them. Give up.
+                    entity.directive = LoiterDirective()
+                else:
+                    pass # Keep pursuing!
+    ...
+
+fn can_see_loc(world: World, entity: Entity, loc: Location) -> Bool:
+    return (
+        not is_blinded(entity) and
+        has_line_of_sight(world, entity.loc, loc)
+    )
+```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">struct</span><span style="color: #c9d1d9"> </span><span style="color: #ffa657">PursueDirective</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">enemy&#95;id</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">enemy&#95;last&#95;seen&#95;loc</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Location</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">path</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">List</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">Location</span><span style="color: #c9d1d9">]</span>
+<span></span>
+<span style="color: #ff7b72">struct</span><span style="color: #c9d1d9"> </span><span style="color: #ffa657">LoiterDirective</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">pass</span><span style="color: #c9d1d9">  </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> empty</span>
+<span></span>
+<span style="color: #ff7b72">alias</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Directive</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Variant</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">LoiterDirective</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">PursueDirective</span><span style="color: #c9d1d9">]</span>
+<span></span>
+<span style="color: #ff7b72">struct</span><span style="color: #c9d1d9"> </span><span style="color: #ffa657">Entity</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">loc</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Location</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">is&#95;blinded</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Bool</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">directive</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Directive</span>
+<span></span>
+<span style="color: #ff7b72">struct</span><span style="color: #c9d1d9"> </span><span style="color: #ffa657">World</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">entities</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">List</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">Entity</span><span style="color: #c9d1d9">]</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">tiles</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">List</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">List</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">Entity</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">]</span>
+<span></span>
+<span></span>
+<span style="color: #8b949e">#</span><span style="color: #8b949e"> Entity looks around and thinks and decides their objective</span>
+<span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">plan</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">read </span><span style="color: #79c0ff">world</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">World</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> mut </span><span style="color: #79c0ff">entity</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Entity</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> If there&#039;s an existing directive, check it and see if it even makes sense anymore.</span>
+<span style="color: #c9d1d9">    </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> In which case, set to loiter.</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">match</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">entity</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">directive</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">case</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">LoiterDirective</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">as</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">walk</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">            </span><span style="color: #ff7b72">pass</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">case</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">PursueDirective</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">as</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">pursue</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">            </span><span style="color: #c9d1d9">enemy&#95;loc</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">world</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">entities</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">enemy&#95;id</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">loc</span>
+<span></span>
+<span style="color: #c9d1d9">            </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">can&#95;see&#95;loc</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">world</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">entity</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">enemy&#95;loc</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">                </span><span style="color: #c9d1d9">pursue</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">enemy&#95;last&#95;seen&#95;at</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">enemy&#95;loc</span>
+<span style="color: #c9d1d9">                </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Store the path to the enemy. Keep the path around so we</span>
+<span style="color: #c9d1d9">                </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> have something to follow if we lose sight of the enemy.</span>
+<span style="color: #c9d1d9">                </span><span style="color: #c9d1d9">pursue</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">path</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">find&#95;path</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">entity</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">loc</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">enemy&#95;loc</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">                </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">len</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">pursue</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">path</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">==</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">                    </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> We see them but can&#039;t get to them, abort.</span>
+<span style="color: #c9d1d9">                    </span><span style="color: #c9d1d9">entity</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">directive</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">LoiterDirective</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">                </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">not</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">world</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">tiles</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">pursue</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">path</span><span style="color: #c9d1d9">&#91;</span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">walkable</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">                    </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Next step is unwalkable for some reason, abort.</span>
+<span style="color: #c9d1d9">                    </span><span style="color: #c9d1d9">entity</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">directive</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">LoiterDirective</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">                </span><span style="color: #ff7b72">else</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> There&#039;s a path to the enemy!</span>
+<span style="color: #c9d1d9">                    </span><span style="color: #ff7b72">pass</span><span style="color: #c9d1d9"> </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Keep pursuing!</span>
+<span style="color: #c9d1d9">            </span><span style="color: #ff7b72">else</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Can&#039;t see the player.</span>
+<span style="color: #c9d1d9">                </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">entity</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">loc</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">==</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">pursue</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">enemy&#95;last&#95;seen&#95;at</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">                    </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> We reached where we last saw them. Give up.</span>
+<span style="color: #c9d1d9">                    </span><span style="color: #c9d1d9">entity</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">directive</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">LoiterDirective</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">                </span><span style="color: #ff7b72">else</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">                    </span><span style="color: #ff7b72">pass</span><span style="color: #c9d1d9"> </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Keep pursuing!</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">...</span>
+<span></span>
+<span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">can&#95;see&#95;loc</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">world</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">World</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">entity</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Entity</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">loc</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Location</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Bool</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">return</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">(</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">not</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">is&#95;blinded</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">entity</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">and</span>
+<span style="color: #c9d1d9">        </span><span style="color: #d2a8ff">has&#95;line&#95;of&#95;sight</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">world</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">entity</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">loc</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">loc</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">)</span></code></pre>
+
+
+So let's see the problem. Look at the signature again:
+
+
+<ignore>
+```mojo
+fn plan(read world: World, mut entity: Entity):
+```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">plan</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">read </span><span style="color: #79c0ff">world</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">World</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> mut </span><span style="color: #79c0ff">entity</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Entity</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span></code></pre>
+
+
+That `entity` is _inside_ the `World`. So, Mojo rejects this:
+
+(show error)
+
+
+The classic Rust solution would be to refactor `plan` to give it *mutable access to the entire World* (`&mut World`) and a handle (`entity_id`) that we can use to find the `Entity` in the `World`.
+
+
+```rs
+// Entity looks around and thinks and decides their objective
+fn plan(world: &mut World, entity_id: usize) {
+    let entity_read = &world.entities[entity_id];
+
+    // if there's an existing directive, check it and see if it even makes sense anymore.
+    // In which case, set to loiter.
+    // TODO: try to get rid of this clone. then we'll have a mut ref supposedly and we can overwrite it
+    match entity_read.directive.clone() {
+        LoiterDirective => {}
+        PursueDirective(existing_pursue) => {
+            let enemy_loc = world.entities[existing_pursue.enemy_id].loc.clone();
+
+            if can_see_loc(&world, entity_read, &enemy_loc) {
+                // we store path to the enemy. keep the path around so we
+                // dont have to recalculate it every turn, just recalculate
+                // if we run into something.
+                let new_path = find_path(&world, &entity_read.loc, &enemy_loc);
+                if new_path.steps.len() == 0 {
+                    // we see them but can't get to them. loiter instead.
+                    // need to re-fetch because we need to mutate.
+                    // Mention: ironically, this is why vale did its gen ref thing.
+                    let entity_mut = &mut world.entities[entity_id];
+                    entity_mut.directive = LoiterDirective;
+                } else if !world.tile_at(&new_path.steps[0]).walkable {
+                    // next step is unwalkable for some reason, stop
+                    // need to re-fetch because we need to mutate.
+                    let entity_mut = &mut world.entities[entity_id];
+                    entity_mut.directive = LoiterDirective;
+                } else { // there's a path to the enemy
+                    // keep pursuing
+                    let entity_mut = &mut world.entities[entity_id];
+                    entity_mut.directive = PursueDirective(Pursue {
+                        enemy_id: existing_pursue.enemy_id,
+                        enemy_last_seen_loc: enemy_loc,
+                        path: new_path
+                    });
+                }
+            } else { // can't see the player
+                if entity_read.loc == existing_pursue.enemy_last_seen_loc {
+                    // we're where we last saw them. give up.
+                    // need to re-fetch because we need to mutate.
+                    let entity_mut = &mut world.entities[entity_id];
+                    entity_mut.directive = LoiterDirective;
+                } else {
+                    // keep pursuing
+                    let entity_mut = &mut world.entities[entity_id];
+                    entity_mut.directive = PursueDirective(Pursue {
+                        enemy_id: existing_pursue.enemy_id,
+                        enemy_last_seen_loc: enemy_loc,
+                        path: existing_pursue.path
+                    });
+                }
+            }
+        }
+    }
+}
+
+fn can_see_loc(world: &World, entity: &Entity, loc: &Location) -> bool {
+    return !entity.is_blinded &&
+        world.has_line_of_sight(&entity.loc, loc);
+}
+
+// TODO: change from usize to generational_index
+```
+
+
+We needed to hand in a `&mut World` because:
+
+ * We need mutable access to something inside it.
+ * We need access to `World` for various functions (`can_see_loc`, etc.).
+
+
+However, we just introduced two problems:
+
+ 1. We just made it slower: the borrow checker forced us to do `let entity_read = &world.entities[entity_id];` to look up the entity. Unfortunate, because the caller likely already had a reference handy.
+ 2. We made it slower again: the borrow checker forced us to add an extra `let entity_mut = &mut world.entities[entity_id];` lookup on each path because we couldn't use our `entity_read` to mutate.
+ 3. `plan` now has mutable access to the entire World.
+
+
+Let's talk about that last one. This is problematic for two reasons:
+
+ * We risk architectural violations: we now risk someone modifying something outside of this entity, if they didn't understand that `plan` is only supposed to modify this single unit's intentions, it's not supposed to modify anything else in the World.
+ * It's viral: it forces all of `plan`'s callers to receive a `&mut World`, so they can give it to `plan`.
+
+
+In other words, it's a viral architectural risk.
+
+
+Don't get me wrong, the borrow checker is great and a net positive. But this is a very strong drawback.
+
+
+And unfortunately, Mojo is in the same situation.
+
+
+...or is it?
+
+
+Perhaps not!
+
+
+There's nothing inherently unsafe with the original code. This is one of those cases where the borrow checker just doesn't have the right information, and therefore has to conservatively reject a valid program.
+
+
+So what is the right information?
+
+
+It's one simple addition, to tell the compiler what makes it safe: an *argument origin path.*
+
+
+We'd simply add `[world.entities]` to the `entity` argument:
+
+
+<ignore>
+```mojo
+fn plan(read world: World, mut [world.entities] entity: Entity):
+```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">plan</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">read </span><span style="color: #79c0ff">world</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">World</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> mut &#91;world.entities] </span><span style="color: #79c0ff">entity</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Entity</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span></code></pre>
+
+
+That's it.
+
+
+The rest of the function doesn't need to change. I'll show the full function anyway for reference, and then I'll explain how it works below.
+
+
+<ignore>
+```mojo
+# Entity looks around and thinks and decides their objective
+fn plan(read world: World, mut [world.entities] entity: Entity):
+    # if there's an existing directive, check it and see if it even makes sense anymore.
+    # In which case, set to loiter.
+    match entity.directive:
+        case LoiterDirective as walk:
+            pass
+        case PursueDirective as pursue:
+            # convenient: we're not holding an enemy_ref. but if we were,
+            # it might be fine because of origin path tracking.
+            enemy_loc = world.entities[enemy_id].loc
+
+            if can_see_loc(world, entity, enemy_loc):
+                pursue.enemy_last_seen_at = enemy_loc
+                # we store path to the enemy. keep the path around so we
+                # dont have to recalculate it every turn, just recalculate
+                # if we run into something.
+                pursue.path = find_path(entity.loc, enemy_loc)
+                if len(pursue.path) == 0:
+                    # we see them but can't get to them. loiter instead.
+                    entity.directive = LoiterDirective()
+                if not world.tiles[pursue.path[0]].walkable:
+                    # next step is unwalkable for some reason, stop
+                    entity.directive = LoiterDirective()
+                else: # there's a path to the enemy
+                    pass # keep pursuing
+            else: # can't see the player
+                if entity.loc == pursue.enemy_last_seen_at:
+                    # we're where we last saw them. give up.
+                    entity.directive = LoiterDirective()
+                else:
+                    # keep pursuing
+                    pass
+
+fn can_see_loc(world: World, entity: Entity, loc: Location) -> Bool:
+    return (
+        not is_blinded(entity) and
+        has_line_of_sight(world, entity.loc, loc)
+    )
+
+```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #8b949e">#</span><span style="color: #8b949e"> Entity looks around and thinks and decides their objective</span>
+<span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">plan</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">read </span><span style="color: #79c0ff">world</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">World</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> mut &#91;world.entities] </span><span style="color: #79c0ff">entity</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Entity</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> if there&#039;s an existing directive, check it and see if it even makes sense anymore.</span>
+<span style="color: #c9d1d9">    </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> In which case, set to loiter.</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">match</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">entity</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">directive</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">case</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">LoiterDirective</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">as</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">walk</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">            </span><span style="color: #ff7b72">pass</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">case</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">PursueDirective</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">as</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">pursue</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">            </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> convenient: we&#039;re not holding an enemy&#95;ref. but if we were,</span>
+<span style="color: #c9d1d9">            </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> it might be fine because of origin path tracking.</span>
+<span style="color: #c9d1d9">            </span><span style="color: #c9d1d9">enemy&#95;loc</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">world</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">entities</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">enemy&#95;id</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">loc</span>
+<span></span>
+<span style="color: #c9d1d9">            </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">can&#95;see&#95;loc</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">world</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">entity</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">enemy&#95;loc</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">                </span><span style="color: #c9d1d9">pursue</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">enemy&#95;last&#95;seen&#95;at</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">enemy&#95;loc</span>
+<span style="color: #c9d1d9">                </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> we store path to the enemy. keep the path around so we</span>
+<span style="color: #c9d1d9">                </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> dont have to recalculate it every turn, just recalculate</span>
+<span style="color: #c9d1d9">                </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> if we run into something.</span>
+<span style="color: #c9d1d9">                </span><span style="color: #c9d1d9">pursue</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">path</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">find&#95;path</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">entity</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">loc</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">enemy&#95;loc</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">                </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">len</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">pursue</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">path</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">==</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">                    </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> we see them but can&#039;t get to them. loiter instead.</span>
+<span style="color: #c9d1d9">                    </span><span style="color: #c9d1d9">entity</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">directive</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">LoiterDirective</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">                </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">not</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">world</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">tiles</span><span style="color: #c9d1d9">&#91;</span><span style="color: #c9d1d9">pursue</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">path</span><span style="color: #c9d1d9">&#91;</span><span style="color: #79c0ff">0</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">]</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">walkable</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">                    </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> next step is unwalkable for some reason, stop</span>
+<span style="color: #c9d1d9">                    </span><span style="color: #c9d1d9">entity</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">directive</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">LoiterDirective</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">                </span><span style="color: #ff7b72">else</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> there&#039;s a path to the enemy</span>
+<span style="color: #c9d1d9">                    </span><span style="color: #ff7b72">pass</span><span style="color: #c9d1d9"> </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> keep pursuing</span>
+<span style="color: #c9d1d9">            </span><span style="color: #ff7b72">else</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> can&#039;t see the player</span>
+<span style="color: #c9d1d9">                </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">entity</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">loc</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">==</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">pursue</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">enemy&#95;last&#95;seen&#95;at</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">                    </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> we&#039;re where we last saw them. give up.</span>
+<span style="color: #c9d1d9">                    </span><span style="color: #c9d1d9">entity</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">directive</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">LoiterDirective</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">                </span><span style="color: #ff7b72">else</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">                    </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> keep pursuing</span>
+<span style="color: #c9d1d9">                    </span><span style="color: #ff7b72">pass</span>
+<span></span>
+<span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">can&#95;see&#95;loc</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">world</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">World</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">entity</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Entity</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">loc</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Location</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Bool</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">return</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">(</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">not</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">is&#95;blinded</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">entity</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">and</span>
+<span style="color: #c9d1d9">        </span><span style="color: #d2a8ff">has&#95;line&#95;of&#95;sight</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">world</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">entity</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">loc</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">loc</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">)</span>
+<span></span></code></pre>
+
+
+So how does this work? All we did was change the signature:
+
+
+<ignore>
+```mojo
+fn plan(read world: World, mut [world.entities] entity: Entity):
+```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">plan</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">read </span><span style="color: #79c0ff">world</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">World</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> mut &#91;world.entities] </span><span style="color: #79c0ff">entity</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Entity</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span></code></pre>
+
+
+How did that one addition of `[world.entities]` make this entire thing memory safe?
+
+
+It's because the compiler now knows two things:
+
+ * The `entity` reference is pointing at one of the entities in `world.entities`. And therefore...
+ * If we ever temporarily turn the `entity` reference immutable (easy), then the entire `world` is temporarily immutable.
+
+
+And suddenly, with that last item there, we've solved the problems that led to the harmful `&mut World` workaround:
+
+ * We have mutable access to the `Entity`. No need for `&mut World`!
+ * We have immutable access to `World` for various functions (`can_see_loc`, etc.). No need for `&mut World`!
+
+
+This is much better, because now our type system is helping us maintain our architecture, instead of working against us.
+
+
+Okay, but this is just a toy example, let's hear about a real use case!
+
+
+(TODO: doesn't this also enable better error messages?)
+(TODO: reference Niko's View Types post wherever possible)
+
+
+## Example: Google Earth
+
+Long ago, in the earlier days of [Google Earth](https://earth.google.com/web/), we were constantly facing state management challenges, because Earth was such a large app with such complex requirements, and we weren't that principled about it.
+
+
+(And yes, before you ask, we couldn't eliminate this state. This was _inherent_ state. Client-side apps can't avoid inherent state, you just have to be disciplined about how you handle it.)
+
+
+Some of these problems got so complicated and spaghetti-ish that there were some bugs that took _weeks_ to fix.
+
+These problems seemed to rhyme, and my spidey sense was tingling. I eventually found the common pattern in all of these problems:
+
+ * Presenter A modifies the AppState.
+    * Presenter B observes this, and modifies the AppState in response.
+ * Presenter A reads the AppState, found it in a completely unexpected state, and crashed.
+
+
+We then put some constraints on our system [#statemanager] which completely eliminated this entire class of bugs. One of them was this:
+
+> AppState methods could read and mutate the AppState, but could only _read_ the surrounding world.
+
+
+This was in C++, so we simply gave AppState some const references to the other subsystems.
+
+In Rust, we might have needed the same workaround:
+
+ * Take a &mut App and suddenly have mutable access to *everything*
+ * Take a &mut self, and & refs to everything else (very verbose, there are a lot, cant call other methods)
+
+(Or we could take in 20 subsystems in as arguments)
+
+
+And Mojo would have the same problems.
+
+
+But with argument paths, we could make a function like this:
+
+
+<ignore>
+```mojo
+struct App:
+    var document_manager: DocumentManager
+    var app_state: AppState
+    var network_requester: NetworkRequester
+    var lfs: LocalFileSystem
+    ... # About 15 more
+
+    fn can_show_document(self, document_id: Int) -> bool:
+        return (
+            self.network_requester.ready() and
+            self.document_manager.ready() and
+            self.document_manager.document_loaded(document_id)
+        )
+
+fn open_document_view(
+    read app: App,
+    mut [app.state] app_state: AppState,
+    document_id: Int  # TODO: I think this could even be a ref now?
+) -> Bool:
+    app_state.currently_open_card_id = None
+    app_state.legend_is_open = False
+    app_state.currently_open_document_id = document_id
+    if app.can_show_document(document_id):
+        app_state.current_view = CurrentView::Document
+        return True
+    else:
+        return False
+```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">struct</span><span style="color: #c9d1d9"> </span><span style="color: #ffa657">App</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">document&#95;manager</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">DocumentManager</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">app&#95;state</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">AppState</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">network&#95;requester</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">NetworkRequester</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">lfs</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">LocalFileSystem</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">...</span><span style="color: #c9d1d9"> </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> About 15 more</span>
+<span></span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">can&#95;show&#95;document</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">self</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">document&#95;id</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #ffa657">bool</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">return</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">(</span>
+<span style="color: #c9d1d9">            </span><span style="color: #79c0ff">self</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">network&#95;requester</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">ready</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">and</span>
+<span style="color: #c9d1d9">            </span><span style="color: #79c0ff">self</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">document&#95;manager</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">ready</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">and</span>
+<span style="color: #c9d1d9">            </span><span style="color: #79c0ff">self</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">document&#95;manager</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">document&#95;loaded</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">document&#95;id</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">        </span><span style="color: #c9d1d9">)</span>
+<span></span>
+<span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">open&#95;document&#95;view</span><span style="color: #c9d1d9">(</span>
+<span style="color: #c9d1d9">    read </span><span style="color: #79c0ff">app</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">App</span><span style="color: #c9d1d9">,</span>
+<span style="color: #c9d1d9">    mut &#91;app.state] </span><span style="color: #79c0ff">app&#95;state</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">AppState</span><span style="color: #c9d1d9">,</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">document&#95;id</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span><span style="color: #c9d1d9">  </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> </span><span style="color: #ff7b72">TODO</span><span style="color: #8b949e">: I think this could even be a ref now?</span>
+<span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Bool</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">app&#95;state</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">currently&#95;open&#95;card&#95;id</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">None</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">app&#95;state</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">legend&#95;is&#95;open</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">False</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">app&#95;state</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">currently&#95;open&#95;document&#95;id</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">document&#95;id</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">if</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">app</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">can&#95;show&#95;document</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">document&#95;id</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">        </span><span style="color: #c9d1d9">app&#95;state</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">current&#95;view</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">CurrentView</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9">Document</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">return</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">True</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">else</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">        </span><span style="color: #ff7b72">return</span><span style="color: #c9d1d9"> </span><span style="color: #79c0ff">False</span></code></pre>
+
+
+(This is of course a simplified version of the actual Google Earth logic, [# For example, there were a few more AppState methods that would be called when the `network_requester` and `document_manager` were all ready.] but you get the idea.)
+
+
+Note how `open_document_view` is reading the `app` with `app.can_show_document(document_id)`, yet it also has a `mut app_state`. This is possible because of the `app` argument's `[app.state]` origin path.
+
+
+This is much better, because now our type system is helping us maintain our architecture, instead of working against us.
+
+
+(TODO: doesn't this also enable better error messages?)
+(TODO: reference Niko's View Types post wherever possible)
+
+
+<slice>
+#statemanager: The complete list of constraints:
+
+ * If Presenter A needs to modify Presenter B's state ("cross-cutting mutation"), move that state into the central AppState class.
+ * All cross-cutting mutation logic (`OpenDocumentView` which closes CardView, `SetShownCard` which hides the LegendView, etc.) should be in an AppState method.
+ * When a presenter observes a change, it cannot ask AppState to mutate anything in response.
+ * AppState methods could only mutate AppState, but could also _read_ the surrounding world.
+</slice>
+
+
+## Argument Paths
+
+In all three of those examples, we added *argument origin paths* to let us access a mutable part of an otherwise-immutable whole.
+
+
+We helped the compiler understand that `evolve` was memory-safe by specifying `tail_ref`'s origin path was `[bird.tail]`:
+
+
+<ignore>
+```mojo
+fn main():
+    var bird = Bird(Wing(10), Wing(20), Tail(15))
+    ref tail_ref = bird.tail
+    evolve(bird, tail_ref)
+
+fn evolve(bird: Bird, mut [bird.tail] tail_ref: Tail):
+    tail_ref.length += bird.get_weight()
+```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">main</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">Bird</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">Wing</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">10</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">Wing</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">20</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">Tail</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">15</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">ref</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">tail&#95;ref</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">tail</span>
+<span style="color: #c9d1d9">    </span><span style="color: #d2a8ff">evolve</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">bird</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">tail&#95;ref</span><span style="color: #c9d1d9">)</span>
+<span></span>
+<span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">evolve</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">bird</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Bird</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> mut &#91;bird.tail] </span><span style="color: #79c0ff">tail&#95;ref</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Tail</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">tail&#95;ref</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">length</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">+=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">get&#95;weight</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span></code></pre>
+
+
+We helped the compiler understand that `plan` was memory-safe by specifying `entity`'s origin path was `[world.entities]`:
+
+
+<ignore>
+```mojo
+fn plan(read world: World, mut [world.entities] entity: Entity):
+    ...
+```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">plan</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">read </span><span style="color: #79c0ff">world</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">World</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> mut &#91;world.entities] </span><span style="color: #79c0ff">entity</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Entity</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">...</span></code></pre>
+
+
+And we helped the compiler understand that `open_document_view` was memory-safe by specifying `app_state`'s origin path was `[app.state]`:
+
+
+<ignore>
+```mojo
+fn open_document_view(
+    read app: App,
+    mut [app.state] app_state: AppState,
+    document_id: Int
+) -> Bool:
+    ...
+```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">open&#95;document&#95;view</span><span style="color: #c9d1d9">(</span>
+<span style="color: #c9d1d9">    read </span><span style="color: #79c0ff">app</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">App</span><span style="color: #c9d1d9">,</span>
+<span style="color: #c9d1d9">    mut &#91;app.state] </span><span style="color: #79c0ff">app&#95;state</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">AppState</span><span style="color: #c9d1d9">,</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">document&#95;id</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Int</span>
+<span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">-&gt;</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Bool</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">...</span></code></pre>
+
+
+So how does this actually work under the hood?
+
+
+Let's look at the first example:
+
+
+<ignore>
+```mojo
+fn main():
+    var bird = Bird(Wing(10), Wing(20), Tail(15))
+    ref tail_ref = bird.tail
+    evolve(bird, tail_ref)
+
+fn evolve(bird: Bird, mut [bird.tail] tail_ref: Tail):
+    tail_ref.length += bird.get_weight()
+```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">main</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">Bird</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">Wing</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">10</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">Wing</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">20</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">Tail</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">15</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">ref</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">tail&#95;ref</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">tail</span>
+<span style="color: #c9d1d9">    </span><span style="color: #d2a8ff">evolve</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">bird</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">tail&#95;ref</span><span style="color: #c9d1d9">)</span>
+<span></span>
+<span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">evolve</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">bird</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Bird</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> mut &#91;bird.tail] </span><span style="color: #79c0ff">tail&#95;ref</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Tail</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">tail&#95;ref</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">length</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">+=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">get&#95;weight</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span></code></pre>
+
+
+That `evolve` is equivalent to this, which uses a temporary variable:
+
+
+<ignore>
+```mojo
+fn evolve(bird: Bird, mut [bird.tail] tail_ref: Tail):
+    var weight = bird.get_weight()
+    tail_ref.length += weight
+```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">evolve</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">bird</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Bird</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> mut &#91;bird.tail] </span><span style="color: #79c0ff">tail&#95;ref</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Tail</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">weight</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">get&#95;weight</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">tail&#95;ref</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">length</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">+=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">weight</span></code></pre>
+
+
+Now I'll add a few comments that explain the compiler's thinking:
+
+
+<ignore>
+```mojo
+fn evolve(bird: Bird, mut [bird.tail] tail_ref: Tail):
+    var weight =
+        borrow_imm tail_ref {
+            # Begin temporary scope, in which `tail_ref` is an immutable borrow.
+            # Now, `bird` *and* everything inside it (`tail_ref`) is immutable.
+            # We can now pass an immutable `bird` to `get_weight`.
+            bird.get_weight()
+            # End temporary scope, `tail_ref` becomes mutable again.
+        }
+    # `tail_ref` is mutable here, so add to its `length`.
+    tail_ref.length += weight
+```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">evolve</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">bird</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Bird</span><span style="color: #c9d1d9">,</span><span style="color: #c9d1d9"> mut &#91;bird.tail] </span><span style="color: #79c0ff">tail&#95;ref</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Tail</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">weight</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span>
+<span style="color: #c9d1d9">        </span><span style="color: #c9d1d9">borrow&#95;imm</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">tail&#95;ref</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">{</span>
+<span style="color: #c9d1d9">            </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Begin temporary scope, in which `tail&#95;ref` is an immutable borrow.</span>
+<span style="color: #c9d1d9">            </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> Now, `bird` *and* everything inside it (`tail&#95;ref`) is immutable.</span>
+<span style="color: #c9d1d9">            </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> We can now pass an immutable `bird` to `get&#95;weight`.</span>
+<span style="color: #c9d1d9">            </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">get&#95;weight</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">            </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> End temporary scope, `tail&#95;ref` becomes mutable again.</span>
+<span style="color: #c9d1d9">        </span><span style="color: #c9d1d9">}</span>
+<span style="color: #c9d1d9">    </span><span style="color: #8b949e">#</span><span style="color: #8b949e"> `tail&#95;ref` is mutable here, so add to its `length`.</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">tail&#95;ref</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">length</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">+=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">weight</span></code></pre>
+
+
+In other words, when we try to pass something (`bird`) to a function (`get_weight`) that wants to receive it immutably (the `read` in `fn get_weight(read self)`), we temporarily turn all of its "contained references" (`tail_ref`) immutable, so the entire thing (`bird`) is immutable.
+
+
+### Limitations
+
+There are some limitations to this mechanism, of course:
+
+ * We can't pass an object as both `read` and `mut` (though we can pass it as `mut` and `mut`).
+ * (any other limitations?)
+
+
+First, we can't pass the same object as both `read` and `mut`. We can't do this:
+
+
+<ignore>
+```mojo
+fn main():
+    var bird = Bird(Wing(10), Wing(20), Tail(15))
+    ref tail_ref = bird.tail
+    evolve(bird, tail_ref, tail_ref)
+
+fn evolve(
+    bird: Bird,
+    read [bird.tail] tail_a: Tail,
+    mut [bird.tail] tail_b: Tail
+):
+    tail_b.length += bird.get_weight() + tail_a.length
+```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">main</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">Bird</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">Wing</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">10</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">Wing</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">20</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">Tail</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">15</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">ref</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">tail&#95;ref</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">tail</span>
+<span style="color: #c9d1d9">    </span><span style="color: #d2a8ff">evolve</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">bird</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">tail&#95;ref</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">tail&#95;ref</span><span style="color: #c9d1d9">)</span>
+<span></span>
+<span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">evolve</span><span style="color: #c9d1d9">(</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">bird</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Bird</span><span style="color: #c9d1d9">,</span>
+<span style="color: #c9d1d9">    read &#91;bird.tail] </span><span style="color: #79c0ff">tail&#95;a</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Tail</span><span style="color: #c9d1d9">,</span>
+<span style="color: #c9d1d9">    mut &#91;bird.tail] </span><span style="color: #79c0ff">tail&#95;b</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Tail</span>
+<span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">tail&#95;b</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">length</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">+=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">get&#95;weight</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">+</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">tail&#95;a</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">length</span></code></pre>
+
+
+However, we can pass them both as `mut`:
+
+
+<ignore>
+```mojo
+fn main():
+    var bird = Bird(Wing(10), Wing(20), Tail(15))
+    ref tail_ref = bird.tail
+    evolve(bird, tail_ref, tail_ref)
+
+fn evolve(
+    bird: Bird,
+    mut [bird.tail] tail_a: Tail,
+    mut [bird.tail] tail_b: Tail
+):
+    tail_b.length += bird.get_weight() + tail_a.length
+```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">main</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">Bird</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">Wing</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">10</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">Wing</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">20</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">Tail</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">15</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">ref</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">tail&#95;ref</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">tail</span>
+<span style="color: #c9d1d9">    </span><span style="color: #d2a8ff">evolve</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">bird</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">tail&#95;ref</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">tail&#95;ref</span><span style="color: #c9d1d9">)</span>
+<span></span>
+<span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">evolve</span><span style="color: #c9d1d9">(</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">bird</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Bird</span><span style="color: #c9d1d9">,</span>
+<span style="color: #c9d1d9">    mut &#91;bird.tail] </span><span style="color: #79c0ff">tail&#95;a</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Tail</span><span style="color: #c9d1d9">,</span>
+<span style="color: #c9d1d9">    mut &#91;bird.tail] </span><span style="color: #79c0ff">tail&#95;b</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Tail</span>
+<span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">tail&#95;b</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">length</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">+=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">get&#95;weight</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">+</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">tail&#95;a</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">length</span></code></pre>
+
+
+And it should compose well with the existing origin checking machinery.
+
+
+And if we want to, we can pass them both as `read` (this works today):
+
+
+<ignore>
+```mojo
+fn main():
+    var bird = Bird(Wing(10), Wing(20), Tail(15))
+    ref tail_ref = bird.tail
+    evolve(bird, tail_ref, tail_ref)
+
+fn evolve(
+    bird: Bird,
+    read tail_a: Tail,
+    read tail_b: Tail
+):
+    print(tail_b.length + bird.get_weight() + tail_a.length)
+```
+</ignore>
+
+
+<pre style="background-color: black; padding: 16px; font-size: 80%; overflow-x: auto;"><code class="nohighlight"><span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">main</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #ff7b72">var</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">Bird</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">Wing</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">10</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">Wing</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">20</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">Tail</span><span style="color: #c9d1d9">(</span><span style="color: #79c0ff">15</span><span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">)</span>
+<span style="color: #c9d1d9">    </span><span style="color: #c9d1d9">ref</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">tail&#95;ref</span><span style="color: #c9d1d9"> </span><span style="color: #ff7b72">=</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">bird</span><span style="color: #c9d1d9">.</span><span style="color: #c9d1d9">tail</span>
+<span style="color: #c9d1d9">    </span><span style="color: #d2a8ff">evolve</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">bird</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">tail&#95;ref</span><span style="color: #c9d1d9">,</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">tail&#95;ref</span><span style="color: #c9d1d9">)</span>
+<span></span>
+<span style="color: #ff7b72">fn</span><span style="color: #c9d1d9"> </span><span style="color: #d2a8ff">evolve</span><span style="color: #c9d1d9">(</span>
+<span style="color: #c9d1d9">    </span><span style="color: #79c0ff">bird</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Bird</span><span style="color: #c9d1d9">,</span>
+<span style="color: #c9d1d9">    read </span><span style="color: #79c0ff">tail&#95;a</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Tail</span><span style="color: #c9d1d9">,</span>
+<span style="color: #c9d1d9">    read </span><span style="color: #79c0ff">tail&#95;b</span><span style="color: #c9d1d9">:</span><span style="color: #c9d1d9"> </span><span style="color: #c9d1d9">Tail</span>
+<span style="color: #c9d1d9">)</span><span style="color: #c9d1d9">:</span>
+<span style="color: #c9d1d9">    </span><span style="color: #d2a8ff">print</span><span style="color: #c9d1d9">(</span><span style="color: #d2a8ff">tail&#95;b</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">length</span><span style="color: #d2a8ff"> </span><span style="color: #ff7b72">+</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">bird</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">get&#95;weight</span><span style="color: #c9d1d9">(</span><span style="color: #c9d1d9">)</span><span style="color: #d2a8ff"> </span><span style="color: #ff7b72">+</span><span style="color: #d2a8ff"> </span><span style="color: #d2a8ff">tail&#95;a</span><span style="color: #c9d1d9">.</span><span style="color: #d2a8ff">length</span><span style="color: #c9d1d9">)</span></code></pre>
+
+
+(other limitations here)
+
+
+# Conclusion
+
+(TODO: conclusion here)
+
+
+
+<ignore>
+# Notes
+
+## Critical Gaps and Misrepresentations
+
+However, the skeleton significantly undersells and partially misrepresents the depth of Mojo's innovation:
+
+### 1 *Misses the Temporal Dimension*
+The deep dive emphasizes that references are *passive by default* and only activate at use-sites. The skeleton mentions "checks origins at callsites" but doesn't capture the profound implication that references can exist without holding active borrows. This is THE key insight that enables patterns impossible in Rust.
+
+### 2 *Underplays Sequential Activation*
+The deep dive shows how expressions like `x_ref + increment_x_and_return(point) + x_ref` work through sequential activation. The skeleton doesn't convey that references activate, deactivate, and can reactivate, seeing mutations between uses.
+
+### 3 *Lacks Technical Precision*
+The skeleton's explanation of "no local reference knows whether it's mutable or immutable" is imprecise. The deep dive explains it better: references have a capability to borrow that activates with a mode (mutable/immutable) determined by usage context.
+
+### 4 *Missing Critical Examples*
+The deep dive's most compelling examples aren't in the skeleton:
+- The cache pattern that fails in Rust but works in Mojo
+- Complex interleaving like `left_ref.span + flap_left(bird) + left_ref.span`
+- The distinction between register-passable (Int) and non-copyable (Wing) types
+
+### 5 *Incomplete Origin Path Explanation*
+While the skeleton mentions return types like `ref [b.left] Wing`, it doesn't explain:
+- How origins form an algebraic structure
+- Origin subsumption relationships
+- How the compiler tracks origin identity through chains of function calls
+
+## Suggestions for Improvement
+
+1 *Add a Section on Activation vs Existence*
+   ```mojo
+   ref x_ref = point.x        # Reference exists (passive)
+   increment_x(point)         # point mutably active, x_ref passive - OK!
+   print(x_ref)               # x_ref activates here - sees mutation!
+   ```
+
+2 *Include the Sequential Activation Example*
+   The `x_ref + increment_x_and_return(point) + x_ref` example is crucial for understanding the temporal model.
+
+3 *Explain Why Copyability Matters*
+   The distinction between `Int` (brief activation for copying) vs `Wing` (extended activation) is essential for understanding when patterns work or fail.
+
+4 *Better Motivate the Problem*
+   Start with Rust pain points more explicitly:
+   - The async cache pattern
+   - Field borrowing across function boundaries
+   - Iterator + mutation patterns
+
+5 *Add the Theoretical Foundation*
+   Even in simplified form, explain that origins are type-level metadata, not runtime data.
+
+## The "Secrets" Framing
+
+The "secrets" framing is good for engagement but might undersell this as a principled, deliberate design. Consider reframing as "The Hidden Power of Mojo's Two-Layer Borrowing System" or similar.
+
+## Missing Comparative Analysis
+
+The skeleton should mention:
+- Chris Fallin's deferred borrows proposal (which Mojo essentially implements)
+- How this relates to Polonius and view types in Rust
+- Why Rust can't adopt this (backwards compatibility) but Mojo can
+
+## Conclusion
+
+The skeleton captures maybe 40% of the deep dive's insights. It gets the basic concepts right but misses the profound implications of passive references and sequential activation. The blog post would benefit from:
+
+1 A clearer explanation of the two-layer model (deferred + origins)
+2 More compelling examples showing impossible-in-Rust patterns
+3 Technical precision about when and how references activate
+4 The broader context of why this matters for language evolution
+
+The skeleton has good bones but needs more meat to truly convey why Mojo's approach is revolutionary rather than just "Rust with some improvements."
+</ignore>

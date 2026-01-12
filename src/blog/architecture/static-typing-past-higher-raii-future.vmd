@@ -1,0 +1,17 @@
+---
+title: Static Typing Helps the Past, Linear Types Help the Future
+author: Evan Ovadia
+date: Jul 12, 2023
+realm: blog
+path: blog/static-typing-past-linear-types-future
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+
+
+"Must move types"
+https://smallcultfollowing.com/babysteps/blog/2023/03/16/must-move-types/
+
+> Rust has lots of mechanisms that prevent you from doing something bad. But, right now, it has NO mechanisms that force you to do something good.

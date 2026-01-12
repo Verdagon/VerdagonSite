@@ -1,0 +1,597 @@
+---
+title: Complexity Should Be Opt-In
+subtitle: How to design a good language
+author: Evan Ovadia
+date: May 14, 2024
+realm: blog
+path: blog/higher-raii-uses-linear-types
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+The hardest part of software engineering, especially language design, is *keeping complexity down.*
+
+
+It's one of those things that's easy to say, but there's only a few languages out there that really live up to this.
+
+
+# Complexity is complex
+
+Let's not over-simplify it! There are plenty of ways a language can be complex:
+
+ * A lack of rules, which means we have to hold a lot more in our heads (C, Javascript).
+ * A few simple rules that lead to a lot of *emergent complexity* (Rust, Haskell, etc.)
+ * Many small rules that *interact in complex ways* (C++).
+
+
+But before we analyze these differences, let's first talk about *inherent* versus *incidental* complexity.
+
+
+
+# Inherent vs incidental complexity
+
+Remember that piece of code you wrote, that you later simplified?
+
+That "removable" complexity is *incidental complexity.*
+
+In fact, there's probably even more ways you could go back and simplify that code. There's more incidental complexity, even if you can't see it yet.
+
+
+However, at some point, you can't simplify any more. The code is still pretty intricate though. It has to be, it was a hard problem you were solving!
+
+The remaining un-removable complexity is *inherent complexity.* It will always be there, no matter how much you simplify.
+
+
+# Example: Static Typing
+
+Static typing is pretty complex. There's structs, and interfaces, and generics, and a lot of concepts that we have to learn.
+
+
+But is it inherently or artificially complex?
+
+
+Well, even in dynamically-typed languages like Javascript and Python, we still think about an object's type even if we don't inform the language about it.
+
+<<<<
+Even in this dynamically-typed Javascript function, we know that `ship` should have two members: an `hp` integer and a `name` string.
+////
+```js
+function printSpaceship(ship) {
+  console.log(ship.hp / 100 + "%");
+  console.log(ship.name);
+}
+```
+>>>>
+
+
+# Example: `async`/`await`
+
+In a web server, when we receive a request we usually spun up a thread to handle it.
+
+Of course, a thread takes a lot of memory. So many languages added `async`/`await`, which uses a lot less memory to represent an ongoing operation.
+
+
+There was a downside, of course. `async`/`await` makes our code more complex, as illustrated by Bob Nystrom's [What Color Is Your Function?](https://journal.stuffwithstuff.com/2015/02/01/what-color-is-your-function/) article.
+
+
+But there's no other way to get anything that small. `async`/`await`'s complexity is unremovable if you need to scale a server. It's inherent complexity.
+
+
+...or is it?
+
+
+# Inherent complexity is a tempting lie we tell ourselves
+
+So let's take a step back, and realize that we humans are _terrible_ at identifying inherent complexity.
+
+We often look at some complexity and think "that's unavoidable," and declare it as Inherent Complexity™ and move on with our lives.
+
+
+This was the case with `async`/`await`, as [goroutines](https://dev.to/ankitmalikg/what-is-goroutine-1j6d) and Java's [Project Loom](https://www.baeldung.com/openjdk-project-loom) showed us (and there's even ways to do Loom-like concurrency without garbage collection).
+
+
+This brings us to an interesting truth: inherent complexity can be reduced.
+
+
+"But then maybe it wasn't inherent complexity to begin with!"
+
+Technically true. However, if we can't identify inherent complexity, then perhaps it's time we retire it as a concept.
+
+
+# How do we reduce inherent complexity?
+
+We move things to bette
+
+
+We need to be wary of global complexity costs to tiny problems.
+
+
+
+
+
+
+
+
+
+
+
+
+However, that's often not the case. For example:
+
+ * We thought that `async`/`await` was inherent complexity, because there was no possible way to make a server ridiculously scalable without it. 
+ * We thought that borrow checking's complexity was inherent because it was the only way to get really fast memory-safe code, but then [generational references and regions](https://verdagon.dev/blog/generational-references) proved us wrong.
+ * (need one more example, two more preferably because dont wanna talk about gen refs and regions)
+
+
+In all these cases, we reduced this "inherent" complexity by abstracting it away.
+
+
+In other words *good abstractions reduce complexity.*
+
+
+So how do we use this in languages?
+
+
+# Abstraction
+
+
+
+
+
+
+
+
+
+
+I'd say that *static typing is inherent complexity* in general. Of course, when you consider languages like C++ where their type system is [literally turing complete](https://stackoverflow.com/a/275295/1424454) then you get into incidental complexity territory.
+
+
+In fact, when a language doesn't help us keep the types straight, we have to do it ourselves. We have to think harder to make sure our program is correct.
+
+You can really feel this when refactoring. When you're refactoring a statically typed language, you can sometimes mindlessly just follow the compiler errors until the refactor is done. With dynamically typed languages, you need to think a lot harder.
+
+
+However, this isn't a black-and-white judgment.
+
+ * If you're writing something small that only deals with simple types, it's simple enough to fit in your head.
+ * If it's a program that runs quickly and has pretty simple inputs, there's not much difference between detecting it at compile-time or at run-time.
+
+
+
+
+
+
+I've been dealing a lot with the Rust/Vale FFI boundary a lot lately, so I'll use some examples from Rust that I used to believe.
+
+ * I thought `async`/`await` is inherent complexity, because we need to be aware of where our thread might be interrupted.
+ * I thought borrow checking is inherent complexity, because we need to avoid data races and even [single-threaded race conditions](https://manishearth.github.io/blog/2015/05/17/the-problem-with-shared-mutability/).
+ * I thought `Result<T, E>` is inherent complexity, because we need to consider errors that happen in a function we're calling.
+
+
+"Of course!" says the computer scientist, "we need to be absolutely rigorous about these things! We need to prevent these things."
+
+
+"Not so fast," says the software engineer. "We have to balance these against other real-world concerns."
+
+
+
+
+
+
+
+
+
+
+
+
+Thinking these thoughts makes the computer scientist in me happy. However, the engineer in me knows better.
+
+
+You see, those three things
+
+
+However, all of these come with a complexity cost.
+
+
+for the longest time I thought `async`/`await` was just inherent 
+
+
+For example, 
+
+
+
+
+
+
+
+
+
+
+# Something can be simple and complex
+
+
+
+
+
+
+
+
+
+Have you ever heard someone say "No, no, it's simple! Here..." and then explain something that's actually very complex?
+
+By the end of their explanation, you're left wondering, "How can they think that's simple? I only barely grasp what they're getting at."
+
+
+The explainer has something called *the curse of knowledge.*
+
+I am very familiar with software-related curses, after what happened in Campeche with [a certain ancient tome](/grimoire/grimoire#a-cursd-tome-and-ancient-memory-safety).
+
+Overcoming this curse is one of the most important skills for a language designer, a software architect, or anyone who wants to communicate well in general.
+
+
+# Macs are simple
+
+A few years ago, my friend bought a Mac.
+
+He'd only ever used Windows before, but Macs are pretty simple, so I figured he'd be able to pick it up pretty quickly. He was a computer science major, after all.
+
+I started walking him through the Mac basics, and I very quickly realized that *Macs are not simple.*
+
+
+They're actually _really_ unintuitive:
+
+ * An app can have multiple windows. The menu bar is associated with the current window, but the dock icon is associated with the whole program.
+ * There's no start bar, or central entry point of any kind. You just gotta know how to get to things.
+ * To install an application, you drag it to the applications folder. A lot of applications just show you two icons and an arrow and expect you to know what to do.
+
+
+After that, I thought, "Why in the world did I think Mac OS was simple?"
+
+
+And more importantly, what else did I mistakenly think was simple?
+
+
+# It's not simple, you're just used to it
+
+I see this happening all the time.
+
+
+People say C is simple, because it's really just a mapping to assembly, which is pretty simple.
+
+People say Haskell is simple, because it's just like regular programming but where everything is immutable.
+
+People say the borrow checker is simple, because it's really just one rule: no shared mutability.
+
+
+Brent Yorgey [famously wrote about](https://byorgey.wordpress.com/2009/01/12/abstraction-intuition-and-the-monad-tutorial-fallacy/) how people get this so wrong when trying to explain the simple concept of monads:
+
+> To see what I mean, imagine the following scenario: Joe Haskeller is trying to learn about monads. After struggling to understand them for a week, looking at examples, writing code, reading things other people have written, he finally has an “aha!” moment: everything is suddenly clear, and Joe Understands Monads! What has really happened, of course, is that Joe’s brain has fit all the details together into a higher-level abstraction, a metaphor which Joe can use to get an intuitive grasp of monads; let us suppose that Joe’s metaphor is that Monads are Like Burritos. Here is where Joe badly misinterprets his own thought process: “Of course!” Joe thinks. “It’s all so simple now. The key to understanding monads is that they are Like Burritos. If only I had thought of this before!” The problem, of course, is that if Joe HAD thought of this before, it wouldn’t have helped: the week of struggling through details was a necessary and integral part of forming Joe’s Burrito intuition, not a sad consequence of his failure to hit upon the idea sooner. 
+
+
+The effect gets worse with time.
+
+It's been so long since I've learned multiplication, that I've completely forgotten how hard it was. Then I hear my small relatives say "multiplication table" and it all comes back... we had to memorize so much, just to multiply numbers!
+
+
+# An example
+
+
+
+
+
+
+
+
+
+
+But we need to be aware of the actual complexity.
+
+
+
+
+It's extremely tempting to build in super-advanced features into a language. 
+
+
+This is also why I have others proofread my articles. Some things are completely obvious to me and not obvious to others.
+
+
+
+# Mastered things seem _right_
+
+
+
+
+# Tell yourself you're wrong, and that there's a better way
+
+
+
+
+
+
+From this I learned that we 
+
+mindfulness meditation, we learn to pay attention to our own thoughts and feelings.
+
+
+
+
+
+
+# Mastered things seem easy
+
+Some things have simple rules, but:
+
+ * They're difficult to apply to the real world.
+ * They require complex background knowledge.
+ * They build on a lot of abstraction.
+
+
+
+
+ However, assembly is actually really complex. [# Did you know that your CPU doesn't actually have an `eax` register? Registers are a lie. In fact, x86 is really just an interpreted language, and the CPU encodes an entire virtual machine!]
+
+
+ Despite that, Rust is one of the most difficult and complex languages out there.
+
+
+
+If you think Python programming is easy, I challenge you to go teach a Computer Science 101 class.
+
+Even computer-literate students have a hard time understanding variables, functions, and classes.
+
+
+We just think these concepts are easy because we're used to it.
+
+
+
+
+Programming is pretty easy if you're using something like Python.
+
+
+
+# Emergent complexity
+
+Borrow checking is simple. 
+
+
+
+
+
+
+
+ been using Windows
+
+
+I use an Android, and I suffer
+
+
+
+A long time ago
+
+
+
+Do 5 + 3 in your head. You probably got the answer instantly!
+
+Addition is one of the most basic skills we have, and it's so easy that even a first-grader can learn it.
+
+
+Now, I want you to remember when you were five years old. 
+
+
+Now, I want you to remember when you were five years old. Do you remember this table?
+
+<img src="images/addition-table.jpg" />
+
+This is the addition table, and we had to memorize every one of these cells.
+
+
+When a five year old asks you if addition is easy, don't say yes, because you probably just forgot how difficult it was.
+
+
+# We only _think_ it's easy
+
+It's been so long since we've learned addition, that we've forgotten how difficult it was to learn back then.
+
+
+If you're reading this blog, you're probably a really smart person
+
+
+
+
+
+Managing complexity is one of the most important things in what we do. Of course, before we can manage complexity, we need to be able to recognize it.
+
+We humans are _really_ bad at this.
+
+
+The problem is that *mastered things seem easy.*
+
+
+
+
+
+Something is "simple" when it can be distilled down to a few thoughts that aren't intertwined with other concepts in complicated ways.
+
+For example, playing a piano is simple, but not easy.
+
+
+
+Using a framework is easy, but not simple.
+
+
+
+
+
+Something is "easy" when it can be 
+
+
+# Languages can be really complex
+
+
+
+
+I'm really sorry to call out some languages specifically, 
+
+
+
+There are a few kinds of complexity in languages:
+
+ * A lack of rules, which means we have to hold a lot more in our heads (C, Javascript, Python).
+ * A lot of complex rules that interact in strange ways (C++).
+ * A few simple rules lead to a lot of *emergent complexity* (Rust, Haskell, etc.)
+
+
+
+
+I'm going to call out Rust and Haskell a little bit here. They're both incredibly useful languages, and the world is a much better place with them in it. However, they suffer a bit of a complexity problem.
+
+
+
+Rust is complex
+
+Haskell is complex
+
+Python is complex.
+
+
+
+
+You need to be aligned with your domain.
+
+
+
+
+
+
+
+
+Let's raise our hands, how many of us have ever tried to explain a very simple concept, only to fail spectacularly?
+
+
+Anyone 
+
+ explaining a simple concept, and then half-way through the explanation, realized that it's actually a lot more complex?
+
+
+Monads.
+
+Borrow checking.
+
+borrow checking is made of an extremely simple concept: AxM. but how its applied is incredibly complicated, and leads to a lot of incidental complexity that just wouldnt exist in a sufficiently statically-typed garbage-collected language.
+
+
+
+
+ explaining a simple concept, and realized that 
+
+
+
+The problem is that when we learn something, it "clicks". It makes sense all of a sudden. We've found the very simple pattern
+
+
+
+
+
+Simple, easy, intuitive.
+
+
+
+
+Let's talk about one of the most central principles of Vale's design: 
+
+
+
+
+
+
+
+Languages ∩ Architecture is a weird name for a blog. After all, we hardly ever hear "programming language" and "software architecture" in the same sentence. Most people would assume they're completely unrelated. My more savvy readers will know that there's a huge overlap between the two.
+
+
+
+
+
+You've probably guessed that I don't share that opinion. [# I don't know what gave it away!] In fact, one of the reasons Vale has such an unusual design is that 
+
+
+Of course, my more savvy readers will know that there is a large and _very interesting_ intersection between the two.
+
+
+Of course, 
+
+
+
+One might not expect that programming languages and software architecture have much to do with each other.
+
+
+I would say the three key architecture skills are:
+
+ * Recognize inherent and artificial complexity, and work to reduce both.
+ * Recognize the velocity of your code, and add flexibility to the system.
+ * Realize that programming is a human endeavor, not a mathematical one.
+ * Reducing risk.
+
+
+However, it was my software architecture experience that led me to Vale's design. 
+
+
+
+Let's talk about the *curse of knowledge*, and how to fight it when designing languages, APIs, and any sort of software.
+
+
+
+
+
+Blake Anderson (of Rhovas) once said that APIs are the biggest part of software engineering
+
+
+
+ APIs... and one of the biggest APIs 
+
+Vale is the largest API I've ever designed, by far.
+
+
+
+
+
+
+
+
+
+
+
+
+borrow checking is best at the leaves, not at the heart of a program.
+cone believed this, which is why it has a gc region.
+vale believes this, which is why it has a region borrow checker.
+
+the borrow checker, and constraints in general, add a certain tautness to a program. most tautness is fine.
+
+when a spiderweb is too tight, 
+
+in engineering, fault tolerance
+
+one thing i like about the framework laptops is that all their parts are replaceable and interchangeable.
+this was also the case with gameboy and palm os back in the day.
+palm os designed their system to support external modules. they unlocked a vast ecosystem of modules, including a camera and a phone (doublecheck).
+
+
+
+
+
+
+
+
+
+
+One of the best software engineering skills to have is the ability to *recognize complexity.* 
+
+And further, to recognize what kind of complexity one is looking at:
+
+ * Inherent complexity, which is 
+
+
+ which complexity is inherent, and which complexity is incidental.
+
+And further, throw out that dichotomy and work to reduce all complexity, inherent and incidental both.

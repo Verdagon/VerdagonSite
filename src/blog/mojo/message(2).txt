@@ -1,0 +1,175 @@
+Had a revelation during my vacation metaprogramming experiments, thought I'd share it here in case it resonates with anyone :slightly_smiling_face:
+TL;DR: I took my normal simple regex implementation, and then moved the entire regex AST to comptime to enable inlining, to make the compiler generate a string matching function that basically looked hand-written and was 12x faster. Depending on how you look at it, this is either just a neat way that Mojo does constant propagation well (and we're already using this technique throughout the stack), or it's the first hints of a paradigm shift that Mojo might unleash into the mainstream. This could enable a lot of things we didn't see coming: compile-time DSLs (compiled database queries!), might even let us arbitrarily rearrange and combine code (custom library optimizations!), and enable ridiculously powerful data structures (time-traveling in-memory databases!).
+
+
+The longer explanation:
+
+I made a super basic regex implementation, that would take a e.g. \w+(\+\w*)?@(\d+\.\d+\.\d+\.\d+|\w+\.\w+) and match emails like:
+
+- user@example.com
+- user+tag@example.com
+- howdy123@1.2.3.4
+
+I have a little regex parser which breaks that down into a regex AST:
+
+- \w+(\+\w*)?@(\d+\.\d+\.\d+\.\d+|\w+\.\w+) SequenceNode
+  - \w+ RepeatNode
+    - \w CharClassNode
+  - (\+\w*)? RepeatNode
+    - \+\w* SequenceNode
+      - \+ LiteralNode
+      - \w* RepeatNode
+        - \w CharClassNode
+  - @ LiteralNode
+  - (\d+\.\d+\.\d+\.\d+|\w+\.\w+) OrNode
+    - \d+\.\d+\.\d+\.\d+ SequenceNode
+      - \d+ RepeatNode
+        - \d CharClassNode
+      - \. LiteralNode
+      - \d+ RepeatNode
+        - \d CharClassNode
+      - \. LiteralNode
+      - \d+ RepeatNode
+        - \d CharClassNode
+      - \. LiteralNode
+      - \d+ RepeatNode
+        - \d CharClassNode
+    - \w+\.\w+ SequenceNode
+      - \w+ RepeatNode
+        - \w CharClassNode
+      - \. LiteralNode
+      - \w+ RepeatNode
+        - \w CharClassNode
+
+and it has this function, which you'd expect in any basic regex implementation:
+
+fn _match_node(
+    nodes: List[RegexNode], node_idx: Int, text: String, start_pos: Int
+) -> MatchResult:
+    var node = nodes[node_idx]
+    if node.isa[LiteralNode]():
+        ref literal_node = node[LiteralNode]
+        return _match_literal(nodes, literal_node, text, start_pos)
+    elif ...
+
+The compiler sees the call graph like this, as a potentially infinitely recursive call:
+
+- main, which calls:
+  - match(Regex instance, node_idx, ...)
+    - _match_node(Regex instance, node_idx, ...)
+      - _match_node(Regex instance, node_idx, ...)
+        - _match_node(Regex instance, node_idx, ...)
+          - ... and so on
+
+...which, of course, cannot be inlined; inlining run-time-recursive functions is impossible because the compiler can't figure out the max depth.
+
+So then things get a little crazy. Since the pattern is constant and specified at compile time, I made it into a parameter-value, and I switched it so the *entire node graph* exists only at compile time.
+
+Before:
+
+var regex = Regex("\w+(\+\w*)?@(\d+\.\d+\.\d+\.\d+|\w+\.\w+)") # regex "compile" (but at runtime)
+regex.match(regex.nodes, regex.root_node, user_string, 0)
+
+After:
+
+alias regex = Regex("\w+(\+\w*)?@(\d+\.\d+\.\d+\.\d+|\w+\.\w+)") # regex "compile" (but at compile time)
+_match_node[regex.nodes, regex.root_node](user_string, 0)
+
+And here's what _match_node looks like now (notice they're parameters now, and the if is now @parameter if):
+
+fn _match_node[
+    nodes: List[RegexNode], node_idx: Int
+](text: String, start_pos: Int) -> MatchResult:
+    alias node = nodes[node_idx]
+    @parameter
+    if node.isa[LiteralNode]():
+        alias literal_node = node[LiteralNode]
+        return _match_literal[nodes, literal_node](text, start_pos)
+    elif ...
+
+and for that email regex, this call graph was instantiated:
+
+- main, which calls:
+  - match[Regex instance]
+    - _match_node[node_idx of root node SequenceNode]
+      - _match_node[node_idx of first \w+ RepeatNode]
+        - _match_node[node_idx of first \w CharClassNode]
+      - _match_node[node_idx of the (\+\w*)? RepeatNode]
+        - _match_node[node_idx of the \+\w* SequenceNode]
+          - _match_node[node_idx of the \+ LiteralNode]
+          - _match_node[node_idx of the \w* RepeatNode]
+            - _match_node[node_idx of the \w CharClassNode]
+      - _match_node[node_idx of @ LiteralNode]
+      - _match_node[node_idx of (\d+\.\d+\.\d+\.\d+|\w+\.\w+) OrNode]
+        - _match_node[node_idx of \d+\.\d+\.\d+\.\d+ SequenceNode]
+          - _match_node[node_idx of \d+ RepeatNode]
+            - _match_node[node_idx of \d CharClassNode]
+          - _match_node[node_idx of \. LiteralNode]
+          - _match_node[node_idx of \d+ RepeatNode]
+            - _match_node[node_idx of \d CharClassNode]
+          - _match_node[node_idx of \. LiteralNode]
+          - _match_node[node_idx of \d+ RepeatNode]
+            - _match_node[node_idx of \d CharClassNode]
+          - _match_node[node_idx of \. LiteralNode]
+          - _match_node[node_idx of \d+ RepeatNode]
+            - _match_node[node_idx of \d CharClassNode]
+        - _match_node[node_idx of \w+\.\w+ SequenceNode]
+          - _match_node[node_idx of \w+ RepeatNode]
+            - _match_node[node_idx of \w CharClassNode]
+          - _match_node[node_idx of \. LiteralNode]
+          - _match_node[node_idx of \w+ RepeatNode]
+            - _match_node[node_idx of \w CharClassNode]
+
+This is no longer recursive. These are different functions. The above is an ahead-of-time known, finite, call graph. The compiler doesn't think it's possibly-infinite like the previous run-time-recursive one, it knows exactly what calls might happen.
+
+Which means... we can add @always_inline on all the _match_xyz functions!
+
+And when I did, it inlined all those functions into a single match function, that looked almost hand-written in structure. It looked like (C-ish pseudocode):
+
+bool matches(String* input_string) {
+    size_t position = 0;
+    size_t length = get_string_length(input_string);
+    // Match the first `\w+` part of the pattern
+    while (position < length) {
+        uint32_t codepoint = get_char_at(input_string, position);
+        if (is_word_char(codepoint)) {
+            position++;
+            continue;
+        } else {
+            break;
+        }
+    }
+    if (position < 1) {
+        return false;
+    }
+    // Match the `(\+\w*)?` part of the pattern
+    if (position < length && get_char_at(input_string, position) == '+') {
+        position++;
+        while (position < length) {
+            uint32_t codepoint = get_char_at(input_string, position);
+            if (is_word_char(codepoint)) {
+                position++;
+                continue;
+            } else {
+                break;
+            }
+        }
+    }
+    if (position >= length || !matches_literal(input_string, position, "@")) {
+        return false;
+    }
+    position++;
+    ... // rest of the pattern
+}
+
+and it was 12x faster than the normal runtime-regex version.
+
+This regex example is just something most of us can relate to, but it can be used for much more than compiling DSLs. This technique can be pushed ridiculously far. Like I said in the TLDR, you could compile entire database transactions (big deal for databases, relevant to pretty much ~every large company), help close the gap between local execution and remote execution and edge execution (big deal for cloud), be used for custom optimizations (there's no reason our `Regex` function couldn't rearrange nodes to speed things up), the sky's the limit.
+
+Also, when combined with the idea from https://github.com/modular/modular/issues/4887#issuecomment-3045841971, we could "constant propagate everything that might be known at compile time, in other words, gracefully degrade back to run-time implementations.
+
+Prior art:
+- Zig, and technically C++20 if one is willing to suffer pain. Someone made a Zig compile-time regular expressions thing, and some people have made perfect hashes out of this, but not much else. I think this is a documentation/culture opportunity. We can bring this technique into the mainstream in a way Zig couldn't.
+- This is a "First Futamura Projection", but it's been impossible to do this with mainstream languages until recently.
+- One could also think of this as just the natural conclusion of good constant propagation, if that helps one grok and find the zen.
+- This is basically what a lot of our stack already does via C++, we're just doing it via Mojo's metaprogramming here.

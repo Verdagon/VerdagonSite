@@ -1,0 +1,12 @@
+{
+  "name": "mojo-syntax-highlighter",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "highlight": "node highlight.js"
+  },
+  "dependencies": {
+    "vscode-textmate": "^9.0.0",
+    "vscode-oniguruma": "^2.0.1"
+  }
+}

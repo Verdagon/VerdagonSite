@@ -1,0 +1,36 @@
+
+But first, why should you listen to me?
+
+
+# Establishing Credibility
+
+Because I'm amazing. When I was on Google Earth, I learned from the best, and took those lessons to make this rather large codebase, such that volunteers could come in and ...
+...
+...
+
+Evan's editor/webmaster here. Normally I don't say anything, but I couldn't in good conscious just sit back and let this guy convince you to listen to him.
+
+Please, don't listen to him.
+
+He's the one that added the `funky` keyword, accidentally turned a useful book on memory safety into a demonic grimoire, and has a rule in his server that on Wednesdays any language bashing must be in the form of a haiku. [#favhaiku]
+
+Remember that guy that went yak shaving for his game, and even eleven years later, hasn't even started on it? Yeah, thats him! [# He sometimes refers to himself as a software architect, but what does that even mean? Anyone can call themselves a software architect. It's not a protected term. I could say I'm a software architect, why not.]
+
+He says words like "arcane", "mysterious", and "sorcery" so much in his articles about coding, that I'm pretty sure he thinks [magic methods](https://www.php.net/manual/en/language.oop5.magic.php) are _actually_ magic. [# This guy is so weird, he once waxed poetic about _linear types_ for half an hour.]
+
+He once went certifiably insane because he tried to use rustdoc output (yes, rustdoc output) to make a SWIG-like tool that lets C call directly into Rust code. I can't even... I just... I can't.
+
+If there's anyone you *don't* want to listen to about anything, it's Evan.
+
+Oh, he's coming back. Quick, pretend I was adding commas or updating the RSS feed or something.
+
+...
+...
+and that's when the council of Mayan pyramid archaeologists deemed me to be worthy of joining the excavation crew as the team's resident software engineer.
+
+
+<slice>
+#favhaiku: Skub's haiku is my favorite:
+
+golang really sucks / rust and zig? they suck as well / all languages suck
+</slice>
