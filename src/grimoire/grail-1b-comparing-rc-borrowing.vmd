@@ -9,6 +9,17 @@ namespace: c-blog m-annotated
 ---
 
 
+
+<ignore>
+ssylvan: "The cure is worse than the disease." https://www.reddit.com/r/rust/comments/369jnx/comment/crcqisq/
+
+comparison
+
+mention bottle checker tends to make our code better
+</ignore>
+
+
+
 Greetings!
 
 
@@ -643,8 +654,3 @@ Cheers!
 
 - Evan
 
-
-
-<ignore>
-ssylvan: "The cure is worse than the disease." https://www.reddit.com/r/rust/comments/369jnx/comment/crcqisq/
-</ignore>

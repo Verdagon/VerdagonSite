@@ -620,10 +620,10 @@ if [ $TARGET == "view-types" ] || [ $TARGET == "all" ] ; then
   fi
 fi
 
-if [ $TARGET == "grail-1" ] || [ $TARGET == "all" ] ; then
-  echo "Doing grail-1"
-  echo $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/grimoire/grail-1 src/grimoire/grail-1.vmd
-  eval $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/grimoire/grail-1 src/grimoire/grail-1.vmd
+if [ $TARGET == "grail-1-intro" ] || [ $TARGET == "all" ] ; then
+  echo "Doing grail-1-intro"
+  echo $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/grimoire/grail-1-intro src/grimoire/grail-1-intro.vmd
+  eval $VMD_SITE_GEN $MODE src --compiler_dir $VALESTROM --out public/grimoire/grail-1-intro src/grimoire/grail-1-intro.vmd
   if [ $? != 0 ]; then
     echo "Failed!"
     exit 1

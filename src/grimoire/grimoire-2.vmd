@@ -1,12 +1,80 @@
 
-ghost cell
+# group borrowing
 
-QCell - https://docs.rs/qcell/latest/qcell/index.html#examples
+carbon's doing it too
 
-shared yet owned
+oh interesting, it looks like someone's been doing some experimenting with group borrowing in the rust server! (search group borrowing in https://discord.gg/rust-lang-community)
 
-focusing
 
-group borrowing
+# shared yet owned
 
-ante/cone/lobster
+probably needs region borrow checking
+
+https://docs.google.com/document/d/1Q5G4qk2YO-owzqZ_-COP-rPeIxNO55VE3N3d0ulPLlk/edit?tab=t.0
+
+
+# ante/cone/lobster
+
+all have some kind of shared mutable stuff
+
+# Ghost Cell
+
+ghost cell is the name of the technique and QCell is its implementation - https://docs.rs/qcell/latest/qcell/index.html#examples
+
+https://discord.com/channels/530598289813536771/530603542138847242/1458355653033721937 Vi says "for the moment I definitely read group borrows as an application of ghost tokens w much better language support"
+
+what did he mean by that?
+
+
+# Vi's other thoughts
+
+https://discord.com/channels/530598289813536771/530603542138847242/1458370922997088371
+
+# DangDone
+
+https://dl.acm.org/doi/pdf/10.1145/3275219.3275231
+
+though im skeptical about its performance since now it has to go through two pointer indirections. this seems like how std::shared_ptr works.
+
+discord user Iran "Maikel van den Hout" wants to adjust that by taking out strong references, and having only one owning reference and multiple weak references, similar to vale. he also wants to use direct borrow references where possible.
+
+
+# focusing - maybe not, only gets opaque and uni access to the outside world.
+
+it's really just ante plus colin gordon
+
+focusing:
+https://docs.google.com/document/d/1BYRgy1Rr3KSrJXz75h3sZRtgVOsy1ktUUA3VhmnVMxc/edit?tab=t.0
+
+focusing + grail:
+https://docs.google.com/document/d/15EpZYRt9ncfGzSa378KHmTQCATm1tqKOudROUpBCkE4/edit?tab=t.0
+
+# Fang is doing some things?
+
+
+# void*
+
+void* has some thoughts:
+
+https://discord.com/channels/398263331808346123/1233148995581247568/1460183675827130398
+and below at
+https://discord.com/channels/398263331808346123/1233148995581247568/1460600960760942708
+
+
+# subtype effects
+
+there's a video somewhere about subtyping and effects:
+https://www.youtube.com/watch?v=NaGFtFrNybE&t=357s
+and a paper with it somewhere
+i dont quite understand it, but i think someone said its related to group borrowing
+
+
+# grail
+
+not sure yet if we want to talk about this
+
+
+# maybe edits to the original grimoire
+
+ * for gen refs: someone tried it in rust: https://www.reddit.com/r/rust/comments/ujlrex/alpha_version_of_vales_generational_reference/
+ * linear static refcounting might actually kind of work. perhaps run it by that one guy from llvm conference university

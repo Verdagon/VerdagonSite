@@ -1,0 +1,166 @@
+---
+title: 2025 SOTA of RC and Borrowing
+subtitle: Reference counting, borrowing, and an impossible quest
+author: Evan Ovadia
+date: Nov XX, 2025
+realm: blog
+path: grimoire/grail-1
+layout: annotated
+namespace: c-blog m-annotated
+---
+
+
+Could a language blend borrowing and either reference counting or garbage collection?
+
+
+Historically, no language has ever done it well.
+
+ * D tried to add borrowing with [DIP 1000](https://dlang.org/blog/2023/01/05/memory-safety-in-a-systems-programming-language-part-3/), but it [can't enforce memory safety](https://atilaoncode.blog/2019/03/13/issues-dip1000-cant-yet-catch/) unfortunately.
+ * Rust has `Rc<RefCell<T>>`, but it risks run-time panics.
+ * Swift has a form of borrowing, but it's slow, risks run-time panics, and is thread-unsafe.
+ * VLang famously promised reference counting with borrowing with its "autofree" system, but it never materialized.
+
+
+
+<ignore>
+"Doesn't Rust already have reference counting?"
+
+Rust has `Rc`, which goes pretty far, but it really doesn't solve the fundamental problem. Because of the Circuitous Shapeshift, Rust's `Rc`/`Arc` often needs `RefCell` or `Mutex`, which introduce unnecessary panics or deadlocks into a program.
+
+
+"Doesn't Swift already have borrowing?"
+
+It has the same sort of run-time enforcement as Rust's `Rc<RefCell<T>>`. If the same thread tries to borrow a class's contents twice at the same time, you get a [run-time panic](https://gist.github.com/Verdagon/257dde6f6ddc12d23dd784e6f0fdf4c7). If _multiple_ threads, you get undefined behavior. [# TIL that Swift is just generally not safe when multithreading. Ironic, since their biggest use case (iOS apps) basically force you into multithreaded patterns.]
+
+
+But we'll get to all that later! Before I talk about that problem and ways we might solve it, I want to clarify what I mean when I say *borrowing is faster* and *reference counting is simpler.*
+</ignore>
+
+
+
+<ignore>
+I see two ways to get this:
+
+ * pure borrowing for avoiding rc increments
+ * group borrowing to let us look into 
+
+generally, we want this stuff to be checked at compile time.
+where rust made a leap forward from so->AxM, we want to make that same leap forward for RC->holygrail
+</ignore>
+
+
+## Vale
+
+I got pretty close to solving this with Vale. As many of you know, Vale has a blend of [generational references and "region" borrowing](https://verdagon.dev/blog/generational-references), which allows inline data and borrowing. 
+
+
+It solves the Circuitous Shapeshift for generational references, because it allows us to take borrow references (via `pure` functions/blocks) to entire "regions" that contain any number of (previously mutable) generational references to it that freely alias each other.
+
+
+But I wouldn't consider Vale's approach "the holy grail" because:
+
+ * Every object in Vale has a single owner; it's not as simple as reference counting or garbage collection.
+ * Unless you code in [a style that blends own-lending and region borrowing](https://verdagon.dev/blog/linear-types-borrowing#matches-made-in-heaven), your program will risk halts if you mishandle memory.
+
+These are unfortunate drawbacks of generational references.
+
+
+But then I realized that Vale's debug mode, which swaps out generational references for reference counting, actually solved both of those problems. It's a [blend of reference counting and region borrowing](https://github.com/verdagon/RegionsRCCellularAutomataBenchmark).
+
+
+However, it was pretty slow, because it didn't support inline data well... it had to move everything to the heap so it could be reference-counted. But I noticed that there were a _lot_ of cases where inline data _could_ work in theory. [# That's when I _knew_ something more had to be possible. And so I joined the quest for the holy grail, like many language designers before me.] Since then, it's been in the back of my brain, poking me to work on it more.
+
+
+To summarize why Vale's explorations didn't solve the holy grail:
+
+ * The generational-reference/region-borrowing blend still risks halting the program at run-time.
+ * The reference-counting/region-borrowing blend moves things to the heap and therefore is slow.
+
+
+So close!
+
+
+The holy grail is elusive indeed.
+
+
+## Rust
+
+Vale's generational-references-based answer wasn't a solution to the holy grail, because it risked run-time halts.
+
+
+The same is unfortunately true of Rust's approach, but Rust gets pretty close.
+
+
+With Rust, when you want to make a `Spaceship` reference-counted, you use a `Rc<RefCell<Spaceship>>`, which is like a safer version of `std::shared_ptr<Spaceship>`.
+
+
+I say "safer" because `RefCell` acts kind of like a mutex: you must lock the `RefCell` before you can access the `Spaceship` within.
+
+This technically prevents the Circuitous Shapeshift! If those `std::shared_ptr<Spaceship>` were `Rc<RefCell<T>>`, there would be no memory unsafety.
+
+However, it wouldn't be caught at compile time. The program would halt at run-time in `fooC` when it tried to gain access to the `Engine`.
+
+
+On top of that, `RefCell` doesn't save us from the shared-xor-mutable, it only delays it.
+
+
+So, because it still has run-time halts and shared-xor-mutable, Rust hasn't quite found the solution to the holy grail.
+
+
+## Swift
+
+Swift is also tangling with this problem.
+
+
+As of Swift 5, [run-time exclusivity checking](https://www.swift.org/blog/swift-5-exclusivity/) is on by default. This basically gives a Rust `RefCell` to any Swift object. [# Not just Swift objects, any mutable piece of data, IIUC.] Whenever you have a "long-term" reference to a variable (passing it as an `inout` parameter, calling a `mutating` method, etc.) Swift checks the shared-xor-mutable rule at run-time (no simultaneous read+write or write+write references to the same object). If you are, the program halts.
+
+
+If you want to see this exclusivity check in action, here's a [Circuitous Shapeshift program](https://gist.github.com/Verdagon/257dde6f6ddc12d23dd784e6f0fdf4c7).
+
+
+Don't get me wrong, this is a big improvement to Swift.
+
+However, it has some drawbacks:
+
+ * It has [run-time overhead](https://www.swift.org/blog/swift-5-exclusivity/): O(n) checking at run-time, looking at [Exclusivity.cpp](https://github.com/swiftlang/swift/blob/main/stdlib/public/runtime/Exclusivity.cpp#L161). [# One user even reported a [25% overhead](https://mjtsai.com/blog/2019/02/05/swift-5-exclusivity-enforcement/#comment-3815897) for a section of their code.] [# It makes me wonder what would have happened if they put a `RefCell` into the object's side table. My guess is they didn't want to change their side-table layout, but I'm not sure. If anyone knows, please comment!]
+ * It risks run-time panics, just like Rust's.
+ * It makes us think in terms of shared-xor-mutable.
+ * It's thread-unsafe, and therefore not memory safe in multi-threaded programs. [# Specifically, the ownership system is [not required to detect concurrent conflicting accesses](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0176-enforce-exclusive-access-to-memory.md) and therefore risks data races, which risks memory unsafety in Swift. See also [Gankra's take](https://gist.github.com/Gankra/1f79fbf2a9776302a9d4c8c0097cc40e)]
+
+
+So unfortunately, it's not a solution to the holy grail.
+
+
+<ignore>
+Borrowing switch proposal: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0432-noncopyable-switch.md?ref=fline.dev
+
+"Swift 5.9 introduced non-copyable types with the ~Copyable syntax for modeling resources with unique ownership, and writing performance-conscious code by eliminating the runtime overhead associated with copying. Swift 6 now supports these types with the generics system, making it possible to write generic code that works with both copyable and non-copyable types." (https://www.swift.org/blog/announcing-swift-6/)
+</ignore>
+
+
+## Lobster
+
+[Lobster](https://strlen.com/lobster/) is probably one of the closest languages to the holy grail today. It starts with reference counting, and then uses a very aggressive [algorithm](https://aardappel.github.io/lobster/memory_management.html) to automatically add borrowing where it can, to remove the vast majority of refcount incrementing/decrementing. [# I've always liked Lobster because it actually values simplicity, as opposed to most languages that just say they do. Lobster intentionally chose to not have lifetime annotations, which put it in a sweet spot on the simplicity-vs-speed spectrum.]
+
+
+There is only one big thing the holy grail would want, past what Lobster offers: Inline enums. Instead of having any types whose inner shape can change (inline enums), Lobster uses classes, which are reference counted. With inline enums, less objects would need to go on the heap, which means less cache misses.
+
+
+I should also note, as Wouter (Lobster's creator) explained to me, Lobster has not proven that its borrowing algorithm is sound in all possible combinations of aliasing data structures. Still, if one is looking for the holy grail, Lobster is a stellar place to start.
+
+
+## Ante
+
+ * incorporate jake's feedback: https://discord.com/channels/@me/922690224163786796/1445418030531084513:
+    * ante is rust plus good refcounting. its shared-mut reference helps a lot with that. gets us pretty far.
+ * borrow sets? which have names not lifetimes?
+
+
+
+
+# Inko
+
+ * yorick / inko: https://yorickpeterse.com/articles/the-inevitability-of-the-borrow-checker/
+    * incorporate his stuff at https://discord.com/channels/@me/1442383707204878357/1445423417238224997
+    * inko has recover? fn / fn mut? uni?
+
