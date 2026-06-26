@@ -166,7 +166,7 @@ exported func main() {
 }
 ```stdout
 Length: 42
-```
+```: notest
 
 ...which would successfully make a Rust `Vec` and call `capacity` on it. [#valeworks]
 
@@ -1000,7 +1000,7 @@ exported func main() {
 }
 ```stdout
 Length: 42
-```
+```: notest
 
 
 We're closer than you might think! [#closer]

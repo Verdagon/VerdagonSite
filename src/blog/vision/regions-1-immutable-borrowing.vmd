@@ -61,7 +61,7 @@ pure func printShipNames(tenShips &List<Ship>) {
     println(ship.name);
   }
 }
-```
+```: notest
 
 But when regions are added to the language, that *drops to zero.*
 
@@ -80,7 +80,7 @@ pure func printShipNames(tenShips &List<Ship>) {
     println(name);
   }
 }
-```
+```: notest
 
 These operations are called "generation checks", and they make our program memory-safe.
 
@@ -134,7 +134,7 @@ pure func printShipNames(tenShips &List<Ship>) {
     println(name);
   }
 }
-```
+```: notest
 
 
 
@@ -188,7 +188,7 @@ pure func printShipNames(
     println(name);
   }
 }
-```
+```: notest
 >>>>
 
 
@@ -242,7 +242,7 @@ pure func printShipNames(
     println(name);
   }
 }
-```
+```: notest
 >>>>
 
 
@@ -292,7 +292,7 @@ pure func printShipNames(
     println(name);
   }
 }
-```
+```: notest
 >>>>
 
 

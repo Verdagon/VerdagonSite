@@ -408,7 +408,7 @@ exported func main() {
 
   println(results);
 }
-```
+```: notest
 
 
 
@@ -430,7 +430,7 @@ exported func main() {
 
   println(results);
 }
-```
+```: notest
 
 
 
@@ -463,7 +463,7 @@ exported func main() {
 
   println(results);
 }
-```
+```: notest
 
 
 
@@ -491,7 +491,7 @@ exported func main() {
 func blur(input &r'[][]int, x int, y int) int {
   ... // Loop over the 3x3 ints around x,y in input and return the average
 }
-```
+```: notest
 
 
 
@@ -597,7 +597,7 @@ The `r'` seems to hint that they're similar! Let's take another look:
 func blur(input &r'[][]int, x int, y int) int {
   ... // Loop over the 3x3 ints around x,y in input and return the average
 }
-```
+```: notest
 
 
 

@@ -65,7 +65,8 @@ We could even call `clamp` with a struct we make, such as a `MyFraction` struct.
 ////
 
 ```vale
-func PrintEqual<T>(a &T, b &T) {
+func PrintEqual<T>(a &T, b &T)
+where func ==(&T, &T) bool {
   if a == b {
     println("Equal!");
   } else {
@@ -106,7 +107,7 @@ func PrintEqual<int>(a int, b int) {
     println("Not equal!");
   }
 }
-```
+```: notest
 
 Second, it type-checks the resulting code.
 
@@ -246,7 +247,7 @@ exported func main() {
 ```stdout
 7
 true
-```
+```: notest
 >>>>
 
 

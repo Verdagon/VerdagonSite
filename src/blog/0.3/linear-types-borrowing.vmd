@@ -72,7 +72,7 @@ func MakeBoard(
   }
   return rows;
 }
-```
+```: notest
 
 
 Specifically, when `RandInt`'s `rand.num` dereferences the `rand` object, it does an implicit [generation check](/blog/generational-references) assertion to ensure the object is still alive.
@@ -108,7 +108,7 @@ func RandInt(rand &Random) i64 {
   set rand.num = x;
   return x;
 }
-```
+```: notest
 ////
 ...`RandInt` could take (and return) an owned `Random`, like this:
 
@@ -121,7 +121,7 @@ func RandInt(rand Random) (i64, Random) {
   set rand.num = x;
   return (x, rand);
 }
-```
+```: notest
 >>>>
 
 

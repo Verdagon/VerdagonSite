@@ -119,7 +119,7 @@ exported func main() {
 Hello Venus!
 Hello Earth!
 Hello Mars!
-```: `import stdlib.*;`
+```: `import stdlib.*; import stdlib.arrays.*;`
 
 
 

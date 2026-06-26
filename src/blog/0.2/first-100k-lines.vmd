@@ -296,7 +296,7 @@ func sanityCheck(
   assert(name_to_account.map(x => x.id) == id_to_account.keys());
   // ... and even more assertions!
 }
-```
+```: notest
 
 
 

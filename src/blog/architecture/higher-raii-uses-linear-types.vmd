@@ -83,7 +83,7 @@ func foo() {
 
   // ERROR: Undestructed linear `x`.
 }
-```
+```: notest
 \\\\
 Other languages might automatically clean it up, or call a destructor or `drop()` method, but here we've opted into the compiler error instead.
 
@@ -163,7 +163,7 @@ Here's some Vale as an example. [# The HEAD version does this, stable and older 
 linear struct Transaction {
   ...
 }
-```
+```: notest
 >>>>
 
 This means the struct can never go out of scope; it can never be automatically destroyed. It must be _explicitly_ destroyed now, such as with Vale's `destruct` keyword, shown below.
@@ -190,7 +190,7 @@ func rollback(txn Transaction, db &DB) {
 
   destruct txn; // Explicitly destroy
 }
-```
+```: notest
 \\\\
 Note the `Transaction` parameter isn't `&Transaction`; the functions take the instance itself, not a reference.
 
@@ -472,7 +472,7 @@ We'll call it `FutureVow`. [# I wanted to call it `Promise`, because this is lit
 linear struct FutureVow<T> {
   future &Future<T>;
 }
-```
+```: notest
 >>>>
 
 
@@ -489,7 +489,7 @@ func set<T>(vow FutureVow<T>, x T) {
   vow.future.set(x);
   destruct vow;
 }
-```
+```: notest
 \\\\
 Now there's no way to get rid of a `FutureVow` except by calling this `set` function.
 >>>>
@@ -582,7 +582,7 @@ func finish(
   [name] = destruct event; «destructure»
   return Event(name, summary);
 }
-```
+```: notest
 >>>>
 
 

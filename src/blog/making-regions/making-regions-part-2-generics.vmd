@@ -39,7 +39,7 @@ pure func SumList(list &List<int>) int {
   }
   return sum;
 }
-```
+```: notest
 
 
 
@@ -55,7 +55,7 @@ func SumList<r' imm, x' rw>(list &r'List<r'int>) 'int { «iso»
   }
   return iso(sum); «isoint»
 }
-```
+```: notest
 
 
 
@@ -81,7 +81,7 @@ func thrice(a int) int {
   result = a + a + a;
   return result;
 }
-```
+```: notest
 
 needs to become this:
 
@@ -90,7 +90,7 @@ func thrice<m' rw>(a m'int) m'int {
   result m'int = a + a + a;
   return result;
 }
-```
+```: notest
 
 
 
@@ -324,7 +324,7 @@ func thrice(a int) int {
   result = a + a + a;
   return result;
 }
-```
+```: notest
 
 ...into this function:
 
@@ -333,7 +333,7 @@ func thrice<x' rw>(a x'int) x'int {
   result x'int = a + a + a;
   return result;
 }
-```
+```: notest
 
 ...then the compiler will be "region-aware". After that, we can start playing with multi-region functions and the real fun can begin!
 

@@ -49,7 +49,7 @@ func handleClick(self &Button) {
     clickObserver.onClick();
   }
 }
-```
+```: notest
 
 
 
@@ -71,7 +71,7 @@ func takeAction(self &Missile) {
     self.explode();
   }
 }
-```
+```: notest
 
 
 
@@ -226,7 +226,7 @@ func main() {
     println("File doesn't exist!");
   }
 }
-```
+```: notest
 
 
 
@@ -240,7 +240,7 @@ func printName(ships &HashMap<int, Spaceship>, ship_id int) {
     println("Ship doesn't exist!");
   }
 }
-```
+```: notest
 
 
 

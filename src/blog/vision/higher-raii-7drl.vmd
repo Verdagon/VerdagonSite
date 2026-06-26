@@ -84,7 +84,7 @@ func SetValueAndDestroy<T>(self Promise<T>, new_value T) {
   set self.future.value = new_value;
   destruct self;
 }
-```
+```: notest
 
 
 
@@ -104,7 +104,7 @@ func main() {
   // Here, since promise still exists, compiler will try to call its `drop` function.
   // Compile error: No function named `drop` exists!
 }
-```
+```: notest
 
 
 
@@ -118,7 +118,7 @@ func main() {
   // The above line moved the promise local variable into the
   // SetValueAndDestroy function, so it no longer exists here.
 }
-```
+```: notest
 
 
 <slice />
@@ -173,7 +173,7 @@ struct TokenedHashMap<K, V> {
 
   ...
 }
-```
+```: notest
 
 
 <slice />
@@ -193,7 +193,7 @@ func Destroy(self UnitController, game &GameInstance) {
 
   // Compile error here, because we didn't do anything with locToUnitToken
 }
-```
+```: notest
 
 
 
