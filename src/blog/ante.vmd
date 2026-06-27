@@ -9,8 +9,6 @@ namespace: c-blog m-annotated
 ---
 
 
-[# EDIT: intro seems disjointed] [# EDIT: need a TLDR-style list about the overall point of the article. refcounting is good because its easy, borrow checking is good because its fast, nobody blends them well and when they try they get runtime crashes, ante is pushing the boundary on that with its uniq conversions feature]
-
 Ante has taken the first step towards something *we all thought was impossible:* blending reference counting and borrow checking without run-time crashes. [# To be more specific, Ante has found a way to blend reference counting and borrow checking for mutable objects, without run-time panics or overhead that come from Rust's RefCell or Swift's exclusivity checking.]
 
 
@@ -23,7 +21,7 @@ Rust tried, but when we try to use Rust's reference-counting `Rc` type, it often
 
 Swift too has tried, with its [new borrowing system](https://github.com/swiftlang/swift/blob/main/docs/OwnershipManifesto.md), but it has an [expensive](https://forums.swift.org/t/huge-performance-hit-from-exclusive-memory-access-checks/54374/12) [run-time check](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0176-enforce-exclusive-access-to-memory.md) which crashes at run-time if you hold it wrong.
 
-It turns out, blending reference counting and borrow checking is _hard_, for reasons you'll see below. [# EDIT: its weird here, i should say earlier that its hard, swift failed, rust came close. dont say rust came really close.]
+It turns out, blending reference counting and borrow checking is _hard_, for reasons you'll see below.
 
 
 So let's talk about Ante!
@@ -78,7 +76,7 @@ Before I talk about its shared mutability superpowers, let's start basic. Let's 
 Ante has a concept of *shape-stability*, which means "a reference to something of stable shape is always valid [# Here, "valid" means dereferenceable; you can dereference the reference without risking any memory unsafety or undefined behavior.] no matter what mutations are made elsewhere."
 
 
-Because of this, Ante code can safely have *multiple mutable borrow references to the same struct at the same time.* [# EDIT: that doesnt sound like the triumph that youre making it sound like, because that opens us up to logic bugs rather than runtime crashes. but the point is we dont care about logic bugs, we care about runtime crashes. also, its too obvious here that we still have logic bugs, that we just moved the memory safety bugs and runtime crashes to logic bugs.]
+Because of this, Ante code can safely have *multiple mutable borrow references to the same struct at the same time.*
 
 
 To set the stage, here's a `heal` function taking two mutable references to `Entity`s:
@@ -93,7 +91,7 @@ heal (healer: mut Entity) (target: mut Entity) =
     target.health := target.health + 10
 ```
 
-In Ante, we can call `heal` with the same `Entity` for both parameters — for example, when an entity heals itself: [# EDIT: wait, this is bad, because we immediately overwrite it with 200.]
+In Ante, we can call `heal` with the same `Entity` for both parameters — for example, when an entity heals itself:
 
 ```ante
 self_heal (entity: mut Entity) =
@@ -299,7 +297,7 @@ Other languages such as Java don't do this, they instead make Engine into an int
 Pointers are slow. Unions are fast. Ante is like C here.
 </slice>
 
-## `uniq` references [# EDIT: in this whole section, it was a lot repeated and could be trimmed. i dont have to keep redefining a lot of it.] [# EDIT: "was confused about how it was relevant, because i thought it was about how we can handle this super niche case of unions. i dont think a lot of people use unions. why are we drilling down so much into the edge cases?"] [# EDIT: felt like we needed a bit more about why this is exciting.]
+## `uniq` references
 
 *`uniq`* means "exclusive mutable reference".
 
@@ -421,7 +419,7 @@ launch (var ship: Rc Spaceship) (var other_ship: Rc Spaceship) =
     // End scope where nobody can access any other var that might contain a Spaceship
 ```
 
-This is an error because we're accessing `other_ship` while `ship` is temporarily converted to a `uniq Spaceship`. [# EDIT: that seems super limiting, because we cant reference any other variable of the same type, even if its a different object.]
+This is an error because we're accessing `other_ship` while `ship` is temporarily converted to a `uniq Spaceship`.
 
 
 We can't use anything that even *indirectly* contains a Spaceship,   
@@ -571,7 +569,7 @@ Even with these possible angles, the hard part will be making it ergonomic. Jake
 
 ## The broader picture
 
-If you look closely, you'll see that something _very interesting_ is happening in the realms of memory safety design. [# EDIT: need to be clearer that this is exciting. pretty bland transition.]
+If you look closely, you'll see that something _very interesting_ is happening in the realms of memory safety design.
 
 
 We used to think that it was impossible to have "shared mutable borrowing", where we could have a borrowed reference to something, even though others can mutate it through their own references. Heck, Rust is basically built on that belief.
