@@ -9,28 +9,22 @@ namespace: c-blog m-annotated
 ---
 
 
-[# EDIT: intro seems disjointed] [# EDIT: need a TLDR-style list about the overall point of the article. refcounting is good because its easy, borrow checking is good because its fast, nobody blends them well and when they try they get runtime crashes, ante is pushing the boundary on that with its uniq conversions feature]
+Ante has taken the first step towards something *we all thought was impossible:* blending reference counting and borrow checking without run-time crashes. [# To be more specific, Ante has found a way to blend reference counting and borrow checking for mutable objects, without run-time panics or overhead that come from Rust's RefCell or Swift's exclusivity checking.]
 
 
-I would love a language that makes it easy to blend reference counting and borrow checking, that lets me use *each approach when it makes sense.* If there was a language like that, I could prototype a game in a flexible way with reference-counting, and gradually migrate it to faster borrow-checked code. After years of dealing with today's mainstream languages, _I need that in my soul._ [# This is close to the same reason I work on Vale! But Vale uses generational references, and I wanted to write more about reference counting today.]
+This is _huge_, because it means that someday, we can more easily use *each approach when it makes sense* without risking crashes. If there was a language like that, I could prototype a game in a flexible way with reference-counting, and gradually migrate it to faster borrow-checked code. [# This is close to the same reason I work on Vale! But Vale uses generational references, which often risk these exact kinds of program halts.]
 
 
-But alas, even though many have tried, no mainstream language has figured out how to combine them seamlessly.
+No mainstream language has figured out how to combine them seamlessly, even though many have tried.
 
-Rust comes the closest, but when we try to use Rust in a simple reference-counted way, it often requires RefCell (like Rc<RefCell<Thing>>) which can crash at run-time if you hold it wrong. [# By "hold it wrong" I mean two people getting unique (read-write) references to it at the same time.] [# It also has `try_borrow()` and `try_borrow_mut()` methods which don't panic, but just moves the problem somewhere else.] I wish `rustc` could check for proper `Rc` usage at compile-time! [# And no, GhostCell / QCell doesn't count.] [# There is Cell, but it doesn't let you get references to its innards. For example you can’t go from `&Cell<(T, U)>` to a `&Cell<U>`. Rust also tends to have a lot of friction when internal mutability is used in general, leading to many users avoiding it.]
+Rust tried, but when we try to use Rust's reference-counting `Rc` type, it often requires `RefCell` (like `Rc<RefCell<Spaceship>>`) which can crash at run-time if you hold it wrong. [# For example, two people getting unique (read-write) references to it at the same time would crash it.] [# It also has `try_borrow()` and `try_borrow_mut()` methods which don't panic, but just moves the problem somewhere else.] I wish `rustc` could check for proper `Rc` usage at compile-time! [# And no, GhostCell / QCell doesn't count.] [# There is Cell, but it doesn't let you get references to its innards. For example you can’t go from `&Cell<(T, U)>` to a `&Cell<U>`. Rust also tends to have a lot of friction when internal mutability is used in general, leading to many users avoiding it.]
 
+Swift too has tried, with its [new borrowing system](https://github.com/swiftlang/swift/blob/main/docs/OwnershipManifesto.md), but it has an [expensive](https://forums.swift.org/t/huge-performance-hit-from-exclusive-memory-access-checks/54374/12) [run-time check](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0176-enforce-exclusive-access-to-memory.md) which crashes at run-time if you hold it wrong.
 
-But it turns out, blending reference counting and borrow checking is hard. [# EDIT: its weird here, i should say earlier that its hard, swift failed, rust came close. dont say rust came really close.] Swift too has tried, with its [new borrowing system](https://github.com/swiftlang/swift/blob/main/docs/OwnershipManifesto.md), but it has an [expensive](https://forums.swift.org/t/huge-performance-hit-from-exclusive-memory-access-checks/54374/12) [run-time check](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0176-enforce-exclusive-access-to-memory.md) which crashes at run-time if you hold it wrong.
-
-
-In my opinion, *the holy grail of memory safety design* is something that is simple, yet lets you drop down into borrow-checked code for speed, without any undefined behavior, unnecessary overhead, or run-time crashes.
+It turns out, blending reference counting and borrow checking is _hard_, for reasons you'll see below.
 
 
-Alas, nobody knows how to make the holy grail.
-
-
-*But Jake Fecher's language, Ante, might be taking a big first step* with how it's blending reference counting and borrowing. It's exciting to a language nerd like me because it reveals to us a *new design space* in language design, something that could eventually lead to the holy grail.
-
+So let's talk about Ante!
 
 ! Ante is a work-in-progress! Some parts of this are implemented, some are still theoretical, and the design is still in flux. This is being actively developed as we speak, so follow Ante's progress on its [site](https://antelang.org/) and [discord](https://discord.gg/BN97fKnEH2)!
 
@@ -49,8 +43,10 @@ And when the user wants to prioritize simplicity, they can opt into reference co
 For example, this snippet would balance a red-black tree:
 
 ```ante
+// Color can be either an R or a B
 shared type Color = | R | B
 
+// RbTree can either be an Empty or a Tree
 shared type RbTree t =
     | Empty
     | Tree Color (RbTree t) t (RbTree t)
@@ -64,7 +60,7 @@ balance (tree: RbTree t) {Copy t}: RbTree t =
     | other -> other
 ```
 
-I normally favor C-style syntax, but even I have to admit, this is beautiful. And it's concise, too! It's as small as the [Python equivalent](https://github.com/Verdagon/AntePost/blob/main/python-rbtree/rbtree.py), and smaller than the [C++ equivalent](https://github.com/Verdagon/AntePost/blob/main/cpp-rbtree/main.cpp) and [Rust equivalent](https://github.com/Verdagon/AntePost/blob/main/rust-rbtree/src/main.rs).
+I normally favor C-style syntax, but even I have to admit, this is beautiful. And it's concise too, as small as the [Python equivalent](https://github.com/Verdagon/AntePost/blob/main/python-rbtree/rbtree.py), and smaller than the [C++ equivalent](https://github.com/Verdagon/AntePost/blob/main/cpp-rbtree/main.cpp) and [Rust equivalent](https://github.com/Verdagon/AntePost/blob/main/rust-rbtree/src/main.rs).
 
 
 But the most interesting thing for me is what Ante is doing in memory safety. Ante has *shared mutability superpowers:* if you want to mutably borrow reference-counted data, you don't need to risk run-time errors. No mainstream language can do that, not even Rust or Swift.
@@ -80,34 +76,33 @@ Before I talk about its shared mutability superpowers, let's start basic. Let's 
 Ante has a concept of *shape-stability*, which means "a reference to something of stable shape is always valid [# Here, "valid" means dereferenceable; you can dereference the reference without risking any memory unsafety or undefined behavior.] no matter what mutations are made elsewhere."
 
 
-Because of this, Ante code can safely have *multiple mutable borrow references to the same struct at the same time.* [# EDIT: that doesnt sound like the triumph that youre making it sound like, because that opens us up to logic bugs rather than runtime crashes. but the point is we dont care about logic bugs, we care about runtime crashes. also, its too obvious here that we still have logic bugs, that we just moved the memory safety bugs and runtime crashes to logic bugs.]
+Because of this, Ante code can safely have *multiple mutable borrow references to the same struct at the same time.*
 
 
-To set the stage, here's a `set_fuel` function taking in a `mut Engine` reference:
+To set the stage, here's a `heal` function taking two mutable references to `Entity`s:
 
 ```ante
-// Make an Engine struct with an int inside
-type Engine =
-    fuel: I32
+type Entity =
+    energy: I32
+    health: I32
 
-// set_fuel function, taking a mutable reference to an Engine
-set_fuel (engine: mut Engine) =
-    // Change engine's fuel to 100
-    engine.fuel := 100
+heal (healer: mut Entity) (target: mut Entity) =
+    healer.energy := healer.energy - 10
+    target.health := target.health + 10
 ```
 
-Now let's change it so we have multiple mutable borrow references to the same object at the same time: [# EDIT: wait, this is bad, because we immediately overwrite it with 200.]
+In Ante, we can call `heal` with the same `Entity` for both parameters — for example, when an entity heals itself:
 
 ```ante
-set_fuel (engine: mut Engine) =
-    ref1: mut Engine = engine
-    ref2: mut Engine = engine
-    ref1.fuel := 100
-    ref2.fuel := 200
+self_heal (entity: mut Entity) =
+    heal entity entity
 ```
 
 
-Mutating `fuel` can't invalidate shared references to the `Engine` in any way, [# Similar to how in Rust you can't use a `&mut Spaceship` to destroy the `Spaceship` it's pointing at. Even in Rust, it would be perfectly safe to have multiple `&mut Spaceship` references pointing at the same `Spaceship` local variable.] so the compiler accepts this code as valid.
+Mutating `healer` can't invalidate shared references to the `Entity` in any way, [# Similar to how in Rust you can't use a `&mut Spaceship` to destroy the `Spaceship` it's pointing at. Even in Rust, it would be perfectly safe to have multiple `&mut Spaceship` references pointing at the same `Spaceship` local variable.] so the compiler accepts this code as valid.
+
+
+In other words, even though `healer` and `target` might point to the same `Entity`, this is memory safe: nothing here can destroy the `Entity`, so both references stay valid. [# Similar to how in Rust you can't use a `&mut Spaceship` to destroy the `Spaceship` it's pointing at. Even in Rust, it would be perfectly safe to have multiple `&mut Spaceship` references pointing at the same `Spaceship` local variable.]
 
 
 Now let's get a little more complicated.
@@ -191,7 +186,7 @@ More generally: *you can always make a mut borrow reference to a shared mut type
 From here on out, I'll be using the more explicit `Rc Spaceship` syntax instead of the `shared mut type` syntactic sugar (you'll see why later).
 
 
-With the more explicit `Rc` syntax, the above snippet would look like this: [# We're assuming an Ante syntax where we can access fields of an Rc's contents. Without it, this might instead be something like `set_fuel (mut (ship.as_mut ()).engine)`]
+With the more explicit `Rc` syntax, the above snippet would look like this: [# We're assuming an Ante syntax where we can access fields of an Rc's contents. Without it, this might instead be something like `set_fuel (ship.as_mut ()).engine`]
 
 ```ante
 type Engine =
@@ -218,13 +213,13 @@ Differences:
 
 ## Unions
 
-Recall the rule for structs was: "If you have a mut borrow reference to a struct, you can make a mut borrow reference to one of its fields."
+Unions are *really good for speed.* [#unionsfast] We like unions.
 
 
-Alas, this doesn't work for unions. If you have a mut borrow reference to a union, you *can't* get a reference to its contents.
+Unfortunately, unions are notoriously unsafe, and it's hard for memory-safe languages to support them well.
 
 
-To see why, look at the below example, where `Engine` is a union, and we're doing some unsafe shenanigans with it.
+To see why, look at the below example, where `Engine` is a union, and we're trying to do unsafe shenanigans with it.
 
 ```ante
 type Engine =
@@ -247,7 +242,16 @@ launch (var ship: Rc Spaceship) (var other_ship: Rc Spaceship) =
 This program can actually segfault if we pass the same `Spaceship` in for both `ship` and `other_ship`!
 
 
-For this reason, Ante actually refuses to compile the above. It gives us this error:
+For this reason, *Ante needs to refuse to compile the above.* Ante has this rule:
+
+If you have a mut borrow reference to a union, you *cannot* make a mut borrow reference to one of its variants.
+
+This is the opposite of the struct rule from before:
+
+If you have a mut borrow reference to a struct, you *can* make a mut borrow reference to one of its fields.
+
+
+In a perfect world, Ante would refuse the above program with an error like this:
 
 ```ante
     match uniq ship.engine
@@ -260,28 +264,45 @@ For this reason, Ante actually refuses to compile the above. It gives us this er
         ()
 ```
 
-Ante knows to give this error because `ship.engine` went through a *temporary `uniq` conversion.*
-
-What do I mean by that, and what is `uniq`?
+But how would Ante know that? Is that even possible?
 
 
-<slice/>
+It is! Ante knows to give this error because `ship.engine` went through a *temporary `uniq` conversion.*
 
-## `uniq` references [# EDIT: in this whole section, it was a lot repeated and could be trimmed. i dont have to keep redefining a lot of it.] [# EDIT: "was confused about how it was relevant, because i thought it was about how we can handle this super niche case of unions. i dont think a lot of people use unions. why are we drilling down so much into the edge cases?"] [# EDIT: felt like we needed a bit more about why this is exciting.]
-
-We saw above that there can be multiple `mut` (mutable borrow) references to a struct, and to any of its fields that are structs, and any of _their_ fields that are structs, and so on. [# EDIT: intro seems redundant because of the last few sentences.]
+So what do I mean by that, and what is `uniq`?
 
 
-But as we saw above, `mut` references run into a problem with unions.
+<slice>
+#unionsfast: Unions are fast because they hold their contents inline, which leads to less cache misses (or "pointer chasing"). For example, in C if we have a union like this:
 
-The solution to that problem is *uniq references.*
+```
+union Engine {
+  StringTheoryEngine ste;
+  ImpuseEngine ie;
+};
+```
+
+and it's inside a Spaceship like:
+
+```
+struct Spaceship {
+  Engine engine;
+};
+```
+
+The StringTheoryEngine and ImpulseEngine live _inside_ the Spaceship's memory.
+
+Other languages such as Java don't do this, they instead make Engine into an interface, and make `Spaceship` contain a `Engine` pointer instead.
+
+Pointers are slow. Unions are fast. Ante is like C here.
+</slice>
+
+## `uniq` references
 
 *`uniq`* means "exclusive mutable reference".
 
 
-If a variable contains a `uniq Spaceship`, then it's the only usable reference to that Spaceship.
-
-Ante's `uniq Spaceship` is similar to a Rust `&mut Spaceship`.
+If a variable contains a `uniq Spaceship`, then it's the *only usable reference* to that Spaceship. [# Ante's `uniq Spaceship` is similar to a Rust `&mut Spaceship`.]
 
 ```ante
 set_fuel (engine: uniq Engine) (other: mut Engine) =
@@ -371,7 +392,10 @@ Whereas Rust prevents the `uniq` from existing "because other references might e
 ! This is an important nuance right here. A `uniq Spaceship` isn't the only reference to the Spaceship, it's just the only *usable* reference. This is similar to C in that there can be many pointers to an object, but in a given scope, a `restrict` pointer is the only one that can be used. Ante is taking advantage of this nuance.
 
 
-If we used another local variable inside that scope (such as another `Rc Spaceship`) that might indirectly refer to a Spaceship, we'd get a compile error: [# EDIT: that seems super limiting, because we cant reference any other variable of the same type, even if its a different object.]
+However, there are some limitations.
+
+
+If we used another local variable inside that scope (such as another `Rc Spaceship`) that might indirectly refer to a Spaceship, we'd get a compile error:
 
 ```ante
 type Engine =
@@ -526,7 +550,8 @@ It does have a downside however. As Jake emphasized to me, this _does_ require s
 
 And for that reason, Jake's looking for a better way to uphold that guarantee, with some promising options:
 
- * If one had an effect system tracking invalidations (like [group borrowing](https://verdagon.dev/blog/group-borrowing) or Flix's references), that might also work here. A downside of this approach would be that it’d require a lifetime variable on all shared types (like `Rc`) and all containers which store them. [# I and a few others have been exploring this angle lately.]  
+ * Taking a page from [group borrowing](https://verdagon.dev/blog/group-borrowing) and [Flix’s references](https://doc.flix.dev/references.html), [# I and a few others have been exploring this angle lately.] each shared mutable type like `Rc` could be branded with an anonymous but unique type. The compiler could then use that brand to distinguish multiple values for uniqueness instead of using the element type. This could make common types like strings easier to convert since they are more likely to appear within other values and thus be blocked from the current type-based check.
+    * From there, the type analysis can be removed entirely if an effect like `Mutates ‘a` is added when mutating a shared type. The compiler would only need to ensure each `Mutates ‘a` effect comes from the same variable.
  * There are run-time options too, e.g. a language could allow the user to check if two references point to different objects, or offer logic to express checks, or even `unsafe` checks to wrap in a safe API.  
  * The compiler could track which values are not possibly aliased, because e.g., they are not indirectly stored inside an `Rc`. If the compiler did this, any of these values could be used within a locally unique variable’s scope regardless of the types they contain.
 
@@ -544,7 +569,7 @@ Even with these possible angles, the hard part will be making it ergonomic. Jake
 
 ## The broader picture
 
-If you look closely, you'll see that something is happening in the realms of memory safety design. [# EDIT: need to be clearer that this is exciting. pretty bland transition.]
+If you look closely, you'll see that something _very interesting_ is happening in the realms of memory safety design.
 
 
 We used to think that it was impossible to have "shared mutable borrowing", where we could have a borrowed reference to something, even though others can mutate it through their own references. Heck, Rust is basically built on that belief.
